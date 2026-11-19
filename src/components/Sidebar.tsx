@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Film,
   Scissors,
@@ -18,11 +18,20 @@ import {
   Play,
   Loader2,
   Palette,
+  Sliders,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition } from '../types/editor';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
-import { AVAILABLE_VOICES, generateTTSAudio, previewSpeechSynthesis, generateSyncedSubtitlesFromText } from '../utils/tts';
+import {
+  AVAILABLE_VOICES,
+  VOICE_EFFECTS,
+  generateTTSAudio,
+  previewSpeechSynthesis,
+  generateSyncedSubtitlesFromText,
+  getSystemVoices,
+  type VoiceEffectPreset,
+} from '../utils/tts';
 
 interface SubtitleStylePreset {
   id: string;
@@ -153,10 +162,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [ttsText, setTtsText] = useState('');
   const [ttsVoice, setTtsVoice] = useState('id-female');
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
+  const [ttsPitch, setTtsPitch] = useState(1.0);
+  const [selectedVoiceEffect, setSelectedVoiceEffect] = useState('normal');
+  const [voiceCategoryFilter, setVoiceCategoryFilter] = useState<'all' | 'id' | 'en' | 'intl' | 'system'>('all');
+  const [systemVoices, setSystemVoices] = useState<{ id: string; name: string; lang: string }[]>([]);
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
   const [ttsStatus, setTtsStatus] = useState('');
   const [createSubtitleFromTTS, setCreateSubtitleFromTTS] = useState(true);
   const [isPreviewingSpeech, setIsPreviewingSpeech] = useState(false);
+
+  // Fetch native system OS speech synthesis voices
+  useEffect(() => {
+    const loadVoices = () => {
+      const sys = getSystemVoices();
+      setSystemVoices(sys);
+    };
+    loadVoices();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -300,15 +325,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   // Text-to-Speech (TTS) Operations
+  const handleSelectVoiceEffect = (effect: VoiceEffectPreset) => {
+    setSelectedVoiceEffect(effect.id);
+    setTtsPitch(effect.pitch);
+    setTtsSpeed(effect.speed);
+  };
+
+  const handleSelectVoice = (voiceId: string) => {
+    setTtsVoice(voiceId);
+    const found = AVAILABLE_VOICES.find((v) => v.id === voiceId);
+    if (found?.defaultPitch && selectedVoiceEffect === 'normal') {
+      setTtsPitch(found.defaultPitch);
+    }
+    if (found?.defaultSpeed && selectedVoiceEffect === 'normal') {
+      setTtsSpeed(found.defaultSpeed);
+    }
+  };
+
   const handlePreviewTTS = () => {
     if (!ttsText.trim()) {
       alert('Silakan ketik atau paste teks narasi terlebih dahulu.');
       return;
     }
-    const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
     setIsPreviewingSpeech(true);
-    previewSpeechSynthesis(ttsText, voiceObj.lang, ttsSpeed, voiceObj.gender === 'female' ? 1.1 : 0.9);
-    setTimeout(() => setIsPreviewingSpeech(false), 3000);
+
+    if (ttsVoice.startsWith('sys-')) {
+      const rawName = ttsVoice.replace(/^sys-/, '');
+      previewSpeechSynthesis(ttsText, 'id', ttsSpeed, ttsPitch, rawName);
+    } else {
+      const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
+      previewSpeechSynthesis(ttsText, voiceObj.lang, ttsSpeed, ttsPitch);
+    }
+
+    setTimeout(() => setIsPreviewingSpeech(false), 3500);
   };
 
   const handleGenerateTTS = async () => {
@@ -318,12 +367,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     setIsGeneratingTTS(true);
-    setTtsStatus('Membuat suara narasi...');
+    setTtsStatus('Menghubungkan ke server suara...');
 
     try {
-      const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
-      const { url, duration } = await generateTTSAudio(ttsText, voiceObj.lang, (msg) => {
-        setTtsStatus(msg);
+      let lang = 'id';
+      let voiceLabel = 'Narasi';
+      if (ttsVoice.startsWith('sys-')) {
+        lang = 'id';
+        voiceLabel = ttsVoice.replace(/^sys-/, '').slice(0, 15);
+      } else {
+        const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
+        lang = voiceObj.lang;
+        voiceLabel = voiceObj.name.split(' ')[0];
+      }
+
+      const { url, duration } = await generateTTSAudio(ttsText, lang, {
+        pitch: ttsPitch,
+        speed: ttsSpeed,
+        onProgress: (msg) => setTtsStatus(msg),
       });
 
       // If currentTime is at the end of the video, place from 0 so it plays from beginning!
@@ -331,7 +392,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       const newVoiceover: Voiceover = {
         id: `vo-tts-${Date.now()}`,
-        name: `TTS: ${ttsText.slice(0, 24)}...`,
+        name: `TTS [${voiceLabel}]: ${ttsText.slice(0, 20)}...`,
         url,
         duration,
         startTime: parseFloat(targetStart.toFixed(1)),
@@ -346,7 +407,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const syncedSubtitles = generateSyncedSubtitlesFromText(
           ttsText,
           targetStart,
-          Math.max(2, duration)
+          Math.max(1.5, duration)
         );
         setSubtitles((prev) => [...prev, ...syncedSubtitles]);
       }
@@ -1270,55 +1331,264 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* 1. TEXT TO SPEECH (COPY & GENERATE) */}
             {narrationMode === 'tts' && (
               <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-3">
+                {/* Textarea */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs font-semibold text-gray-300">
                       Naskah Narasi Suara
                     </span>
-                    <span className="text-[10px] text-gray-500 font-mono">
-                      {ttsText.length} karakter
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTtsText(
+                            'Halo kawan-kawan! Selamat datang kembali di video terbaru saya. Hari ini kita akan menjelajahi sesuatu yang sangat luar biasa.'
+                          )
+                        }
+                        className="text-[10px] text-teal-400 hover:text-teal-300 underline"
+                      >
+                        Contoh Naskah
+                      </button>
+                      <span className="text-[10px] text-gray-500 font-mono">
+                        {ttsText.length} karakter
+                      </span>
+                    </div>
                   </div>
                   <textarea
                     value={ttsText}
                     onChange={(e) => setTtsText(e.target.value)}
                     placeholder="Paste atau ketik naskah narasi di sini... (contoh: Halo kawan-kawan! Selamat datang kembali di video terbaru saya. Hari ini kita akan membahas tutorial yang sangat menarik.)"
-                    rows={4}
+                    rows={3}
                     className="w-full bg-[#101115] border border-[#2b2d3d] rounded-lg p-2.5 text-xs text-gray-200 outline-none focus:border-teal-500/70 resize-none leading-relaxed"
                   />
                 </div>
 
-                {/* Voice Selection */}
+                {/* Voice Category Filter */}
                 <div>
-                  <span className="text-[11px] text-gray-400 block mb-1">Karakter / Bahasa Suara:</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[11px] font-semibold text-gray-300">
+                      Pilihan Karakter Suara:
+                    </span>
+                    <span className="text-[10px] text-teal-400 font-mono">
+                      {AVAILABLE_VOICES.length} Versi Suara
+                    </span>
+                  </div>
+
+                  <div className="flex space-x-1 overflow-x-auto pb-1.5 text-[10px]">
+                    {[
+                      { id: 'all', label: `Semua (${AVAILABLE_VOICES.length})` },
+                      {
+                        id: 'id',
+                        label: `🇮🇩 Indonesia (${AVAILABLE_VOICES.filter((v) => v.category === 'id').length})`,
+                      },
+                      {
+                        id: 'en',
+                        label: `🇺🇸 English (${AVAILABLE_VOICES.filter((v) => v.category === 'en').length})`,
+                      },
+                      {
+                        id: 'intl',
+                        label: `🌏 Internasional (${AVAILABLE_VOICES.filter((v) => v.category === 'intl').length})`,
+                      },
+                      ...(systemVoices.length > 0
+                        ? [{ id: 'system', label: `💻 OS (${systemVoices.length})` }]
+                        : []),
+                    ].map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setVoiceCategoryFilter(cat.id as typeof voiceCategoryFilter)}
+                        className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors font-medium ${
+                          voiceCategoryFilter === cat.id
+                            ? 'bg-teal-500 text-black font-semibold'
+                            : 'bg-[#101115] text-gray-400 hover:text-gray-200 border border-[#262836]'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Voice Select Dropdown */}
                   <select
                     value={ttsVoice}
-                    onChange={(e) => setTtsVoice(e.target.value)}
+                    onChange={(e) => handleSelectVoice(e.target.value)}
                     className="w-full bg-[#101115] border border-[#2b2d3d] rounded-lg px-2.5 py-1.5 text-xs text-gray-200 outline-none focus:border-teal-500/60 font-medium"
                   >
-                    {AVAILABLE_VOICES.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}
-                      </option>
-                    ))}
+                    {voiceCategoryFilter === 'all' ? (
+                      <>
+                        <optgroup label="🇮🇩 Bahasa Indonesia">
+                          {AVAILABLE_VOICES.filter((v) => v.category === 'id').map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.flag} {v.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="🇺🇸 / 🇬🇧 English">
+                          {AVAILABLE_VOICES.filter((v) => v.category === 'en').map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.flag} {v.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="🌏 Internasional & Asia">
+                          {AVAILABLE_VOICES.filter((v) => v.category === 'intl').map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.flag} {v.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        {systemVoices.length > 0 && (
+                          <optgroup label="💻 Suara Komputer / OS">
+                            {systemVoices.map((v) => (
+                              <option key={v.id} value={v.id}>
+                                💻 {v.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </>
+                    ) : voiceCategoryFilter === 'system' ? (
+                      systemVoices.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          💻 {v.name}
+                        </option>
+                      ))
+                    ) : (
+                      AVAILABLE_VOICES.filter((v) => v.category === voiceCategoryFilter).map(
+                        (v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.flag} {v.name}
+                          </option>
+                        )
+                      )
+                    )}
                   </select>
+
+                  {/* Selected Voice Card */}
+                  {(() => {
+                    const currentVoice = AVAILABLE_VOICES.find((v) => v.id === ttsVoice);
+                    if (!currentVoice || ttsVoice.startsWith('sys-')) return null;
+                    return (
+                      <div className="mt-1.5 bg-[#101115] p-2 rounded-lg border border-[#252834] flex items-center justify-between text-[11px]">
+                        <div className="min-w-0 pr-2">
+                          <p className="text-teal-300 font-semibold truncate">
+                            {currentVoice.flag} {currentVoice.name}
+                          </p>
+                          <p className="text-[10px] text-gray-400 truncate">
+                            {currentVoice.description}
+                          </p>
+                        </div>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 font-semibold uppercase flex-shrink-0">
+                          {currentVoice.gender === 'female' ? 'Wanita' : 'Pria'}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                {/* Speed Slider */}
+                {/* Voice Character Effect Presets (CapCut Style) */}
                 <div>
-                  <div className="flex justify-between text-[11px] text-gray-400 mb-1">
-                    <span>Kecepatan Bicara:</span>
-                    <span className="text-teal-400 font-mono">{ttsSpeed}x</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[11px] font-semibold text-gray-300">
+                      🎭 Karakter / Efek Suara (Presets):
+                    </span>
+                    <span className="text-[10px] text-gray-500">CapCut Style</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0.75"
-                    max="1.5"
-                    step="0.05"
-                    value={ttsSpeed}
-                    onChange={(e) => setTtsSpeed(parseFloat(e.target.value))}
-                    className="w-full accent-teal-400"
-                  />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {VOICE_EFFECTS.map((eff) => (
+                      <button
+                        key={eff.id}
+                        type="button"
+                        onClick={() => handleSelectVoiceEffect(eff)}
+                        className={`p-2 rounded-lg text-left border transition-all flex items-start space-x-2 ${
+                          selectedVoiceEffect === eff.id
+                            ? 'bg-teal-500/20 border-teal-400 text-teal-200 shadow-sm'
+                            : 'bg-[#101115] border-[#252838] hover:border-gray-600 text-gray-300'
+                        }`}
+                      >
+                        <span className="text-base leading-none">{eff.icon}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-bold truncate">{eff.name}</p>
+                          <p className="text-[9px] text-gray-400 truncate">{eff.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fine-Tuning Sliders: Pitch & Speed */}
+                <div className="bg-[#101115] p-2.5 rounded-lg border border-[#232535] space-y-2.5">
+                  <div>
+                    <div className="flex justify-between items-center text-[11px] text-gray-400 mb-1">
+                      <span className="flex items-center space-x-1">
+                        <Sliders className="w-3 h-3 text-teal-400" />
+                        <span>Nada Suara (Pitch):</span>
+                      </span>
+                      <span className="text-teal-400 font-mono text-[11px]">
+                        {ttsPitch.toFixed(2)}x{' '}
+                        <span className="text-[10px] text-gray-400 font-sans">
+                          {ttsPitch < 0.85
+                            ? '🎬 Berat / Deep'
+                            : ttsPitch > 1.35
+                              ? '🐿️ Kartun / Tupai'
+                              : ttsPitch > 1.12
+                                ? '🌸 Ceria / Anime'
+                                : '🎙️ Normal'}
+                        </span>
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.65"
+                      max="1.6"
+                      step="0.05"
+                      value={ttsPitch}
+                      onChange={(e) => {
+                        setTtsPitch(parseFloat(e.target.value));
+                        setSelectedVoiceEffect('custom');
+                      }}
+                      className="w-full accent-teal-400"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center text-[11px] text-gray-400 mb-1">
+                      <span>Kecepatan Bicara (Speed):</span>
+                      <span className="text-teal-400 font-mono text-[11px]">
+                        {ttsSpeed.toFixed(2)}x{' '}
+                        <span className="text-[10px] text-gray-400 font-sans">
+                          {ttsSpeed < 0.9 ? '🌙 Lambat' : ttsSpeed > 1.15 ? '⚡ Cepat' : '🎙️ Normal'}
+                        </span>
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.75"
+                      max="1.5"
+                      step="0.05"
+                      value={ttsSpeed}
+                      onChange={(e) => {
+                        setTtsSpeed(parseFloat(e.target.value));
+                        setSelectedVoiceEffect('custom');
+                      }}
+                      className="w-full accent-teal-400"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTtsPitch(1.0);
+                        setTtsSpeed(1.0);
+                        setSelectedVoiceEffect('normal');
+                      }}
+                      className="text-[10px] text-gray-400 hover:text-teal-400 flex items-center space-x-1"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      <span>Reset Nada & Tempo</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Option: Also create subtitle */}
@@ -1330,7 +1600,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className="rounded accent-teal-500"
                   />
                   <span className="text-[11px] text-teal-300 font-medium">
-                    ✨ Otomatis buat subtitle sinkron per kalimat / frasa (CapCut style)
+                    ✨ Otomatis buat subtitle sinkron per frasa (CapCut style)
                   </span>
                 </label>
 
@@ -1340,7 +1610,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={handlePreviewTTS}
                     disabled={!ttsText.trim() || isGeneratingTTS}
                     className="px-3 py-2 bg-[#20222d] hover:bg-[#282a38] text-gray-200 text-xs font-semibold rounded-lg border border-[#2f3244] flex items-center justify-center space-x-1.5 transition-colors disabled:opacity-50"
-                    title="Tes mendengarkan sampel suara"
+                    title="Tes mendengarkan sampel suara secara langsung"
                   >
                     <Play className="w-3.5 h-3.5 fill-current" />
                     <span>{isPreviewingSpeech ? 'Memutar...' : 'Tes Dengar'}</span>
