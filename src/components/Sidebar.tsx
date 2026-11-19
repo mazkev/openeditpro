@@ -15,10 +15,13 @@ import {
   Radio,
   RotateCcw,
   Sparkles,
+  Play,
+  Loader2,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition } from '../types/editor';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
+import { AVAILABLE_VOICES, generateTTSAudio, previewSpeechSynthesis } from '../utils/tts';
 
 interface SidebarProps {
   clips: VideoClip[];
@@ -56,6 +59,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('media');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+
+  // Text-to-Speech (TTS) State
+  const [narrationMode, setNarrationMode] = useState<'tts' | 'mic' | 'upload'>('tts');
+  const [ttsText, setTtsText] = useState('');
+  const [ttsVoice, setTtsVoice] = useState('id-female');
+  const [ttsSpeed, setTtsSpeed] = useState(1.0);
+  const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
+  const [ttsStatus, setTtsStatus] = useState('');
+  const [createSubtitleFromTTS, setCreateSubtitleFromTTS] = useState(true);
+  const [isPreviewingSpeech, setIsPreviewingSpeech] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -194,6 +207,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
       positionY: 85,
     };
     setSubtitles((prev) => [...prev, newSub]);
+  };
+
+  // Text-to-Speech (TTS) Operations
+  const handlePreviewTTS = () => {
+    if (!ttsText.trim()) {
+      alert('Silakan ketik atau paste teks narasi terlebih dahulu.');
+      return;
+    }
+    const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
+    setIsPreviewingSpeech(true);
+    previewSpeechSynthesis(ttsText, voiceObj.lang, ttsSpeed, voiceObj.gender === 'female' ? 1.1 : 0.9);
+    setTimeout(() => setIsPreviewingSpeech(false), 3000);
+  };
+
+  const handleGenerateTTS = async () => {
+    if (!ttsText.trim()) {
+      alert('Silakan ketik atau paste teks narasi terlebih dahulu.');
+      return;
+    }
+
+    setIsGeneratingTTS(true);
+    setTtsStatus('Membuat suara narasi...');
+
+    try {
+      const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
+      const { url, duration } = await generateTTSAudio(ttsText, voiceObj.lang, (msg) => {
+        setTtsStatus(msg);
+      });
+
+      const newVoiceover: Voiceover = {
+        id: `vo-tts-${Date.now()}`,
+        name: `TTS: ${ttsText.slice(0, 24)}...`,
+        url,
+        duration,
+        startTime: currentTime,
+        volume: 1,
+      };
+
+      setVoiceovers((prev) => [...prev, newVoiceover]);
+
+      // If user also wants subtitles generated from this narration
+      if (createSubtitleFromTTS) {
+        const newSub: Subtitle = {
+          id: `sub-tts-${Date.now()}`,
+          text: ttsText,
+          startTime: currentTime,
+          endTime: currentTime + duration,
+          fontSize: 26,
+          color: '#ffffff',
+          bgColor: 'rgba(0,0,0,0.75)',
+          positionY: 85,
+        };
+        setSubtitles((prev) => [...prev, newSub]);
+      }
+
+      setTtsText('');
+      setTtsStatus('');
+    } catch (err: unknown) {
+      console.error('TTS error:', err);
+      alert('Gagal membuat suara narasi: ' + (err instanceof Error ? err.message : 'Terjadi kesalahan'));
+    } finally {
+      setIsGeneratingTTS(false);
+    }
   };
 
   const selectedClip = clips.find((c) => c.id === selectedClipId);
@@ -868,69 +944,216 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* TAB 5: NARASI SUARA */}
         {activeTab === 'voiceover' && (
-          <div className="flex flex-col h-full overflow-y-auto pr-1 space-y-4">
-            <h2 className="text-sm font-bold text-gray-200">Narasi Suara (Voiceover)</h2>
-            <p className="text-[11px] text-gray-400">
-              Rekam suara Anda secara langsung menggunakan mikrofon atau upload file audio.
-            </p>
-
-            {/* Microphone recorder card */}
-            <div className="bg-[#171820] p-4 rounded-xl border border-[#252834] flex flex-col items-center justify-center text-center space-y-3">
-              {isRecording ? (
-                <div className="flex flex-col items-center space-y-2">
-                  <div className="w-14 h-14 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center animate-pulse">
-                    <Radio className="w-7 h-7 text-red-500" />
-                  </div>
-                  <span className="text-xs font-bold text-red-400">
-                    Sedang Merekam: {formatTime(recordingDuration)}
-                  </span>
-                  <button
-                    onClick={stopRecording}
-                    className="flex items-center space-x-1.5 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg shadow-md transition-colors"
-                  >
-                    <StopCircle className="w-4 h-4" />
-                    <span>Berhenti & Simpan</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center space-y-2">
-                  <button
-                    onClick={startRecording}
-                    className="w-14 h-14 rounded-full bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-400 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-md"
-                    title="Mulai Rekam Suara"
-                  >
-                    <Mic className="w-7 h-7" />
-                  </button>
-                  <span className="text-xs font-semibold text-gray-200">
-                    Klik Mic untuk Mulai Rekam
-                  </span>
-                  <span className="text-[10px] text-gray-400">
-                    Audio akan disisipkan di posisi waktu saat ini ({formatTime(currentTime)})
-                  </span>
-                </div>
-              )}
+          <div className="flex flex-col h-full overflow-y-auto pr-1 space-y-3">
+            <div>
+              <h2 className="text-sm font-bold text-gray-200">Narasi Suara (Voiceover)</h2>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Generate suara otomatis dari teks naskah, rekam mic, atau upload audio.
+              </p>
             </div>
 
-            {/* Upload Audio File */}
-            <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-2">
-              <span className="text-xs font-semibold text-gray-300 block">
-                Atau Upload File Audio
-              </span>
-              <input
-                ref={audioInputRef}
-                type="file"
-                accept="audio/*"
-                onChange={handleAudioUpload}
-                className="hidden"
-              />
+            {/* Sub-mode selector tabs */}
+            <div className="flex p-1 bg-[#101116] rounded-xl border border-[#232535] text-[11px]">
               <button
-                onClick={() => audioInputRef.current?.click()}
-                className="w-full py-2 bg-[#20222d] hover:bg-[#282a38] text-teal-300 text-xs font-medium rounded-lg border border-[#2f3244] flex items-center justify-center space-x-2 transition-colors"
+                onClick={() => setNarrationMode('tts')}
+                className={`flex-1 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center space-x-1 ${
+                  narrationMode === 'tts'
+                    ? 'bg-teal-500 text-black font-semibold shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Teks ke Suara</span>
+              </button>
+
+              <button
+                onClick={() => setNarrationMode('mic')}
+                className={`flex-1 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center space-x-1 ${
+                  narrationMode === 'mic'
+                    ? 'bg-teal-500 text-black font-semibold shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Rekam Mic</span>
+              </button>
+
+              <button
+                onClick={() => setNarrationMode('upload')}
+                className={`flex-1 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center space-x-1 ${
+                  narrationMode === 'upload'
+                    ? 'bg-teal-500 text-black font-semibold shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
               >
                 <Upload className="w-3.5 h-3.5" />
-                <span>Upload Audio (MP3/WAV)</span>
+                <span>Upload</span>
               </button>
             </div>
+
+            {/* 1. TEXT TO SPEECH (COPY & GENERATE) */}
+            {narrationMode === 'tts' && (
+              <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-semibold text-gray-300">
+                      Naskah Narasi Suara
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-mono">
+                      {ttsText.length} karakter
+                    </span>
+                  </div>
+                  <textarea
+                    value={ttsText}
+                    onChange={(e) => setTtsText(e.target.value)}
+                    placeholder="Paste atau ketik naskah narasi di sini... (contoh: Halo kawan-kawan! Selamat datang kembali di video terbaru saya. Hari ini kita akan membahas tutorial yang sangat menarik.)"
+                    rows={4}
+                    className="w-full bg-[#101115] border border-[#2b2d3d] rounded-lg p-2.5 text-xs text-gray-200 outline-none focus:border-teal-500/70 resize-none leading-relaxed"
+                  />
+                </div>
+
+                {/* Voice Selection */}
+                <div>
+                  <span className="text-[11px] text-gray-400 block mb-1">Karakter / Bahasa Suara:</span>
+                  <select
+                    value={ttsVoice}
+                    onChange={(e) => setTtsVoice(e.target.value)}
+                    className="w-full bg-[#101115] border border-[#2b2d3d] rounded-lg px-2.5 py-1.5 text-xs text-gray-200 outline-none focus:border-teal-500/60 font-medium"
+                  >
+                    {AVAILABLE_VOICES.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Speed Slider */}
+                <div>
+                  <div className="flex justify-between text-[11px] text-gray-400 mb-1">
+                    <span>Kecepatan Bicara:</span>
+                    <span className="text-teal-400 font-mono">{ttsSpeed}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.75"
+                    max="1.5"
+                    step="0.05"
+                    value={ttsSpeed}
+                    onChange={(e) => setTtsSpeed(parseFloat(e.target.value))}
+                    className="w-full accent-teal-400"
+                  />
+                </div>
+
+                {/* Option: Also create subtitle */}
+                <label className="flex items-center space-x-2 text-xs text-gray-300 cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={createSubtitleFromTTS}
+                    onChange={(e) => setCreateSubtitleFromTTS(e.target.checked)}
+                    className="rounded accent-teal-500"
+                  />
+                  <span className="text-[11px]">Otomatis jadikan subtitle teks di video juga</span>
+                </label>
+
+                {/* Action buttons */}
+                <div className="flex space-x-2 pt-1">
+                  <button
+                    onClick={handlePreviewTTS}
+                    disabled={!ttsText.trim() || isGeneratingTTS}
+                    className="px-3 py-2 bg-[#20222d] hover:bg-[#282a38] text-gray-200 text-xs font-semibold rounded-lg border border-[#2f3244] flex items-center justify-center space-x-1.5 transition-colors disabled:opacity-50"
+                    title="Tes mendengarkan sampel suara"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>{isPreviewingSpeech ? 'Memutar...' : 'Tes Dengar'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleGenerateTTS}
+                    disabled={!ttsText.trim() || isGeneratingTTS}
+                    className="flex-1 py-2 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-black text-xs font-bold rounded-lg flex items-center justify-center space-x-1.5 shadow-md active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {isGeneratingTTS ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>{ttsStatus || 'Memproses...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Generate & Pasang Narasi</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-gray-500 text-center">
+                  Audio narasi otomatis disisipkan di detik ke-{formatTime(currentTime)} pada linimasa.
+                </p>
+              </div>
+            )}
+
+            {/* 2. REKAM MIC */}
+            {narrationMode === 'mic' && (
+              <div className="bg-[#171820] p-4 rounded-xl border border-[#252834] flex flex-col items-center justify-center text-center space-y-3">
+                {isRecording ? (
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="w-14 h-14 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center animate-pulse">
+                      <Radio className="w-7 h-7 text-red-500" />
+                    </div>
+                    <span className="text-xs font-bold text-red-400">
+                      Sedang Merekam: {formatTime(recordingDuration)}
+                    </span>
+                    <button
+                      onClick={stopRecording}
+                      className="flex items-center space-x-1.5 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg shadow-md transition-colors"
+                    >
+                      <StopCircle className="w-4 h-4" />
+                      <span>Berhenti & Simpan</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center space-y-2">
+                    <button
+                      onClick={startRecording}
+                      className="w-14 h-14 rounded-full bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-400 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-md"
+                      title="Mulai Rekam Suara"
+                    >
+                      <Mic className="w-7 h-7" />
+                    </button>
+                    <span className="text-xs font-semibold text-gray-200">
+                      Klik Mic untuk Mulai Rekam
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                      Audio akan disisipkan di posisi waktu saat ini ({formatTime(currentTime)})
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 3. UPLOAD AUDIO FILE */}
+            {narrationMode === 'upload' && (
+              <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-2">
+                <span className="text-xs font-semibold text-gray-300 block">
+                  Pilih File Audio dari Komputer
+                </span>
+                <input
+                  ref={audioInputRef}
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleAudioUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => audioInputRef.current?.click()}
+                  className="w-full py-2 bg-[#20222d] hover:bg-[#282a38] text-teal-300 text-xs font-medium rounded-lg border border-[#2f3244] flex items-center justify-center space-x-2 transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Audio (MP3/WAV)</span>
+                </button>
+              </div>
+            )}
 
             {/* Voiceovers list */}
             <div className="space-y-2 flex-1 overflow-y-auto">

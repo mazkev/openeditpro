@@ -37,11 +37,20 @@ Aplikasi ini berjalan 100% di sisi klien (in-browser) menggunakan **HTML5 Canvas
 - **Slider Transparansi (Opacity)**: Atur kepekatan dari 10% hingga 100%.
 - **Slider Skala Ukuran**: Perkecil atau perbesar ukuran watermark.
 
-### 5. 🎙️ Tambah Narasi Suara (Voiceover)
+### 5. 🎙️ Tambah Narasi Suara (Voiceover & AI Text-to-Speech)
+- **✨ Teks ke Suara (Text-to-Speech / Copy & Generate)**:
+  - Cukup *copy* dan *paste* naskah teks narasi ke dalam kotak input.
+  - Pilihan karakter suara:
+    - 🇮🇩 **Gadis** (Bahasa Indonesia - Wanita)
+    - 🇮🇩 **Budi** (Bahasa Indonesia - Pria)
+    - 🇺🇸 **Jenny** (English US - Female)
+    - 🇺🇸 **Guy** (English US - Male)
+  - Slider pengaturan kecepatan bicara (*Speed*: 0.75x hingga 1.5x).
+  - Tombol **"🔊 Tes Dengar"** untuk mendengarkan sampel suara sebelum dipasang.
+  - Opsi cerdas: **"Otomatis jadikan subtitle teks di video juga"** sehingga narasi suara dan subtitle otomatis tersinkronisasi dalam sekali klik!
 - **Rekam Suara Langsung**: Rekam suara Anda melalui mikrofon secara langsung dengan indikator status perekaman dan penghitung durasi waktu.
 - **Upload File Audio**: Impor rekaman atau musik latar belakang (**MP3 / WAV**).
-- Penempatan audio pada detik tertentu di *timeline* agar tersinkronisasi tepat dengan momen video.
-- Pengaturan volume audio narasi suara.
+- Penempatan audio pada detik tertentu di *timeline* agar tersinkronisasi tepat dengan momen video serta pengaturan volume audio narasi suara.
 
 ### 6. 🎛️ Player Interaktif & Multi-Track Timeline
 - **Player Preview**: Pratinjau langsung dengan rasio aspek yang dapat dipilih:
