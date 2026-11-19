@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Sparkles,
   Play,
+  Square,
   Loader2,
   Palette,
   Sliders,
@@ -27,7 +28,8 @@ import {
   AVAILABLE_VOICES,
   VOICE_EFFECTS,
   generateTTSAudio,
-  previewSpeechSynthesis,
+  playTTSPreview,
+  stopTTSPreview,
   generateSyncedSubtitlesFromText,
   getSystemVoices,
   type VoiceEffectPreset,
@@ -332,35 +334,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleSelectVoice = (voiceId: string) => {
+    stopTTSPreview();
+    setIsPreviewingSpeech(false);
     setTtsVoice(voiceId);
-    const found = AVAILABLE_VOICES.find((v) => v.id === voiceId);
-    if (found?.defaultPitch && selectedVoiceEffect === 'normal') {
-      setTtsPitch(found.defaultPitch);
-    }
-    if (found?.defaultSpeed && selectedVoiceEffect === 'normal') {
-      setTtsSpeed(found.defaultSpeed);
-    }
   };
 
-  const handlePreviewTTS = () => {
-    if (!ttsText.trim()) {
-      alert('Silakan ketik atau paste teks narasi terlebih dahulu.');
+  const handlePreviewTTS = async () => {
+    // If currently previewing, stop it immediately!
+    if (isPreviewingSpeech) {
+      stopTTSPreview();
+      setIsPreviewingSpeech(false);
       return;
     }
-    setIsPreviewingSpeech(true);
 
-    if (ttsVoice.startsWith('sys-')) {
-      const rawName = ttsVoice.replace(/^sys-/, '');
-      previewSpeechSynthesis(ttsText, 'id', ttsSpeed, ttsPitch, rawName);
-    } else {
-      const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
-      previewSpeechSynthesis(ttsText, voiceObj.lang, ttsSpeed, ttsPitch);
+    const trimmed = ttsText.trim();
+    const textToPlay =
+      trimmed ||
+      'Halo! Ini adalah contoh uji coba suara narasi saya. Silakan dengarkan karakternya.';
+    if (!trimmed) {
+      setTtsText(textToPlay);
     }
 
-    setTimeout(() => setIsPreviewingSpeech(false), 3500);
+    setIsPreviewingSpeech(true);
+
+    try {
+      if (ttsVoice.startsWith('sys-')) {
+        const rawName = ttsVoice.replace(/^sys-/, '');
+        await playTTSPreview(
+          textToPlay,
+          { id: ttsVoice, name: rawName, lang: 'id' },
+          ttsPitch,
+          ttsSpeed,
+          () => setIsPreviewingSpeech(false)
+        );
+      } else {
+        const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
+        await playTTSPreview(
+          textToPlay,
+          voiceObj,
+          ttsPitch,
+          ttsSpeed,
+          () => setIsPreviewingSpeech(false)
+        );
+      }
+    } catch (err) {
+      console.error('Preview speech error:', err);
+      setIsPreviewingSpeech(false);
+    }
   };
 
   const handleGenerateTTS = async () => {
+    stopTTSPreview();
+    setIsPreviewingSpeech(false);
+
     if (!ttsText.trim()) {
       alert('Silakan ketik atau paste teks narasi terlebih dahulu.');
       return;
@@ -372,6 +398,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     try {
       let lang = 'id';
       let voiceLabel = 'Narasi';
+      let effectivePitch = ttsPitch;
+      let effectiveSpeed = ttsSpeed;
+
       if (ttsVoice.startsWith('sys-')) {
         lang = 'id';
         voiceLabel = ttsVoice.replace(/^sys-/, '').slice(0, 15);
@@ -379,11 +408,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
         lang = voiceObj.lang;
         voiceLabel = voiceObj.name.split(' ')[0];
+
+        const basePitch = voiceObj.defaultPitch ?? (voiceObj.gender === 'male' ? 0.80 : 1.0);
+        const baseSpeed = voiceObj.defaultSpeed ?? 1.0;
+        effectivePitch = basePitch * ttsPitch;
+        effectiveSpeed = baseSpeed * ttsSpeed;
       }
 
       const { url, duration } = await generateTTSAudio(ttsText, lang, {
-        pitch: ttsPitch,
-        speed: ttsSpeed,
+        pitch: effectivePitch,
+        speed: effectiveSpeed,
         onProgress: (msg) => setTtsStatus(msg),
       });
 
@@ -1478,9 +1512,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {currentVoice.description}
                           </p>
                         </div>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 font-semibold uppercase flex-shrink-0">
-                          {currentVoice.gender === 'female' ? 'Wanita' : 'Pria'}
-                        </span>
+                        <div className="flex items-center space-x-1.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={handlePreviewTTS}
+                            className={`px-2 py-1 rounded flex items-center space-x-1 text-[10px] font-semibold border transition-all ${
+                              isPreviewingSpeech
+                                ? 'bg-red-500/20 text-red-400 border-red-500/40 animate-pulse'
+                                : 'bg-teal-500/10 text-teal-300 border-teal-500/30 hover:bg-teal-500/20'
+                            }`}
+                            title="Tes Dengar Karakter Suara Ini Langsung"
+                          >
+                            {isPreviewingSpeech ? (
+                              <Square className="w-2.5 h-2.5 fill-current" />
+                            ) : (
+                              <Play className="w-2.5 h-2.5 fill-current" />
+                            )}
+                            <span>{isPreviewingSpeech ? 'Stop' : 'Tes Suara'}</span>
+                          </button>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#1c1e28] text-gray-300 font-medium uppercase">
+                            {currentVoice.gender === 'female' ? 'Wanita' : 'Pria'}
+                          </span>
+                        </div>
                       </div>
                     );
                   })()}
@@ -1608,12 +1661,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="flex space-x-2 pt-1">
                   <button
                     onClick={handlePreviewTTS}
-                    disabled={!ttsText.trim() || isGeneratingTTS}
-                    className="px-3 py-2 bg-[#20222d] hover:bg-[#282a38] text-gray-200 text-xs font-semibold rounded-lg border border-[#2f3244] flex items-center justify-center space-x-1.5 transition-colors disabled:opacity-50"
-                    title="Tes mendengarkan sampel suara secara langsung"
+                    disabled={isGeneratingTTS}
+                    className={`px-3 py-2 text-xs font-semibold rounded-lg border flex items-center justify-center space-x-1.5 transition-colors disabled:opacity-50 ${
+                      isPreviewingSpeech
+                        ? 'bg-red-500/20 border-red-500/50 text-red-300 hover:bg-red-500/30'
+                        : 'bg-[#20222d] hover:bg-[#282a38] text-gray-200 border-[#2f3244]'
+                    }`}
+                    title={
+                      isPreviewingSpeech
+                        ? 'Klik untuk menghentikan audio preview'
+                        : 'Tes mendengarkan sampel suara secara langsung'
+                    }
                   >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>{isPreviewingSpeech ? 'Memutar...' : 'Tes Dengar'}</span>
+                    {isPreviewingSpeech ? (
+                      <>
+                        <Square className="w-3.5 h-3.5 fill-current text-red-400" />
+                        <span>Berhenti</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current text-teal-400" />
+                        <span>Tes Dengar</span>
+                      </>
+                    )}
                   </button>
 
                   <button

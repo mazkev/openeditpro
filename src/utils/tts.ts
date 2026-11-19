@@ -91,36 +91,40 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'id',
     flag: '🇮🇩',
     description: 'Suara wanita ramah, cocok untuk tutorial, vlog & presentasi',
+    defaultPitch: 1.0,
+    defaultSpeed: 1.0,
   },
   {
     id: 'id-male',
-    name: 'Budi (Formal & Berita)',
+    name: 'Budi (Pria Formal & Berita)',
     lang: 'id',
     gender: 'male',
     category: 'id',
     flag: '🇮🇩',
-    description: 'Suara pria formal, cocok untuk narasi berita, edukasi & dokumenter',
+    description: 'Suara pria formal & wibawa, cocok untuk narasi berita & edukasi',
+    defaultPitch: 0.80,
+    defaultSpeed: 0.98,
   },
   {
     id: 'id-female-2',
-    name: 'Siti (Lembut & Storyteller)',
+    name: 'Siti (Wanita Lembut & Storyteller)',
     lang: 'id',
     gender: 'female',
     category: 'id',
     flag: '🇮🇩',
     description: 'Suara wanita halus & hangat untuk puisi, kisah dongeng & meditasi',
-    defaultPitch: 0.96,
-    defaultSpeed: 0.92,
+    defaultPitch: 0.95,
+    defaultSpeed: 0.90,
   },
   {
     id: 'id-male-2',
-    name: 'Bayu (Santai & Podcast)',
+    name: 'Bayu (Pria Santai & Podcast)',
     lang: 'id',
     gender: 'male',
     category: 'id',
     flag: '🇮🇩',
-    description: 'Suara santai & akrab untuk podcast, obrolan santai & unboxing',
-    defaultPitch: 0.94,
+    description: 'Suara pria santai & akrab untuk podcast, obrolan santai & unboxing',
+    defaultPitch: 0.85,
     defaultSpeed: 1.02,
   },
   {
@@ -130,8 +134,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '🇮🇩',
-    description: 'Suara energik & ceria untuk video reels & TikTok',
-    defaultPitch: 1.15,
+    description: 'Suara wanita energik & ceria untuk video reels & TikTok',
+    defaultPitch: 1.18,
     defaultSpeed: 1.08,
   },
   {
@@ -141,9 +145,9 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '🇮🇩',
-    description: 'Suara berat berkarisma untuk pengantar video sinematik',
-    defaultPitch: 0.84,
-    defaultSpeed: 0.95,
+    description: 'Suara pria berat bariton untuk pengantar video sinematik',
+    defaultPitch: 0.70,
+    defaultSpeed: 0.92,
   },
 
   // ENGLISH
@@ -155,6 +159,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'en',
     flag: '🇺🇸',
     description: 'Natural American female creator voice for vlogs & tutorials',
+    defaultPitch: 1.0,
+    defaultSpeed: 1.0,
   },
   {
     id: 'en-male',
@@ -164,6 +170,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'en',
     flag: '🇺🇸',
     description: 'Dynamic & confident American male voice for gaming & tech',
+    defaultPitch: 0.82,
+    defaultSpeed: 1.0,
   },
   {
     id: 'en-female-2',
@@ -173,7 +181,7 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'en',
     flag: '🇺🇸',
     description: 'Crisp & persuasive American female voice for promos',
-    defaultPitch: 1.08,
+    defaultPitch: 1.10,
     defaultSpeed: 1.05,
   },
   {
@@ -184,8 +192,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'en',
     flag: '🇺🇸',
     description: 'Deep resonant American baritone for dramatic voiceovers',
-    defaultPitch: 0.86,
-    defaultSpeed: 0.95,
+    defaultPitch: 0.72,
+    defaultSpeed: 0.92,
   },
   {
     id: 'en-female-uk',
@@ -195,6 +203,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'en',
     flag: '🇬🇧',
     description: 'Sophisticated British RP female accent for luxury & explainers',
+    defaultPitch: 1.0,
+    defaultSpeed: 0.98,
   },
   {
     id: 'en-male-uk',
@@ -204,6 +214,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'en',
     flag: '🇬🇧',
     description: 'Classic British documentary style voice',
+    defaultPitch: 0.82,
+    defaultSpeed: 0.95,
   },
   {
     id: 'en-female-au',
@@ -213,6 +225,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'en',
     flag: '🇦🇺',
     description: 'Friendly & upbeat Australian accent',
+    defaultPitch: 1.02,
+    defaultSpeed: 1.02,
   },
 
   // INTERNATIONAL & ASIA
@@ -224,7 +238,7 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇯🇵',
     description: 'Japanese female voice ideal for anime & aesthetic clips',
-    defaultPitch: 1.25,
+    defaultPitch: 1.28,
     defaultSpeed: 1.05,
   },
   {
@@ -235,6 +249,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇯🇵',
     description: 'Japanese male voice for gaming & dramatic clips',
+    defaultPitch: 0.84,
+    defaultSpeed: 1.02,
   },
   {
     id: 'ko-female',
@@ -244,6 +260,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇰🇷',
     description: 'Korean melodramatic female voice for romance & beauty vlogs',
+    defaultPitch: 1.06,
+    defaultSpeed: 0.98,
   },
   {
     id: 'ko-male',
@@ -253,6 +271,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇰🇷',
     description: 'Korean calm male voice for storytelling & lifestyle',
+    defaultPitch: 0.82,
+    defaultSpeed: 0.95,
   },
   {
     id: 'ar-male',
@@ -262,6 +282,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇸🇦',
     description: 'Clear, eloquent Arabic voice for quotes & recitations',
+    defaultPitch: 0.86,
+    defaultSpeed: 0.95,
   },
   {
     id: 'zh-female',
@@ -271,6 +293,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇨🇳',
     description: 'Standard Mandarin Chinese, clear & melodious',
+    defaultPitch: 1.05,
+    defaultSpeed: 1.0,
   },
   {
     id: 'fr-female',
@@ -280,6 +304,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇫🇷',
     description: 'Chic, romantic French voice for fashion & art',
+    defaultPitch: 1.0,
+    defaultSpeed: 0.96,
   },
   {
     id: 'de-male',
@@ -289,6 +315,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇩🇪',
     description: 'Strong, authoritative German male voice',
+    defaultPitch: 0.82,
+    defaultSpeed: 0.98,
   },
   {
     id: 'es-female',
@@ -298,6 +326,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇪🇸',
     description: 'Warm & vibrant Spanish / Latin American voice',
+    defaultPitch: 1.02,
+    defaultSpeed: 1.02,
   },
   {
     id: 'th-female',
@@ -307,6 +337,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇹🇭',
     description: 'Melodic & gentle Thai voice for travel & culture',
+    defaultPitch: 1.05,
+    defaultSpeed: 0.98,
   },
   {
     id: 'ru-male',
@@ -316,6 +348,8 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     category: 'intl',
     flag: '🇷🇺',
     description: 'Deep cinematic Russian male voice',
+    defaultPitch: 0.74,
+    defaultSpeed: 0.92,
   },
 ];
 
@@ -329,6 +363,99 @@ export function getSystemVoices(): { id: string; name: string; lang: string }[] 
     name: `${v.name} (${v.lang})`,
     lang: v.lang,
   }));
+}
+
+// Active audio tracking for live preview
+let currentPreviewAudio: HTMLAudioElement | null = null;
+let currentPreviewTimer: number | null = null;
+
+/**
+ * Stop any ongoing TTS audio preview
+ */
+export function stopTTSPreview(): void {
+  if (currentPreviewAudio) {
+    try {
+      currentPreviewAudio.pause();
+      currentPreviewAudio.currentTime = 0;
+    } catch {
+      // Ignore
+    }
+    currentPreviewAudio = null;
+  }
+  if (currentPreviewTimer) {
+    clearTimeout(currentPreviewTimer);
+    currentPreviewTimer = null;
+  }
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+/**
+ * Play a high-fidelity live TTS preview of any voice character
+ */
+export async function playTTSPreview(
+  text: string,
+  voice: TTSVoiceOption | { id: string; name: string; lang: string },
+  userPitch: number = 1.0,
+  userSpeed: number = 1.0,
+  onEnd?: () => void
+): Promise<void> {
+  stopTTSPreview();
+
+  // If OS local voice (starts with sys-)
+  if (voice.id.startsWith('sys-')) {
+    const rawName = voice.id.replace(/^sys-/, '');
+    previewSpeechSynthesis(text, voice.lang, userSpeed, userPitch, rawName);
+    const durEst = Math.max(1500, Math.min(6000, text.length * 80));
+    currentPreviewTimer = window.setTimeout(() => {
+      onEnd?.();
+    }, durEst);
+    return;
+  }
+
+  const ttsVoice = voice as TTSVoiceOption;
+  const lang = ttsVoice.lang || 'id';
+
+  // For testing preview, use first sentence or up to 80 chars so it loads instantly (<200ms)
+  const trimmed = text.trim();
+  const sentences = splitTextIntoSentences(trimmed);
+  const snippet = sentences[0] || trimmed.slice(0, 80);
+
+  const basePitch = ttsVoice.defaultPitch ?? (ttsVoice.gender === 'male' ? 0.80 : 1.0);
+  const baseSpeed = ttsVoice.defaultSpeed ?? 1.0;
+  const effectivePitch = basePitch * userPitch;
+  const effectiveSpeed = baseSpeed * userSpeed;
+
+  try {
+    const { url } = await generateTTSAudio(snippet, lang, {
+      pitch: effectivePitch,
+      speed: effectiveSpeed,
+    });
+
+    const audio = new Audio();
+    audio.src = url;
+    audio.playbackRate = Math.max(0.5, Math.min(2.0, effectiveSpeed));
+    currentPreviewAudio = audio;
+
+    audio.onended = () => {
+      currentPreviewAudio = null;
+      onEnd?.();
+    };
+
+    audio.onerror = () => {
+      currentPreviewAudio = null;
+      onEnd?.();
+    };
+
+    await audio.play();
+  } catch (err) {
+    console.warn('Real audio preview error, falling back to speech synthesis:', err);
+    previewSpeechSynthesis(snippet, lang, effectiveSpeed, effectivePitch);
+    currentPreviewTimer = window.setTimeout(() => {
+      onEnd?.();
+    }, 2500);
+  }
 }
 
 /**
