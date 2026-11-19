@@ -303,7 +303,9 @@ export function App() {
         selectedClipId={selectedClipId}
         setSelectedClipId={setSelectedClipId}
         subtitles={subtitles}
+        setSubtitles={setSubtitles}
         voiceovers={voiceovers}
+        setVoiceovers={setVoiceovers}
         currentTime={currentTime}
         setCurrentTime={setCurrentTime}
         totalDuration={totalDuration}
