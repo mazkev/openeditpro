@@ -260,30 +260,51 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
           )}
 
           {/* SUBTITLE OVERLAY */}
-          {activeSubtitles.map((sub) => (
-            <div
-              key={sub.id}
-              className="absolute left-0 right-0 flex justify-center pointer-events-none z-30 px-6 transition-all"
-              style={{
-                top: `${sub.positionY ?? 80}%`,
-                transform: 'translateY(-50%)',
-              }}
-            >
+          {activeSubtitles.map((sub) => {
+            let fontFamilyStyle = 'system-ui, -apple-system, sans-serif';
+            if (sub.fontFamily === 'impact') fontFamilyStyle = 'Impact, "Arial Black", sans-serif';
+            else if (sub.fontFamily === 'serif') fontFamilyStyle = 'Georgia, "Times New Roman", serif';
+            else if (sub.fontFamily === 'mono') fontFamilyStyle = 'ui-monospace, Consolas, monospace';
+            else if (sub.fontFamily === 'cursive') fontFamilyStyle = '"Comic Sans MS", "Segoe Print", cursive';
+
+            const strokeStyle =
+              sub.strokeWidth && sub.strokeWidth > 0
+                ? `${sub.strokeWidth}px ${sub.strokeColor || '#000000'}`
+                : undefined;
+
+            return (
               <div
-                className="max-w-[90%] px-4 py-2 rounded-xl text-center font-bold tracking-wide shadow-2xl transition-all"
+                key={sub.id}
+                className="absolute left-0 right-0 flex justify-center pointer-events-none z-30 px-6 transition-all"
                 style={{
-                  color: sub.color || '#ffffff',
-                  backgroundColor: sub.bgColor || 'rgba(0, 0, 0, 0.8)',
-                  fontSize: `${Math.max(16, sub.fontSize || 24)}px`,
-                  lineHeight: 1.35,
-                  textShadow: '0 2px 4px rgba(0,0,0,0.95), 0 0 2px #000',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  top: `${sub.positionY ?? 80}%`,
+                  transform: 'translateY(-50%)',
                 }}
               >
-                {sub.text}
+                <div
+                  className="max-w-[90%] px-4 py-2 rounded-xl text-center font-bold tracking-wide shadow-2xl transition-all"
+                  style={{
+                    color: sub.color || '#ffffff',
+                    backgroundColor: sub.bgColor || 'rgba(0, 0, 0, 0.8)',
+                    fontSize: `${Math.max(16, sub.fontSize || 24)}px`,
+                    fontFamily: fontFamilyStyle,
+                    textTransform: sub.isUppercase ? 'uppercase' : 'none',
+                    WebkitTextStroke: strokeStyle,
+                    lineHeight: 1.35,
+                    textShadow: sub.glowColor
+                      ? `0 0 14px ${sub.glowColor}, 0 2px 4px rgba(0,0,0,0.9)`
+                      : '0 2px 4px rgba(0,0,0,0.95), 0 0 2px #000',
+                    border:
+                      sub.bgColor && sub.bgColor !== 'transparent'
+                        ? '1px solid rgba(255, 255, 255, 0.2)'
+                        : 'none',
+                  }}
+                >
+                  {sub.text}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

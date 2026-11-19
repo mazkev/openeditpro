@@ -17,11 +17,95 @@ import {
   Sparkles,
   Play,
   Loader2,
+  Palette,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition } from '../types/editor';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
 import { AVAILABLE_VOICES, generateTTSAudio, previewSpeechSynthesis, generateSyncedSubtitlesFromText } from '../utils/tts';
+
+interface SubtitleStylePreset {
+  id: string;
+  name: string;
+  preview: string;
+  color: string;
+  bgColor: string;
+  fontFamily: 'sans' | 'impact' | 'serif' | 'mono' | 'cursive';
+  strokeColor: string;
+  strokeWidth: number;
+  isUppercase: boolean;
+  glowColor?: string;
+}
+
+const SUBTITLE_PRESETS: SubtitleStylePreset[] = [
+  {
+    id: 'tiktok',
+    name: 'TikTok Viral',
+    preview: 'VIRAL',
+    color: '#FACC15',
+    bgColor: '#000000',
+    fontFamily: 'impact',
+    strokeColor: '#000000',
+    strokeWidth: 3,
+    isUppercase: true,
+  },
+  {
+    id: 'youtube',
+    name: 'YouTube Red',
+    preview: 'BOX RED',
+    color: '#FFFFFF',
+    bgColor: '#DC2626',
+    fontFamily: 'sans',
+    strokeColor: 'transparent',
+    strokeWidth: 0,
+    isUppercase: true,
+  },
+  {
+    id: 'cyber',
+    name: 'Cyber Glow',
+    preview: 'NEON',
+    color: '#2DD4BF',
+    bgColor: 'rgba(15, 23, 42, 0.9)',
+    fontFamily: 'mono',
+    strokeColor: '#0F766E',
+    strokeWidth: 2,
+    glowColor: '#14B8A6',
+    isUppercase: true,
+  },
+  {
+    id: 'minimalist',
+    name: 'Clean White',
+    preview: 'Classic',
+    color: '#FFFFFF',
+    bgColor: 'transparent',
+    fontFamily: 'sans',
+    strokeColor: '#000000',
+    strokeWidth: 3,
+    isUppercase: false,
+  },
+  {
+    id: 'cinematic',
+    name: 'Cinematic',
+    preview: 'Cinema',
+    color: '#F3F4F6',
+    bgColor: 'rgba(0, 0, 0, 0.85)',
+    fontFamily: 'serif',
+    strokeColor: 'transparent',
+    strokeWidth: 0,
+    isUppercase: false,
+  },
+  {
+    id: 'aesthetic',
+    name: 'Pastel Glow',
+    preview: 'Pastel',
+    color: '#F472B6',
+    bgColor: 'rgba(30, 27, 75, 0.85)',
+    fontFamily: 'cursive',
+    strokeColor: '#701A75',
+    strokeWidth: 2,
+    isUppercase: false,
+  },
+];
 
 interface SidebarProps {
   clips: VideoClip[];
@@ -664,6 +748,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
 
+            {/* POPULAR SUBTITLE STYLE PRESETS */}
+            <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] mb-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-200 flex items-center space-x-1.5">
+                  <Palette className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Preset Gaya Teks (CapCut)</span>
+                </span>
+                <span className="text-[10px] text-gray-400">Pilih tema</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-1.5">
+                {SUBTITLE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => {
+                      // Apply to all subtitles
+                      setSubtitles((prev) =>
+                        prev.map((s) => ({
+                          ...s,
+                          color: preset.color,
+                          bgColor: preset.bgColor,
+                          fontFamily: preset.fontFamily,
+                          strokeColor: preset.strokeColor,
+                          strokeWidth: preset.strokeWidth,
+                          isUppercase: preset.isUppercase,
+                          glowColor: preset.glowColor,
+                          stylePreset: preset.id,
+                        }))
+                      );
+                    }}
+                    className="p-1.5 bg-[#121319] hover:bg-[#1f212d] border border-[#2b2d3e] hover:border-teal-400/60 rounded-lg flex flex-col items-center justify-center transition-all group active:scale-95 text-center"
+                    title={`Terapkan gaya "${preset.name}" ke semua subtitle`}
+                  >
+                    <span
+                      className="text-xs font-black px-1.5 py-0.5 rounded"
+                      style={{
+                        color: preset.color,
+                        backgroundColor: preset.bgColor,
+                        fontFamily: preset.fontFamily === 'impact' ? 'Impact, sans-serif' : 'sans-serif',
+                        textTransform: preset.isUppercase ? 'uppercase' : 'none',
+                        textShadow: preset.glowColor ? `0 0 8px ${preset.glowColor}` : 'none',
+                        WebkitTextStroke: preset.strokeWidth > 0 ? `1px ${preset.strokeColor}` : 'none',
+                      }}
+                    >
+                      {preset.preview}
+                    </span>
+                    <span className="text-[9px] text-gray-400 mt-1 truncate max-w-full">
+                      {preset.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <p className="text-[11px] text-gray-400 mb-3">
               Keterangan teks akan ditampilkan otomatis sesuai rentang waktu yang diatur.
             </p>
@@ -749,10 +887,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                     </div>
 
-                    {/* Styling controls */}
+                    {/* Font Family & Uppercase */}
                     <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#222430]">
+                      <div className="col-span-2">
+                        <span className="text-[10px] text-gray-400 block mb-1">Gaya Font:</span>
+                        <select
+                          value={sub.fontFamily || 'sans'}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            setSubtitles((prev) =>
+                              prev.map((s) => (s.id === sub.id ? { ...s, fontFamily: val } : s))
+                            );
+                          }}
+                          className="w-full bg-[#101115] border border-[#2b2d3d] rounded px-2 py-1 text-[11px] text-gray-200 outline-none"
+                        >
+                          <option value="sans">Modern Sans (Inter)</option>
+                          <option value="impact">Impact (Viral Reels / Meme)</option>
+                          <option value="serif">Serif (Elegan / Novel)</option>
+                          <option value="mono">Monospace (Code / Retro)</option>
+                          <option value="cursive">Cursive (Santai / Vlog)</option>
+                        </select>
+                      </div>
+
                       <div>
-                        <span className="text-[10px] text-gray-400 block mb-1">Warna:</span>
+                        <span className="text-[10px] text-gray-400 block mb-1">Kapital:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubtitles((prev) =>
+                              prev.map((s) =>
+                                s.id === sub.id ? { ...s, isUppercase: !s.isUppercase } : s
+                              )
+                            );
+                          }}
+                          className={`w-full py-1 rounded text-xs font-bold border transition-colors ${
+                            sub.isUppercase
+                              ? 'bg-teal-500 text-black border-teal-400 font-extrabold'
+                              : 'bg-[#101115] text-gray-400 border-[#2b2d3d] hover:text-gray-200'
+                          }`}
+                        >
+                          AA CAPS
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Colors & Outline */}
+                    <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1">Warna Teks:</span>
                         <input
                           type="color"
                           value={sub.color}
@@ -767,10 +949,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-[10px] text-gray-400 block mb-1">Ukuran ({sub.fontSize}px):</span>
+                        <span className="text-[10px] text-gray-400 block mb-1">Background:</span>
+                        <select
+                          value={sub.bgColor || 'rgba(0, 0, 0, 0.8)'}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSubtitles((prev) =>
+                              prev.map((s) => (s.id === sub.id ? { ...s, bgColor: val } : s))
+                            );
+                          }}
+                          className="w-full h-7 bg-[#101115] border border-[#2b2d3d] rounded px-1.5 text-[10px] text-gray-200 outline-none"
+                        >
+                          <option value="rgba(0, 0, 0, 0.8)">Hitam Gelap</option>
+                          <option value="#000000">Hitam Solid</option>
+                          <option value="#DC2626">Merah YouTube</option>
+                          <option value="rgba(15, 23, 42, 0.9)">Biru Cyber</option>
+                          <option value="rgba(30, 27, 75, 0.85)">Ungu Aesthetic</option>
+                          <option value="transparent">Tanpa Background</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1">Garis Tepi ({sub.strokeWidth ?? 3}px):</span>
                         <input
                           type="range"
-                          min="14"
+                          min="0"
+                          max="6"
+                          step="1"
+                          value={sub.strokeWidth ?? 3}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setSubtitles((prev) =>
+                              prev.map((s) => (s.id === sub.id ? { ...s, strokeWidth: val } : s))
+                            );
+                          }}
+                          className="w-full accent-teal-400 mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Size & Position */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#222430]">
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1">Ukuran Huruf ({sub.fontSize}px):</span>
+                        <input
+                          type="range"
+                          min="16"
                           max="48"
                           value={sub.fontSize}
                           onChange={(e) => {
@@ -779,25 +1003,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               prev.map((s) => (s.id === sub.id ? { ...s, fontSize: val } : s))
                             );
                           }}
-                          className="w-full accent-teal-400 mt-1"
+                          className="w-full accent-teal-400"
                         />
                       </div>
 
                       <div>
-                        <span className="text-[10px] text-gray-400 block mb-1">Posisi Y ({sub.positionY}%):</span>
-                        <input
-                          type="range"
-                          min="10"
-                          max="95"
-                          value={sub.positionY}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value);
-                            setSubtitles((prev) =>
-                              prev.map((s) => (s.id === sub.id ? { ...s, positionY: val } : s))
-                            );
-                          }}
-                          className="w-full accent-teal-400 mt-1"
-                        />
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] text-gray-400">Posisi Layar:</span>
+                          <span className="text-[9px] text-teal-400 font-mono">{sub.positionY}%</span>
+                        </div>
+                        <div className="flex space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubtitles((prev) =>
+                                prev.map((s) => (s.id === sub.id ? { ...s, positionY: 20 } : s))
+                              );
+                            }}
+                            className={`flex-1 py-0.5 rounded text-[9px] border ${
+                              sub.positionY === 20
+                                ? 'bg-teal-500 text-black border-teal-400 font-bold'
+                                : 'bg-[#101115] text-gray-400 border-[#2b2d3d]'
+                            }`}
+                          >
+                            Atas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubtitles((prev) =>
+                                prev.map((s) => (s.id === sub.id ? { ...s, positionY: 50 } : s))
+                              );
+                            }}
+                            className={`flex-1 py-0.5 rounded text-[9px] border ${
+                              sub.positionY === 50
+                                ? 'bg-teal-500 text-black border-teal-400 font-bold'
+                                : 'bg-[#101115] text-gray-400 border-[#2b2d3d]'
+                            }`}
+                          >
+                            Tengah
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubtitles((prev) =>
+                                prev.map((s) => (s.id === sub.id ? { ...s, positionY: 80 } : s))
+                              );
+                            }}
+                            className={`flex-1 py-0.5 rounded text-[9px] border ${
+                              sub.positionY === 80
+                                ? 'bg-teal-500 text-black border-teal-400 font-bold'
+                                : 'bg-[#101115] text-gray-400 border-[#2b2d3d]'
+                            }`}
+                          >
+                            Bawah
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

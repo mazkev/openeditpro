@@ -228,21 +228,29 @@ export async function exportVideo(
 
       for (const sub of activeSubs) {
         ctx.save();
-        const fontSize = Math.round((sub.fontSize || 24) * (width / 1280));
-        ctx.font = `600 ${fontSize}px sans-serif`;
+        const fontSize = Math.round((sub.fontSize || 26) * (width / 1280));
+
+        let fontFamilyName = 'sans-serif';
+        if (sub.fontFamily === 'impact') fontFamilyName = 'Impact, sans-serif';
+        else if (sub.fontFamily === 'serif') fontFamilyName = 'Georgia, serif';
+        else if (sub.fontFamily === 'mono') fontFamilyName = 'Consolas, monospace';
+        else if (sub.fontFamily === 'cursive') fontFamilyName = '"Comic Sans MS", cursive';
+
+        ctx.font = `bold ${fontSize}px ${fontFamilyName}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        const lines = sub.text.split('\n');
-        const lineHeight = fontSize * 1.3;
+        const rawText = sub.isUppercase ? sub.text.toUpperCase() : sub.text;
+        const lines = rawText.split('\n');
+        const lineHeight = fontSize * 1.35;
         const totalTextHeight = lines.length * lineHeight;
-        const targetY = (sub.positionY / 100) * height;
+        const targetY = ((sub.positionY ?? 80) / 100) * height;
 
         lines.forEach((line, index) => {
           const lineY = targetY - totalTextHeight / 2 + index * lineHeight + lineHeight / 2;
           const metrics = ctx.measureText(line);
-          const bgPaddingX = 16;
-          const bgPaddingY = 8;
+          const bgPaddingX = 20;
+          const bgPaddingY = 10;
 
           // Draw background pill
           if (sub.bgColor && sub.bgColor !== 'transparent') {
@@ -255,15 +263,28 @@ export async function exportVideo(
               lineY - bgHeight / 2,
               bgWidth,
               bgHeight,
-              8
+              12
             );
             ctx.fill();
           }
 
+          // Text Glow & Shadow
+          if (sub.glowColor) {
+            ctx.shadowColor = sub.glowColor;
+            ctx.shadowBlur = 14;
+          } else {
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 4;
+          }
+
           // Draw text stroke & fill
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-          ctx.strokeText(line, width / 2, lineY);
+          const strokeWidth = sub.strokeWidth ?? 3;
+          if (strokeWidth > 0) {
+            ctx.lineWidth = strokeWidth;
+            ctx.strokeStyle = sub.strokeColor || 'rgba(0, 0, 0, 0.9)';
+            ctx.strokeText(line, width / 2, lineY);
+          }
+
           ctx.fillStyle = sub.color || '#ffffff';
           ctx.fillText(line, width / 2, lineY);
         });

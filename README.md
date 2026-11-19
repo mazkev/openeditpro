@@ -20,13 +20,23 @@ Aplikasi ini berjalan 100% di sisi klien (in-browser) menggunakan **HTML5 Canvas
 - **Duplikat & Hapus**: Tombol duplikat klip dan hapus klip terpilih.
 - **Kontrol Volume**: Atur volume masing-masing klip video secara independen.
 
-### 3. 💬 Subtitle & Teks (Termasuk Auto Subtitle AI Speech-to-Text)
-- **✨ Subtitle Otomatis (Auto Captions / Speech-to-Text)**:
-  - Fitur AI Speech Recognition yang mendengarkan percakapan dari audio video secara otomatis.
-  - Mendukung pilihan bahasa: **Bahasa Indonesia (`id-ID`)** dan **English (`en-US`)**.
-  - Mengonversi ucapan ke teks secara *real-time* lengkap dengan pencatatan waktu mulai (*Start Time*) dan selesai (*End Time*) yang tersinkronisasi dengan ucapan di video.
-  - Opsi **"Deteksi Cepat AI"** untuk pembuatan takarir instan otomatis.
-- **Kustomisasi Manual**: Tambahkan teks takarir manual, atur ukuran font (*slider*), warna teks (*color picker*), latar belakang *pill*, dan posisi vertikal Y.
+### 3. 💬 Subtitle & Teks (Kustomisasi Gaya & Tipografi CapCut)
+- **🎨 Preset Gaya Teks Populer (Style Presets)**:
+  - 🟡 **TikTok Viral**: Teks kuning terang, font Impact tebal, border hitam, dan huruf besar (*ALL CAPS*).
+  - 🔴 **YouTube Red**: Teks putih tajam di dalam kotak merah YouTube mencolok.
+  - 🟢 **Cyber Glow**: Efek pendaran neon tosca futuristik di atas kotak biru gelap.
+  - ⚪ **Clean White**: Teks putih bersih klasik dengan bayangan kontras.
+  - ⬛ **Cinematic**: Font Serif elegan dengan kotak transparan hitam bioskop.
+  - 🟣 **Pastel Glow**: Warna merah muda pastel dengan font santai.
+  - **Terapkan ke Semua Subtitle**: Cukup 1 klik pada preset untuk mengubah seluruh subtitle di video secara serentak!
+- **🔤 Kustomisasi Tipografi Lengkap**:
+  - Pilihan Font: *Modern Sans*, *Impact / Meme*, *Serif Elegan*, *Monospace Retro*, dan *Cursive Santai*.
+  - Warna teks & warna latar belakang (*pill background*).
+  - Ketebalan garis tepi (*stroke/outline*) dari 0px hingga 6px.
+  - Tombol pintas huruf kapital (*ALL CAPS* `AA`).
+  - Posisi vertikal instan: **Atas (20%)**, **Tengah (50%)**, dan **Bawah (80%)**.
+- **✨ Subtitle Otomatis (AI Speech-to-Text & Synced Chunks)**:
+  - Mendeteksi percakapan video dan memecahnya menjadi potongan kalimat pendek 4–6 kata yang sinkron secara akurat dengan ketukan suara.
 
 ### 4. 🏷️ Watermark Logo & Teks
 - Aktifkan atau nonaktifkan watermark dengan saklar cepat.

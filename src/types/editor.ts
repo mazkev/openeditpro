@@ -15,10 +15,16 @@ export interface Subtitle {
   text: string;
   startTime: number; // in seconds relative to timeline
   endTime: number; // in seconds relative to timeline
-  fontSize: number; // e.g. 24
+  fontSize: number; // e.g. 26
   color: string; // hex
   bgColor: string; // rgba
-  positionY: number; // percentage from top (e.g. 85 for bottom)
+  positionY: number; // percentage from top (e.g. 80 for bottom)
+  fontFamily?: 'sans' | 'impact' | 'serif' | 'mono' | 'cursive';
+  strokeColor?: string;
+  strokeWidth?: number;
+  isUppercase?: boolean;
+  glowColor?: string;
+  stylePreset?: string;
 }
 
 export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
