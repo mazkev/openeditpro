@@ -20,14 +20,13 @@ Aplikasi ini berjalan 100% di sisi klien (in-browser) menggunakan **HTML5 Canvas
 - **Duplikat & Hapus**: Tombol duplikat klip dan hapus klip terpilih.
 - **Kontrol Volume**: Atur volume masing-masing klip video secara independen.
 
-### 3. 💬 Subtitle & Teks
-- Tambahkan teks takarir (*captions/subtitles*) pada linimasa video.
-- Atur waktu mulai (*Start Time*) dan waktu selesai (*End Time*) dalam detik.
-- Kustomisasi gaya teks:
-  - Ukuran font (*Font size slider*).
-  - Pilihan warna teks (*Color picker*).
-  - Background teks transparan / semi-gelap.
-  - Penyesuaian posisi vertikal (*Y-position percentage slider*).
+### 3. 💬 Subtitle & Teks (Termasuk Auto Subtitle AI Speech-to-Text)
+- **✨ Subtitle Otomatis (Auto Captions / Speech-to-Text)**:
+  - Fitur AI Speech Recognition yang mendengarkan percakapan dari audio video secara otomatis.
+  - Mendukung pilihan bahasa: **Bahasa Indonesia (`id-ID`)** dan **English (`en-US`)**.
+  - Mengonversi ucapan ke teks secara *real-time* lengkap dengan pencatatan waktu mulai (*Start Time*) dan selesai (*End Time*) yang tersinkronisasi dengan ucapan di video.
+  - Opsi **"Deteksi Cepat AI"** untuk pembuatan takarir instan otomatis.
+- **Kustomisasi Manual**: Tambahkan teks takarir manual, atur ukuran font (*slider*), warna teks (*color picker*), latar belakang *pill*, dan posisi vertikal Y.
 
 ### 4. 🏷️ Watermark Logo & Teks
 - Aktifkan atau nonaktifkan watermark dengan saklar cepat.

@@ -14,6 +14,7 @@ import {
   StopCircle,
   Radio,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition } from '../types/editor';
 import { formatTime } from '../utils/time';
@@ -32,6 +33,7 @@ interface SidebarProps {
   setVoiceovers: React.Dispatch<React.SetStateAction<Voiceover[]>>;
   currentTime: number;
   onSplitClip: (clipId: string, splitTime: number) => void;
+  onOpenAutoSubtitle: () => void;
 }
 
 type TabType = 'media' | 'edit' | 'subtitle' | 'watermark' | 'voiceover';
@@ -49,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setVoiceovers,
   currentTime,
   onSplitClip,
+  onOpenAutoSubtitle,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('media');
   const [isRecording, setIsRecording] = useState(false);
@@ -545,14 +548,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* TAB 3: SUBTITLE */}
         {activeTab === 'subtitle' && (
           <div className="flex flex-col h-full overflow-y-auto pr-1">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-bold text-gray-200">Subtitle & Teks</h2>
               <button
                 onClick={handleAddSubtitle}
-                className="flex items-center space-x-1 px-2.5 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-xs rounded-lg border border-teal-500/30 transition-colors"
+                className="flex items-center space-x-1 px-2 py-1 bg-[#202230] hover:bg-[#282a3c] text-gray-300 text-xs rounded-lg border border-[#2f3246] transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Tambah Teks</span>
+                <span>Manual</span>
+              </button>
+            </div>
+
+            {/* Smart Auto Subtitle Banner */}
+            <div className="p-3 bg-gradient-to-r from-teal-950/60 to-cyan-950/50 border border-teal-500/40 rounded-xl mb-3 shadow-md">
+              <div className="flex items-center space-x-2 mb-1">
+                <Sparkles className="w-4 h-4 text-teal-400 animate-pulse" />
+                <span className="text-xs font-bold text-teal-300">
+                  Auto Subtitle (AI Dengar Video)
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 mb-2 leading-relaxed">
+                Otomatis mendeteksi ucapan dan percakapan audio dari video dan mengubahnya menjadi baris subtitle.
+              </p>
+              <button
+                onClick={onOpenAutoSubtitle}
+                className="w-full py-1.5 bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-300 hover:to-cyan-300 text-black text-xs font-bold rounded-lg flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-black" />
+                <span>Buat Subtitle Otomatis</span>
               </button>
             </div>
 

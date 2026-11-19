@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { PreviewPlayer } from './components/PreviewPlayer';
 import { Timeline } from './components/Timeline';
 import { ExportModal } from './components/ExportModal';
+import { AutoSubtitleModal } from './components/AutoSubtitleModal';
 import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio } from './types/editor';
 import { exportVideo } from './utils/exportVideo';
 import type { ExportProgress } from './utils/exportVideo';
@@ -44,6 +45,7 @@ export function App() {
   });
   const [exportedBlob, setExportedBlob] = useState<Blob | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isAutoSubtitleModalOpen, setIsAutoSubtitleModalOpen] = useState<boolean>(false);
 
   // Calculate Total Timeline Duration
   const totalDuration = clips.reduce((acc, c) => acc + Math.max(0, c.trimEnd - c.trimStart), 0);
@@ -276,6 +278,7 @@ export function App() {
           setVoiceovers={setVoiceovers}
           currentTime={currentTime}
           onSplitClip={handleSplitClip}
+          onOpenAutoSubtitle={() => setIsAutoSubtitleModalOpen(true)}
         />
 
         {/* Center Canvas Preview Player */}
@@ -314,6 +317,15 @@ export function App() {
         progress={exportProgress}
         exportedBlob={exportedBlob}
         projectName={projectName}
+      />
+
+      {/* Auto Subtitle (Speech-to-Text) Modal */}
+      <AutoSubtitleModal
+        isOpen={isAutoSubtitleModalOpen}
+        onClose={() => setIsAutoSubtitleModalOpen(false)}
+        clips={clips}
+        onApplySubtitles={(newSubs) => setSubtitles((prev) => [...prev, ...newSubs])}
+        totalDuration={totalDuration}
       />
     </div>
   );
