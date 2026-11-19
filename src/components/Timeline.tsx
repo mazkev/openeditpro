@@ -26,6 +26,8 @@ interface TimelineProps {
   setCurrentTime: (t: number) => void;
   totalDuration: number;
   onSplitClip: (clipId: string, splitTime: number) => void;
+  isPlaying?: boolean;
+  setIsPlaying?: (playing: boolean) => void;
 }
 
 export const Timeline: React.FC<TimelineProps> = ({
@@ -41,6 +43,8 @@ export const Timeline: React.FC<TimelineProps> = ({
   setCurrentTime,
   totalDuration,
   onSplitClip,
+  isPlaying,
+  setIsPlaying,
 }) => {
   const [zoom, setZoom] = useState(40); // pixels per second
   const timelineTracksRef = useRef<HTMLDivElement>(null);
@@ -154,8 +158,13 @@ export const Timeline: React.FC<TimelineProps> = ({
     if (!timelineTracksRef.current) return;
     const rect = timelineTracksRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left + timelineTracksRef.current.scrollLeft;
-    const newTime = Math.min(totalDuration, pxToTime(clickX));
+    const newTime = Math.max(0, Math.min(totalDuration, pxToTime(clickX)));
     setCurrentTime(newTime);
+
+    // Pause playback while scrubbing so user can scrub backward/forward freely
+    if (isPlaying && setIsPlaying) {
+      setIsPlaying(false);
+    }
 
     setDragAction({
       type: 'playhead',
@@ -376,10 +385,10 @@ export const Timeline: React.FC<TimelineProps> = ({
                 return (
                   <div
                     key={clip.id}
-                    draggable
-                    onDragStart={(e) => {
-                      setDraggedClipIndex(index);
-                      e.dataTransfer.setData('text/plain', clip.id);
+                    onMouseDown={(e) => {
+                      // Clicking or dragging clip body scrubs playhead and selects clip
+                      setSelectedClipId(clip.id);
+                      handleRulerMouseDown(e);
                     }}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -400,30 +409,37 @@ export const Timeline: React.FC<TimelineProps> = ({
                       setDraggedClipIndex(null);
                       setDragOverClipIndex(null);
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedClipId(clip.id);
-                    }}
                     style={{
                       left: `${leftPx}px`,
                       width: `${widthPx}px`,
                     }}
-                    className={`absolute top-1 bottom-1 rounded-lg overflow-hidden flex flex-col justify-between border transition-all ${
+                    className={`absolute top-1 bottom-1 rounded-lg overflow-hidden flex flex-col justify-between border cursor-pointer transition-all ${
                       isBeingDraggedOver
                         ? 'border-yellow-400 ring-2 ring-yellow-400/50 scale-105 z-20'
                         : isSelected
                         ? 'border-cyan-400 bg-cyan-950/40 ring-2 ring-cyan-500/50 z-10'
                         : 'border-[#2d3248] bg-[#1b1e2a] hover:border-gray-500'
-                    } cursor-grab active:cursor-grabbing`}
-                    title={`Klik untuk pilih, geser balok untuk tukar urutan, atau geser ujung samping untuk potong (Trim)`}
+                    }`}
+                    title={`Klik untuk arahkan playhead, tarik gagang ⠿ untuk tukar urutan, atau geser ujung samping untuk potong (Trim)`}
                   >
                     {/* Header info */}
-                    <div className="flex items-center justify-between px-2 pt-1 text-[11px] font-semibold text-gray-200 truncate pointer-events-none">
-                      <span className="truncate flex items-center space-x-1">
-                        <GripVertical className="w-3 h-3 text-gray-500" />
-                        <span>{clip.name}</span>
-                      </span>
-                      <span className="text-[10px] text-cyan-300 font-mono ml-1 flex-shrink-0">
+                    <div className="flex items-center justify-between px-2 pt-1 text-[11px] font-semibold text-gray-200 truncate">
+                      <div className="flex items-center space-x-1 truncate">
+                        <div
+                          draggable
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            setDraggedClipIndex(index);
+                            e.dataTransfer.setData('text/plain', clip.id);
+                          }}
+                          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-white/10 rounded flex-shrink-0"
+                          title="Tarik ikon ini untuk menukar urutan klip"
+                        >
+                          <GripVertical className="w-3.5 h-3.5 text-cyan-400" />
+                        </div>
+                        <span className="truncate pointer-events-none">{clip.name}</span>
+                      </div>
+                      <span className="text-[10px] text-cyan-300 font-mono ml-1 flex-shrink-0 pointer-events-none">
                         {formatTime(duration)}
                       </span>
                     </div>
@@ -566,6 +582,7 @@ export const Timeline: React.FC<TimelineProps> = ({
               <div
                 onMouseDown={(e) => {
                   e.stopPropagation();
+                  if (isPlaying && setIsPlaying) setIsPlaying(false);
                   setDragAction({
                     type: 'playhead',
                     initialMouseX: e.clientX,
@@ -578,8 +595,22 @@ export const Timeline: React.FC<TimelineProps> = ({
                 <div className="w-1 h-2.5 bg-white/80 rounded-full" />
               </div>
 
-              {/* Vertical Red Needle Line */}
-              <div className="w-0.5 h-full bg-red-500 -translate-x-1/2 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+              {/* Vertical Red Needle Line with clickable drag zone */}
+              <div
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  if (isPlaying && setIsPlaying) setIsPlaying(false);
+                  setDragAction({
+                    type: 'playhead',
+                    initialMouseX: e.clientX,
+                    initialValue: currentTime,
+                  });
+                }}
+                className="w-4 -translate-x-1/2 h-full flex justify-center cursor-col-resize pointer-events-auto group"
+                title="Geser jarum waktu (Playhead)"
+              >
+                <div className="w-0.5 h-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] group-hover:w-1 transition-all" />
+              </div>
             </div>
           </div>
         </div>

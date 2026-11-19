@@ -8,6 +8,7 @@ import {
   VolumeX,
   Maximize2,
   Film,
+  RotateCcw,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio } from '../types/editor';
 import { formatTime } from '../utils/time';
@@ -78,8 +79,10 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       video.src = activeClip.url;
       video.currentTime = targetClipTime;
     } else {
-      // Seek only if difference is significant to avoid stutter during continuous playback
-      if (Math.abs(video.currentTime - targetClipTime) > 0.3) {
+      // When paused or scrubbing backward/forward, sync video frame immediately!
+      // When playing, sync only if drift is noticeable (> 0.25s) to avoid stutter
+      const drift = Math.abs(video.currentTime - targetClipTime);
+      if (!isPlaying || drift > 0.25) {
         video.currentTime = targetClipTime;
       }
     }
@@ -87,11 +90,15 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
     video.volume = isMuted ? 0 : (activeClip.volume ?? 1) * masterVolume;
 
     if (isPlaying) {
-      video.play().catch(() => {});
+      if (video.paused) {
+        video.play().catch(() => {});
+      }
     } else {
-      video.pause();
+      if (!video.paused) {
+        video.pause();
+      }
     }
-  }, [activeClip, isPlaying, masterVolume, isMuted]);
+  }, [activeClip, activeClipOffset, currentTime, isPlaying, masterVolume, isMuted]);
 
   // Sync voiceovers
   useEffect(() => {
@@ -106,18 +113,21 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       const voStart = vo.startTime;
       const voEnd = vo.startTime + vo.duration;
 
-      if (isPlaying && currentTime >= voStart && currentTime <= voEnd) {
+      if (currentTime >= voStart && currentTime <= voEnd) {
         const targetAudioTime = currentTime - voStart;
-        if (Math.abs(audio.currentTime - targetAudioTime) > 0.3) {
+        if (!isPlaying || Math.abs(audio.currentTime - targetAudioTime) > 0.3) {
           audio.currentTime = targetAudioTime;
         }
-        if (audio.paused) {
+        if (isPlaying && audio.paused) {
           audio.play().catch(() => {});
+        } else if (!isPlaying && !audio.paused) {
+          audio.pause();
         }
       } else {
         if (!audio.paused) {
           audio.pause();
         }
+        audio.currentTime = 0;
       }
     });
 
@@ -135,7 +145,9 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
     if (!isPlaying) return;
 
     let lastTimestamp = performance.now();
-    const interval = requestAnimationFrame(function loop(now) {
+    let animId: number;
+
+    const loop = (now: number) => {
       const delta = (now - lastTimestamp) / 1000;
       lastTimestamp = now;
 
@@ -148,12 +160,11 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         return nextTime;
       });
 
-      if (isPlaying) {
-        requestAnimationFrame(loop);
-      }
-    });
+      animId = requestAnimationFrame(loop);
+    };
 
-    return () => cancelAnimationFrame(interval);
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
   }, [isPlaying, totalDuration, setCurrentTime, setIsPlaying]);
 
   // Active Subtitles for current time
@@ -284,6 +295,19 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         {/* Center: Playback Buttons */}
         <div className="flex items-center space-x-3">
           <button
+            onClick={() => {
+              setCurrentTime(0);
+              if (videoRef.current && clips[0]) {
+                videoRef.current.currentTime = clips[0].trimStart;
+              }
+            }}
+            className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-[#1f212b] rounded-lg transition-colors"
+            title="Putar Ulang dari Awal (Rewind to 0:00)"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+
+          <button
             onClick={() => setCurrentTime((t) => Math.max(0, t - 1))}
             className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-[#1f212b] rounded-lg transition-colors"
             title="Mundur 1 detik"
@@ -293,8 +317,15 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
 
           <button
             onClick={() => {
-              if (currentTime >= totalDuration && totalDuration > 0) {
+              if (clips.length === 0) return;
+              if (totalDuration > 0 && currentTime >= totalDuration - 0.05) {
+                // Replay from start
                 setCurrentTime(0);
+                if (videoRef.current && clips[0]) {
+                  videoRef.current.currentTime = clips[0].trimStart;
+                }
+                setIsPlaying(true);
+                return;
               }
               setIsPlaying(!isPlaying);
             }}
@@ -304,9 +335,17 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                 ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
                 : 'bg-teal-500 hover:bg-teal-400 text-black font-bold active:scale-95'
             }`}
-            title={isPlaying ? 'Jeda (Space)' : 'Putar (Space)'}
+            title={
+              totalDuration > 0 && currentTime >= totalDuration - 0.05
+                ? 'Putar Ulang (Replay)'
+                : isPlaying
+                ? 'Jeda (Space)'
+                : 'Putar (Space)'
+            }
           >
-            {isPlaying ? (
+            {totalDuration > 0 && currentTime >= totalDuration - 0.05 ? (
+              <RotateCcw className="w-4 h-4 text-black" />
+            ) : isPlaying ? (
               <Pause className="w-4 h-4 fill-current" />
             ) : (
               <Play className="w-4 h-4 fill-current ml-0.5" />

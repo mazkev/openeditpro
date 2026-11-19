@@ -228,7 +228,12 @@ export function App() {
       if (e.code === 'Space') {
         e.preventDefault();
         if (clips.length > 0) {
-          setIsPlaying((prev) => !prev);
+          if (currentTime >= totalDuration - 0.05) {
+            setCurrentTime(0);
+            setIsPlaying(true);
+          } else {
+            setIsPlaying((prev) => !prev);
+          }
         }
       } else if (e.code === 'ArrowLeft') {
         e.preventDefault();
@@ -310,6 +315,8 @@ export function App() {
         setCurrentTime={setCurrentTime}
         totalDuration={totalDuration}
         onSplitClip={handleSplitClip}
+        isPlaying={isPlaying}
+        setIsPlaying={setIsPlaying}
       />
 
       {/* Export Progress Modal */}
