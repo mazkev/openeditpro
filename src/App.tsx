@@ -282,6 +282,8 @@ export function App() {
           voiceovers={voiceovers}
           setVoiceovers={setVoiceovers}
           currentTime={currentTime}
+          setCurrentTime={setCurrentTime}
+          totalDuration={totalDuration}
           onSplitClip={handleSplitClip}
           onOpenAutoSubtitle={() => setIsAutoSubtitleModalOpen(true)}
         />

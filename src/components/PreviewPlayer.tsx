@@ -263,17 +263,21 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
           {activeSubtitles.map((sub) => (
             <div
               key={sub.id}
-              className="absolute left-0 right-0 flex justify-center pointer-events-none z-20 px-6 transition-all"
-              style={{ top: `${sub.positionY}%` }}
+              className="absolute left-0 right-0 flex justify-center pointer-events-none z-30 px-6 transition-all"
+              style={{
+                top: `${sub.positionY ?? 80}%`,
+                transform: 'translateY(-50%)',
+              }}
             >
               <div
-                className="max-w-[90%] px-4 py-1.5 rounded-lg text-center font-semibold tracking-wide shadow-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
+                className="max-w-[90%] px-4 py-2 rounded-xl text-center font-bold tracking-wide shadow-2xl transition-all"
                 style={{
-                  color: sub.color,
-                  backgroundColor: sub.bgColor,
-                  fontSize: `${sub.fontSize}px`,
-                  lineHeight: 1.3,
-                  textShadow: '0px 1px 3px rgba(0,0,0,0.9)',
+                  color: sub.color || '#ffffff',
+                  backgroundColor: sub.bgColor || 'rgba(0, 0, 0, 0.8)',
+                  fontSize: `${Math.max(16, sub.fontSize || 24)}px`,
+                  lineHeight: 1.35,
+                  textShadow: '0 2px 4px rgba(0,0,0,0.95), 0 0 2px #000',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
                 }}
               >
                 {sub.text}

@@ -35,6 +35,8 @@ interface SidebarProps {
   voiceovers: Voiceover[];
   setVoiceovers: React.Dispatch<React.SetStateAction<Voiceover[]>>;
   currentTime: number;
+  setCurrentTime?: (t: number) => void;
+  totalDuration?: number;
   onSplitClip: (clipId: string, splitTime: number) => void;
   onOpenAutoSubtitle: () => void;
 }
@@ -53,6 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   voiceovers,
   setVoiceovers,
   currentTime,
+  setCurrentTime,
+  totalDuration = 0,
   onSplitClip,
   onOpenAutoSubtitle,
 }) => {
@@ -196,17 +200,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Subtitle Operations
   const handleAddSubtitle = () => {
+    const targetStart = totalDuration > 0 && currentTime >= totalDuration - 0.2 ? 0 : currentTime;
     const newSub: Subtitle = {
       id: `sub-${Date.now()}`,
       text: 'Teks Subtitle Baru',
-      startTime: currentTime,
-      endTime: Math.min(currentTime + 3, 999),
+      startTime: parseFloat(targetStart.toFixed(1)),
+      endTime: parseFloat((targetStart + 3).toFixed(1)),
       fontSize: 26,
       color: '#ffffff',
-      bgColor: 'rgba(0,0,0,0.6)',
-      positionY: 85,
+      bgColor: 'rgba(0, 0, 0, 0.75)',
+      positionY: 80,
     };
     setSubtitles((prev) => [...prev, newSub]);
+    if (setCurrentTime) setCurrentTime(targetStart);
   };
 
   // Text-to-Speech (TTS) Operations
@@ -236,12 +242,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         setTtsStatus(msg);
       });
 
+      // If currentTime is at the end of the video, place from 0 so it plays from beginning!
+      const targetStart = totalDuration > 0 && currentTime >= totalDuration - 0.2 ? 0 : currentTime;
+
       const newVoiceover: Voiceover = {
         id: `vo-tts-${Date.now()}`,
         name: `TTS: ${ttsText.slice(0, 24)}...`,
         url,
         duration,
-        startTime: currentTime,
+        startTime: parseFloat(targetStart.toFixed(1)),
         volume: 1,
       };
 
@@ -252,14 +261,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const newSub: Subtitle = {
           id: `sub-tts-${Date.now()}`,
           text: ttsText,
-          startTime: currentTime,
-          endTime: currentTime + duration,
+          startTime: parseFloat(targetStart.toFixed(1)),
+          endTime: parseFloat((targetStart + Math.max(2, duration)).toFixed(1)),
           fontSize: 26,
           color: '#ffffff',
-          bgColor: 'rgba(0,0,0,0.75)',
-          positionY: 85,
+          bgColor: 'rgba(0, 0, 0, 0.75)',
+          positionY: 80,
         };
         setSubtitles((prev) => [...prev, newSub]);
+      }
+
+      if (setCurrentTime) {
+        setCurrentTime(targetStart);
       }
 
       setTtsText('');
@@ -668,16 +681,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 subtitles.map((sub, index) => (
                   <div
                     key={sub.id}
-                    className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-2.5"
+                    onClick={() => setCurrentTime && setCurrentTime(sub.startTime)}
+                    className="bg-[#171820] hover:bg-[#1a1b24] p-3 rounded-xl border border-[#252834] hover:border-teal-500/40 space-y-2.5 transition-colors cursor-pointer"
+                    title="Klik untuk melihat subtitle ini pada layar video"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-teal-400">
-                        Subtitle #{index + 1}
+                      <span className="text-[11px] font-bold text-teal-400 flex items-center space-x-1.5">
+                        <span>Subtitle #{index + 1}</span>
+                        <span className="text-[10px] text-gray-400 font-mono font-normal">
+                          ({formatTime(sub.startTime)} - {formatTime(sub.endTime)})
+                        </span>
                       </span>
                       <button
-                        onClick={() =>
-                          setSubtitles((prev) => prev.filter((s) => s.id !== sub.id))
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSubtitles((prev) => prev.filter((s) => s.id !== sub.id));
+                        }}
                         className="text-gray-500 hover:text-red-400 p-1 transition-colors"
                         title="Hapus Subtitle"
                       >

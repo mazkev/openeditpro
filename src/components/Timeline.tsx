@@ -511,6 +511,10 @@ export const Timeline: React.FC<TimelineProps> = ({
                 return (
                   <div
                     key={sub.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentTime(sub.startTime);
+                    }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
                       setDragAction({
@@ -526,7 +530,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                       width: `${widthPx}px`,
                     }}
                     className="absolute top-1.5 bottom-1.5 rounded-md bg-amber-500/20 border border-amber-500/60 hover:border-amber-400 text-amber-200 px-2 flex items-center justify-between text-[10px] font-medium overflow-hidden truncate shadow-sm cursor-grab active:cursor-grabbing hover:bg-amber-500/30 transition-colors"
-                    title={`Geser balok ini ke kiri/kanan untuk mengatur timing munculnya subtitle (${formatTime(sub.startTime)} - ${formatTime(sub.endTime)})`}
+                    title={`Klik untuk lihat, atau geser balok ini ke kiri/kanan untuk mengatur timing (${formatTime(sub.startTime)} - ${formatTime(sub.endTime)})`}
                   >
                     <span className="truncate select-none pointer-events-none">
                       {sub.text || '(Teks kosong)'}
