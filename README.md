@@ -1,6 +1,6 @@
-# 🎬 CapCut React Web Studio
+# 🎬 OpenEdit - Web Video Editor
 
-Aplikasi video editor berbasis web dengan antarmuka dan alur kerja mirip **CapCut**, dibangun menggunakan **React 19**, **TypeScript**, **Vite**, dan **Tailwind CSS**.
+Aplikasi video editor berbasis web dengan antarmuka dan alur kerja terinspirasi dari **CapCut**, dibangun menggunakan **React 19**, **TypeScript**, **Vite**, dan **Tailwind CSS**.
 
 Aplikasi ini berjalan 100% di sisi klien (in-browser) menggunakan **HTML5 Canvas**, **Web Audio API**, dan **MediaRecorder**, sehingga tidak memerlukan backend/server khusus untuk pemrosesan video.
 

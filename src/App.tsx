@@ -10,7 +10,7 @@ import type { ExportProgress } from './utils/exportVideo';
 import { createSampleVideo } from './utils/media';
 
 export function App() {
-  const [projectName, setProjectName] = useState('Proyek Video CapCut');
+  const [projectName, setProjectName] = useState('Proyek OpenEdit');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export function App() {
   const [watermark, setWatermark] = useState<Watermark>({
     enabled: true,
     type: 'text',
-    text: '@CapCutWeb',
+    text: '@OpenEdit',
     position: 'top-right',
     opacity: 0.85,
     scale: 1,
@@ -109,7 +109,7 @@ export function App() {
   const handleLoadDemo = async () => {
     try {
       // Create Clip 1 (Intro)
-      const clip1 = await createSampleVideo('CapCut Intro', '#0f2027', '#2c5364', 4);
+      const clip1 = await createSampleVideo('OpenEdit Intro', '#0f2027', '#2c5364', 4);
       // Create Clip 2 (Action)
       const clip2 = await createSampleVideo('Video Sambungan', '#8A2387', '#E94057', 4);
 
@@ -145,7 +145,7 @@ export function App() {
       setSubtitles([
         {
           id: `sub-demo-1`,
-          text: 'Halo! Selamat datang di CapCut React Editor 🎬',
+          text: 'Halo! Selamat datang di OpenEdit Video Editor 🎬',
           startTime: 0.5,
           endTime: 3.8,
           fontSize: 26,
@@ -169,7 +169,7 @@ export function App() {
       setWatermark({
         enabled: true,
         type: 'text',
-        text: '@CapCutWeb',
+        text: '@OpenEdit',
         position: 'top-right',
         opacity: 0.85,
         scale: 1.1,

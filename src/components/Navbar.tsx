@@ -29,7 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-2 bg-gradient-to-r from-teal-400 to-cyan-500 text-black px-2.5 py-1.5 rounded-lg font-bold text-sm shadow-sm">
           <Video className="w-4 h-4 text-black fill-current" />
-          <span className="tracking-wide">CapCut Web</span>
+          <span className="tracking-wide">OpenEdit</span>
         </div>
 
         <div className="h-4 w-px bg-[#2f3140] mx-1" />
