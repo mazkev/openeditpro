@@ -21,7 +21,7 @@ import {
 import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition } from '../types/editor';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
-import { AVAILABLE_VOICES, generateTTSAudio, previewSpeechSynthesis } from '../utils/tts';
+import { AVAILABLE_VOICES, generateTTSAudio, previewSpeechSynthesis, generateSyncedSubtitlesFromText } from '../utils/tts';
 
 interface SidebarProps {
   clips: VideoClip[];
@@ -257,18 +257,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setVoiceovers((prev) => [...prev, newVoiceover]);
 
       // If user also wants subtitles generated from this narration
+      // Split into synchronized phrases so subtitles appear progressively with the voice!
       if (createSubtitleFromTTS) {
-        const newSub: Subtitle = {
-          id: `sub-tts-${Date.now()}`,
-          text: ttsText,
-          startTime: parseFloat(targetStart.toFixed(1)),
-          endTime: parseFloat((targetStart + Math.max(2, duration)).toFixed(1)),
-          fontSize: 26,
-          color: '#ffffff',
-          bgColor: 'rgba(0, 0, 0, 0.75)',
-          positionY: 80,
-        };
-        setSubtitles((prev) => [...prev, newSub]);
+        const syncedSubtitles = generateSyncedSubtitlesFromText(
+          ttsText,
+          targetStart,
+          Math.max(2, duration)
+        );
+        setSubtitles((prev) => [...prev, ...syncedSubtitles]);
       }
 
       if (setCurrentTime) {
@@ -1072,7 +1068,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onChange={(e) => setCreateSubtitleFromTTS(e.target.checked)}
                     className="rounded accent-teal-500"
                   />
-                  <span className="text-[11px]">Otomatis jadikan subtitle teks di video juga</span>
+                  <span className="text-[11px] text-teal-300 font-medium">
+                    ✨ Otomatis buat subtitle sinkron per kalimat / frasa (CapCut style)
+                  </span>
                 </label>
 
                 {/* Action buttons */}

@@ -1,4 +1,5 @@
 import { processAudioFile } from './media';
+import type { Subtitle } from '../types/editor';
 
 export interface TTSVoiceOption {
   id: string;
@@ -68,6 +69,82 @@ function splitTextIntoSentences(text: string): string[] {
     }
   }
   return results;
+}
+
+/**
+ * Split text into synchronized subtitle blocks matching narration duration
+ */
+export function generateSyncedSubtitlesFromText(
+  fullText: string,
+  startTime: number,
+  totalDuration: number
+): Subtitle[] {
+  const clean = fullText.replace(/[\r\n]+/g, ' ').trim();
+  if (!clean) return [];
+
+  // Match sentences by punctuation or comma clauses
+  const rawSentences = clean.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [clean];
+  const phrases: string[] = [];
+
+  for (const raw of rawSentences) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+
+    const words = trimmed.split(/\s+/);
+    // If sentence is short (<= 6 words), keep as one phrase
+    if (words.length <= 6) {
+      phrases.push(trimmed);
+    } else {
+      // Split into 4-6 word chunks for natural CapCut / TikTok pacing
+      let chunk: string[] = [];
+      for (let i = 0; i < words.length; i++) {
+        chunk.push(words[i]);
+        if (chunk.length >= 5 || (chunk.length >= 3 && i === words.length - 1)) {
+          phrases.push(chunk.join(' '));
+          chunk = [];
+        }
+      }
+      if (chunk.length > 0) {
+        phrases.push(chunk.join(' '));
+      }
+    }
+  }
+
+  if (phrases.length === 0) return [];
+
+  // Calculate proportional durations based on character length
+  const totalChars = phrases.reduce((acc, p) => acc + p.length, 0);
+  let currentStart = startTime;
+  const subtitles: Subtitle[] = [];
+
+  for (let i = 0; i < phrases.length; i++) {
+    const phrase = phrases[i];
+    const ratio = phrase.length / totalChars;
+    let phraseDur = Math.max(0.8, parseFloat((ratio * totalDuration).toFixed(2)));
+
+    // Ensure the last phrase covers the remaining audio duration
+    if (i === phrases.length - 1) {
+      phraseDur = Math.max(1.0, parseFloat((startTime + totalDuration - currentStart).toFixed(2)));
+    }
+
+    const start = parseFloat(currentStart.toFixed(2));
+    const end = parseFloat((currentStart + phraseDur).toFixed(2));
+
+    subtitles.push({
+      id: `sub-sync-${Date.now()}-${i}`,
+      text: phrase,
+      startTime: start,
+      endTime: end,
+      fontSize: 26,
+      color: '#ffffff',
+      bgColor: 'rgba(0, 0, 0, 0.75)',
+      positionY: 80,
+    });
+
+    currentStart = end;
+  }
+
+  return subtitles;
 }
 
 /**
