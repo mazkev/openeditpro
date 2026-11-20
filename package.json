@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.5",
-    "@travisvn/edge-tts": "^1.0.2",
     "lucide-react": "^1.75.0",
+    "node-edge-tts": "^1.2.12",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.5"

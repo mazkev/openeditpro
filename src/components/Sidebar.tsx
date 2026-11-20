@@ -512,6 +512,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
       let voiceLabel = 'Narasi';
       let effectivePitch = ttsPitch;
       let effectiveSpeed = ttsSpeed;
+      let edgeVoice: string | undefined = undefined;
 
       if (ttsVoice.startsWith('sys-')) {
         lang = 'id';
@@ -520,8 +521,11 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
         lang = voiceObj.lang;
         voiceLabel = voiceObj.name.split(' ')[0];
+        edgeVoice =
+          voiceObj.edgeVoice ||
+          (voiceObj.gender === 'female' ? 'id-ID-GadisNeural' : 'id-ID-ArdiNeural');
 
-        const basePitch = voiceObj.defaultPitch ?? (voiceObj.gender === 'male' ? 0.80 : 1.0);
+        const basePitch = voiceObj.defaultPitch ?? 1.0;
         const baseSpeed = voiceObj.defaultSpeed ?? 1.0;
         effectivePitch = basePitch * ttsPitch;
         effectiveSpeed = baseSpeed * ttsSpeed;
@@ -530,6 +534,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
       const { url, duration } = await generateTTSAudio(ttsText, lang, {
         pitch: effectivePitch,
         speed: effectiveSpeed,
+        edgeVoice,
         onProgress: (msg) => setTtsStatus(msg),
       });
 

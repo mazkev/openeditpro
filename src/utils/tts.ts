@@ -9,6 +9,7 @@ export interface TTSVoiceOption {
   category: 'id' | 'en' | 'intl';
   description?: string;
   flag?: string;
+  edgeVoice?: string;
   defaultPitch?: number;
   defaultSpeed?: number;
 }
@@ -130,6 +131,7 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '🇮🇩',
+    edgeVoice: 'id-ID-GadisNeural',
     description: 'Suara wanita ramah, cocok untuk tutorial, vlog & presentasi',
     defaultPitch: 1.0,
     defaultSpeed: 1.0,
@@ -141,9 +143,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '🇮🇩',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara pria formal & wibawa, cocok untuk narasi berita & edukasi',
-    defaultPitch: 0.80,
-    defaultSpeed: 0.98,
+    defaultPitch: 1.0,
+    defaultSpeed: 1.0,
   },
   {
     id: 'id-female-tiktok',
@@ -152,6 +155,7 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '📱',
+    edgeVoice: 'id-ID-GadisNeural',
     description: 'Suara ikonik narasi video FYP TikTok yang datar & sangat populer',
     defaultPitch: 1.06,
     defaultSpeed: 1.08,
@@ -163,9 +167,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '🕯️',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara berat serak mencekam untuk cerita misteri, konspirasi & creepypasta',
-    defaultPitch: 0.68,
-    defaultSpeed: 0.86,
+    defaultPitch: 0.85,
+    defaultSpeed: 0.88,
   },
   {
     id: 'id-female-gosip',
@@ -174,9 +179,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '💅',
+    edgeVoice: 'id-ID-GadisNeural',
     description: 'Suara centil, ekspresif & cepat ala pembawa acara infotainment selebriti',
-    defaultPitch: 1.25,
-    defaultSpeed: 1.15,
+    defaultPitch: 1.15,
+    defaultSpeed: 1.12,
   },
   {
     id: 'id-male-ustadz',
@@ -185,9 +191,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '🕌',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara hangat & menyejukkan hati untuk video quotes, renungan & dakwah',
-    defaultPitch: 0.88,
-    defaultSpeed: 0.88,
+    defaultPitch: 0.95,
+    defaultSpeed: 0.90,
   },
   {
     id: 'id-female-kids',
@@ -196,9 +203,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '👧',
+    edgeVoice: 'id-ID-GadisNeural',
     description: 'Suara anak kecil perempuan imut untuk video komedi, POV & unboxing mainan',
-    defaultPitch: 1.45,
-    defaultSpeed: 1.12,
+    defaultPitch: 1.30,
+    defaultSpeed: 1.10,
   },
   {
     id: 'id-male-kids',
@@ -207,9 +215,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '👦',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara anak kecil laki-laki ceria & usil untuk konten keluarga & kartun',
-    defaultPitch: 1.38,
-    defaultSpeed: 1.10,
+    defaultPitch: 1.25,
+    defaultSpeed: 1.08,
   },
   {
     id: 'id-male-sports',
@@ -218,9 +227,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '⚽',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara lantang berapi-api & penuh tensi untuk highlight sepak bola & esports',
-    defaultPitch: 0.95,
-    defaultSpeed: 1.22,
+    defaultPitch: 1.05,
+    defaultSpeed: 1.20,
   },
   {
     id: 'id-female-radio',
@@ -229,9 +239,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '📻',
+    edgeVoice: 'id-ID-GadisNeural',
     description: 'Suara lembut berbisik estetik & hangat untuk puisi serta renungan dini hari',
-    defaultPitch: 0.92,
-    defaultSpeed: 0.90,
+    defaultPitch: 0.95,
+    defaultSpeed: 0.92,
   },
   {
     id: 'id-male-grandpa',
@@ -240,9 +251,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '👴',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara pria sepuh berbobot & berwibawa untuk kisah legenda, fabel & sejarah',
-    defaultPitch: 0.76,
-    defaultSpeed: 0.85,
+    defaultPitch: 0.88,
+    defaultSpeed: 0.88,
   },
   {
     id: 'id-ai-jarvis',
@@ -251,9 +263,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '🤖',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara AI robotik sci-fi yang tegas ala asisten canggih masa depan',
-    defaultPitch: 0.84,
-    defaultSpeed: 1.06,
+    defaultPitch: 0.92,
+    defaultSpeed: 1.05,
   },
   {
     id: 'id-male-jawa',
@@ -262,8 +275,9 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '🌾',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara santun bersahabat dengan intonasi medok Jawa yang akrab & ramah',
-    defaultPitch: 0.86,
+    defaultPitch: 0.96,
     defaultSpeed: 0.96,
   },
   {
@@ -273,9 +287,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '🌸',
+    edgeVoice: 'id-ID-GadisNeural',
     description: 'Suara wanita tanah Pasundan yang lemah lembut, merdu & mendayu-dayu',
-    defaultPitch: 1.14,
-    defaultSpeed: 0.95,
+    defaultPitch: 1.08,
+    defaultSpeed: 0.96,
   },
   {
     id: 'id-male-batak',
@@ -284,9 +299,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '⚡',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara pria lantang, berani, ceplas-ceplos & percaya diri',
-    defaultPitch: 0.78,
-    defaultSpeed: 1.10,
+    defaultPitch: 0.90,
+    defaultSpeed: 1.08,
   },
   {
     id: 'id-female-2',
@@ -295,9 +311,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '🇮🇩',
+    edgeVoice: 'id-ID-GadisNeural',
     description: 'Suara wanita halus & hangat untuk puisi, kisah dongeng & meditasi',
-    defaultPitch: 0.95,
-    defaultSpeed: 0.90,
+    defaultPitch: 0.98,
+    defaultSpeed: 0.92,
   },
   {
     id: 'id-male-2',
@@ -306,8 +323,9 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '🇮🇩',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara pria santai & akrab untuk podcast, obrolan santai & unboxing',
-    defaultPitch: 0.85,
+    defaultPitch: 1.0,
     defaultSpeed: 1.02,
   },
   {
@@ -317,9 +335,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'id',
     flag: '🇮🇩',
+    edgeVoice: 'id-ID-GadisNeural',
     description: 'Suara wanita energik & ceria untuk video reels & TikTok',
-    defaultPitch: 1.18,
-    defaultSpeed: 1.08,
+    defaultPitch: 1.10,
+    defaultSpeed: 1.06,
   },
   {
     id: 'id-male-3',
@@ -328,19 +347,21 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'id',
     flag: '🇮🇩',
+    edgeVoice: 'id-ID-ArdiNeural',
     description: 'Suara pria berat bariton untuk pengantar video sinematik',
-    defaultPitch: 0.70,
-    defaultSpeed: 0.92,
+    defaultPitch: 0.85,
+    defaultSpeed: 0.94,
   },
 
   // 🇺🇸 / 🇬🇧 ENGLISH
   {
     id: 'en-female',
     name: 'Jenny (US Casual / Vlog)',
-    lang: 'en',
+    lang: 'en-US',
     gender: 'female',
     category: 'en',
     flag: '🇺🇸',
+    edgeVoice: 'en-US-JennyNeural',
     description: 'Natural American female creator voice for vlogs & tutorials',
     defaultPitch: 1.0,
     defaultSpeed: 1.0,
@@ -352,8 +373,9 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'en',
     flag: '🇺🇸',
+    edgeVoice: 'en-US-GuyNeural',
     description: 'Dynamic & confident American male voice for gaming & tech',
-    defaultPitch: 0.82,
+    defaultPitch: 1.0,
     defaultSpeed: 1.0,
   },
   {
@@ -363,20 +385,22 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'en',
     flag: '🎬',
+    edgeVoice: 'en-US-ChristopherNeural',
     description: 'Legendary deep booming American movie trailer narrator voice',
-    defaultPitch: 0.66,
-    defaultSpeed: 0.88,
+    defaultPitch: 0.85,
+    defaultSpeed: 0.92,
   },
   {
     id: 'en-female-asmr',
     name: 'Luna (ASMR Soft Whisper)',
-    lang: 'en',
+    lang: 'en-US',
     gender: 'female',
     category: 'en',
     flag: '🌙',
+    edgeVoice: 'en-US-JennyNeural',
     description: 'Gentle, soothing female whisper for relaxation & sleep stories',
-    defaultPitch: 0.98,
-    defaultSpeed: 0.82,
+    defaultPitch: 0.95,
+    defaultSpeed: 0.88,
   },
   {
     id: 'en-male-docu',
@@ -385,20 +409,22 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'en',
     flag: '🦁',
+    edgeVoice: 'en-GB-RyanNeural',
     description: 'Distinguished British wildlife & scientific documentary narrator',
-    defaultPitch: 0.78,
-    defaultSpeed: 0.92,
+    defaultPitch: 0.95,
+    defaultSpeed: 0.94,
   },
   {
     id: 'en-female-teen',
     name: 'Hailey (Gen-Z Trendsetter)',
-    lang: 'en',
+    lang: 'en-US',
     gender: 'female',
     category: 'en',
     flag: '✨',
+    edgeVoice: 'en-US-AnaNeural',
     description: 'Bubbly & lively Gen-Z voice for lifestyle, haul & fashion reviews',
-    defaultPitch: 1.20,
-    defaultSpeed: 1.12,
+    defaultPitch: 1.05,
+    defaultSpeed: 1.08,
   },
   {
     id: 'en-male-radio',
@@ -407,20 +433,22 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'en',
     flag: '🎷',
+    edgeVoice: 'en-US-EricNeural',
     description: 'Warm, raspy baritone of a classic midnight FM radio DJ',
-    defaultPitch: 0.72,
-    defaultSpeed: 0.90,
+    defaultPitch: 0.90,
+    defaultSpeed: 0.92,
   },
   {
     id: 'en-female-2',
     name: 'Aria (US Commercial & Clear)',
-    lang: 'en',
+    lang: 'en-US',
     gender: 'female',
     category: 'en',
     flag: '🇺🇸',
+    edgeVoice: 'en-US-AriaNeural',
     description: 'Crisp & persuasive American female voice for promos',
-    defaultPitch: 1.10,
-    defaultSpeed: 1.05,
+    defaultPitch: 1.0,
+    defaultSpeed: 1.02,
   },
   {
     id: 'en-male-2',
@@ -429,9 +457,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'en',
     flag: '🇺🇸',
+    edgeVoice: 'en-US-ChristopherNeural',
     description: 'Deep resonant American baritone for dramatic voiceovers',
-    defaultPitch: 0.72,
-    defaultSpeed: 0.92,
+    defaultPitch: 1.0,
+    defaultSpeed: 0.95,
   },
   {
     id: 'en-female-uk',
@@ -440,6 +469,7 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'en',
     flag: '🇬🇧',
+    edgeVoice: 'en-GB-SoniaNeural',
     description: 'Sophisticated British RP female accent for luxury & explainers',
     defaultPitch: 1.0,
     defaultSpeed: 0.98,
@@ -451,9 +481,10 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'en',
     flag: '🇬🇧',
+    edgeVoice: 'en-GB-RyanNeural',
     description: 'Classic British documentary style voice',
-    defaultPitch: 0.82,
-    defaultSpeed: 0.95,
+    defaultPitch: 1.0,
+    defaultSpeed: 0.96,
   },
   {
     id: 'en-female-au',
@@ -462,66 +493,72 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'en',
     flag: '🇦🇺',
+    edgeVoice: 'en-AU-NatashaNeural',
     description: 'Friendly & upbeat Australian accent',
-    defaultPitch: 1.02,
-    defaultSpeed: 1.02,
+    defaultPitch: 1.0,
+    defaultSpeed: 1.0,
   },
 
   // 🌏 INTERNASIONAL & ASIA
   {
     id: 'ja-female-tsundere',
     name: 'Aoi (Anime Tsundere / Senpai)',
-    lang: 'ja',
+    lang: 'ja-JP',
     gender: 'female',
     category: 'intl',
     flag: '🎀',
+    edgeVoice: 'ja-JP-NanamiNeural',
     description: 'High-energy, expressive Japanese anime character voice',
-    defaultPitch: 1.34,
-    defaultSpeed: 1.10,
+    defaultPitch: 1.15,
+    defaultSpeed: 1.08,
   },
   {
     id: 'ja-female',
     name: 'Nanami (Anime / Kawaii)',
-    lang: 'ja',
+    lang: 'ja-JP',
     gender: 'female',
     category: 'intl',
     flag: '🇯🇵',
+    edgeVoice: 'ja-JP-NanamiNeural',
     description: 'Sweet & cute Japanese female voice for anime & aesthetic clips',
-    defaultPitch: 1.28,
-    defaultSpeed: 1.05,
+    defaultPitch: 1.0,
+    defaultSpeed: 1.0,
   },
   {
     id: 'ja-male',
     name: 'Keita (Anime Action / Dynamic)',
-    lang: 'ja',
+    lang: 'ja-JP',
     gender: 'male',
     category: 'intl',
     flag: '🇯🇵',
+    edgeVoice: 'ja-JP-KeitaNeural',
     description: 'Japanese male voice for gaming & dramatic clips',
-    defaultPitch: 0.84,
+    defaultPitch: 1.0,
     defaultSpeed: 1.02,
   },
   {
     id: 'ko-female',
     name: 'Sun-Hi (K-Drama / Soft)',
-    lang: 'ko',
+    lang: 'ko-KR',
     gender: 'female',
     category: 'intl',
     flag: '🇰🇷',
+    edgeVoice: 'ko-KR-SunHiNeural',
     description: 'Korean melodramatic female voice for romance & beauty vlogs',
-    defaultPitch: 1.06,
+    defaultPitch: 1.0,
     defaultSpeed: 0.98,
   },
   {
     id: 'ko-male',
     name: 'Min-Ho (K-Oppa Narrator)',
-    lang: 'ko',
+    lang: 'ko-KR',
     gender: 'male',
     category: 'intl',
     flag: '🇰🇷',
+    edgeVoice: 'ko-KR-InJoonNeural',
     description: 'Korean calm male voice for storytelling & lifestyle',
-    defaultPitch: 0.82,
-    defaultSpeed: 0.95,
+    defaultPitch: 1.0,
+    defaultSpeed: 0.96,
   },
   {
     id: 'zh-female',
@@ -530,8 +567,9 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'female',
     category: 'intl',
     flag: '🇨🇳',
+    edgeVoice: 'zh-CN-XiaoxiaoNeural',
     description: 'Standard Mandarin Chinese, clear & melodious',
-    defaultPitch: 1.05,
+    defaultPitch: 1.0,
     defaultSpeed: 1.0,
   },
   {
@@ -541,97 +579,106 @@ export const AVAILABLE_VOICES: TTSVoiceOption[] = [
     gender: 'male',
     category: 'intl',
     flag: '🐉',
+    edgeVoice: 'zh-CN-YunjianNeural',
     description: 'Heroic & resolute Mandarin Chinese male voice',
-    defaultPitch: 0.82,
+    defaultPitch: 1.0,
     defaultSpeed: 0.98,
   },
   {
     id: 'hi-female',
     name: 'Priya (Hindi Bollywood)',
-    lang: 'hi',
+    lang: 'hi-IN',
     gender: 'female',
     category: 'intl',
     flag: '🇮🇳',
+    edgeVoice: 'hi-IN-SwaraNeural',
     description: 'Expressive & vibrant Hindi voice for music & storytelling',
-    defaultPitch: 1.08,
-    defaultSpeed: 1.02,
+    defaultPitch: 1.0,
+    defaultSpeed: 1.0,
   },
   {
     id: 'ar-male',
     name: 'Zayd (Arabic / Fasih)',
-    lang: 'ar',
+    lang: 'ar-SA',
     gender: 'male',
     category: 'intl',
     flag: '🇸🇦',
+    edgeVoice: 'ar-SA-HamedNeural',
     description: 'Clear, eloquent Arabic voice for quotes & recitations',
-    defaultPitch: 0.86,
-    defaultSpeed: 0.95,
-  },
-  {
-    id: 'ar-female',
-    name: 'Noor (Arabic Gentle)',
-    lang: 'ar',
-    gender: 'female',
-    category: 'intl',
-    flag: '🌙',
-    description: 'Soft & melodious Arabic female voice',
-    defaultPitch: 1.04,
-    defaultSpeed: 0.96,
-  },
-  {
-    id: 'fr-female',
-    name: 'Camille (French Elegance)',
-    lang: 'fr',
-    gender: 'female',
-    category: 'intl',
-    flag: '🇫🇷',
-    description: 'Chic, romantic French voice for fashion & art',
     defaultPitch: 1.0,
     defaultSpeed: 0.96,
   },
   {
+    id: 'ar-female',
+    name: 'Noor (Arabic Gentle)',
+    lang: 'ar-SA',
+    gender: 'female',
+    category: 'intl',
+    flag: '🌙',
+    edgeVoice: 'ar-SA-ZariyahNeural',
+    description: 'Soft & melodious Arabic female voice',
+    defaultPitch: 1.0,
+    defaultSpeed: 0.98,
+  },
+  {
+    id: 'fr-female',
+    name: 'Camille (French Elegance)',
+    lang: 'fr-FR',
+    gender: 'female',
+    category: 'intl',
+    flag: '🇫🇷',
+    edgeVoice: 'fr-FR-DeniseNeural',
+    description: 'Chic, romantic French voice for fashion & art',
+    defaultPitch: 1.0,
+    defaultSpeed: 0.98,
+  },
+  {
     id: 'de-male',
     name: 'Hans (German Professional)',
-    lang: 'de',
+    lang: 'de-DE',
     gender: 'male',
     category: 'intl',
     flag: '🇩🇪',
+    edgeVoice: 'de-DE-ConradNeural',
     description: 'Strong, authoritative German male voice',
-    defaultPitch: 0.82,
+    defaultPitch: 1.0,
     defaultSpeed: 0.98,
   },
   {
     id: 'es-female',
     name: 'Sofia (Spanish Expressive)',
-    lang: 'es',
+    lang: 'es-ES',
     gender: 'female',
     category: 'intl',
     flag: '🇪🇸',
+    edgeVoice: 'es-ES-ElviraNeural',
     description: 'Warm & vibrant Spanish / Latin American voice',
-    defaultPitch: 1.02,
-    defaultSpeed: 1.02,
+    defaultPitch: 1.0,
+    defaultSpeed: 1.0,
   },
   {
     id: 'th-female',
     name: 'Mali (Thai Melodic)',
-    lang: 'th',
+    lang: 'th-TH',
     gender: 'female',
     category: 'intl',
     flag: '🇹🇭',
+    edgeVoice: 'th-TH-PremwadeeNeural',
     description: 'Melodic & gentle Thai voice for travel & culture',
-    defaultPitch: 1.05,
+    defaultPitch: 1.0,
     defaultSpeed: 0.98,
   },
   {
     id: 'ru-male',
     name: 'Dimitri (Russian Deep)',
-    lang: 'ru',
+    lang: 'ru-RU',
     gender: 'male',
     category: 'intl',
     flag: '🇷🇺',
+    edgeVoice: 'ru-RU-DmitryNeural',
     description: 'Deep cinematic Russian male voice',
-    defaultPitch: 0.74,
-    defaultSpeed: 0.92,
+    defaultPitch: 1.0,
+    defaultSpeed: 0.95,
   },
 ];
 
@@ -678,7 +725,7 @@ export function stopTTSPreview(): void {
  */
 export async function playTTSPreview(
   text: string,
-  voice: TTSVoiceOption | { id: string; name: string; lang: string },
+  voice: TTSVoiceOption | { id: string; name: string; lang: string; edgeVoice?: string },
   userPitch: number = 1.0,
   userSpeed: number = 1.0,
   onEnd?: () => void
@@ -698,13 +745,16 @@ export async function playTTSPreview(
 
   const ttsVoice = voice as TTSVoiceOption;
   const lang = ttsVoice.lang || 'id';
+  const edgeVoice =
+    ttsVoice.edgeVoice ||
+    (ttsVoice.gender === 'female' ? 'id-ID-GadisNeural' : 'id-ID-ArdiNeural');
 
   // For testing preview, use first sentence or up to 80 chars so it loads instantly (<200ms)
   const trimmed = text.trim();
   const sentences = splitTextIntoSentences(trimmed);
   const snippet = sentences[0] || trimmed.slice(0, 80);
 
-  const basePitch = ttsVoice.defaultPitch ?? (ttsVoice.gender === 'male' ? 0.80 : 1.0);
+  const basePitch = ttsVoice.defaultPitch ?? (ttsVoice.gender === 'male' ? 1.0 : 1.0);
   const baseSpeed = ttsVoice.defaultSpeed ?? 1.0;
   const effectivePitch = basePitch * userPitch;
   const effectiveSpeed = baseSpeed * userSpeed;
@@ -713,11 +763,12 @@ export async function playTTSPreview(
     const { url } = await generateTTSAudio(snippet, lang, {
       pitch: effectivePitch,
       speed: effectiveSpeed,
+      edgeVoice,
     });
 
     const audio = new Audio();
     audio.src = url;
-    audio.playbackRate = Math.max(0.5, Math.min(2.0, effectiveSpeed));
+    audio.playbackRate = 1.0;
     currentPreviewAudio = audio;
 
     audio.onended = () => {
@@ -988,12 +1039,14 @@ export function generateSyncedSubtitlesFromText(
 export interface TTSGenerateOptions {
   pitch?: number;
   speed?: number;
+  voice?: string;
+  edgeVoice?: string;
   onProgress?: (msg: string) => void;
 }
 
 /**
- * Generate audio blob using Google TTS endpoint with local proxy or direct audio streaming,
- * with optional pitch and speed audio modulation.
+ * Generate audio blob using high-fidelity Microsoft Edge Neural TTS endpoint (Ardi, Gadis, Guy, Jenny, etc.)
+ * with Google TTS / local browser SpeechSynthesis as robust fallbacks.
  */
 export async function generateTTSAudio(
   text: string,
@@ -1007,12 +1060,56 @@ export async function generateTTSAudio(
 
   const { pitch = 1.0, speed = 1.0, onProgress } = options;
 
-  const sentences = splitTextIntoSentences(text);
-  if (sentences.length === 0) {
+  const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
+  if (!cleanText) {
     throw new Error('Teks narasi tidak boleh kosong');
   }
 
-  onProgress?.('Menghubungkan ke layanan suara manusia alami...');
+  // Determine the best neural AI voice
+  const selectedEdgeVoice =
+    options.edgeVoice ||
+    options.voice ||
+    (lang.startsWith('id')
+      ? 'id-ID-ArdiNeural'
+      : lang.startsWith('en')
+        ? 'en-US-GuyNeural'
+        : 'id-ID-GadisNeural');
+
+  // Convert speed & pitch multipliers to Edge TTS prosody parameters
+  const ratePct = Math.round((speed - 1.0) * 100);
+  const rateStr = ratePct >= 0 ? `+${ratePct}%` : `${ratePct}%`;
+  const pitchHz = Math.round((pitch - 1.0) * 50);
+  const pitchStr = pitchHz >= 0 ? `+${pitchHz}Hz` : `${pitchHz}Hz`;
+
+  // 1. PRIMARY: Edge Neural AI Voice endpoint (/api/edge-tts)
+  onProgress?.(`Memproses suara AI Neural (${selectedEdgeVoice})...`);
+  try {
+    const edgeResp = await fetch('/api/edge-tts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: cleanText,
+        voice: selectedEdgeVoice,
+        rate: rateStr,
+        pitch: pitchStr,
+      }),
+    });
+
+    if (edgeResp.ok) {
+      onProgress?.('Menerima audio suara AI jernih...');
+      const audioBlob = await edgeResp.blob();
+      const { url, duration } = await processAudioFile(audioBlob);
+      return { url, duration };
+    }
+  } catch (edgeErr) {
+    console.warn('Edge TTS endpoint tidak merespons, beralih ke fallback Google TTS:', edgeErr);
+  }
+
+  // 2. SECONDARY FALLBACK: Google TTS with chunking & offline audio modulation
+  onProgress?.('Menghubungkan ke layanan suara cadangan...');
+  const sentences = splitTextIntoSentences(cleanText);
 
   const audioBlobs: Blob[] = [];
   let useDirectUrls = false;
@@ -1073,12 +1170,12 @@ export async function generateTTSAudio(
   }
 
   // Fallback to direct streaming Google TTS URL
-  onProgress?.('Menyiapkan streaming audio suara alami...');
-  const encodedFull = encodeURIComponent(sentences[0]);
+  onProgress?.('Menyiapkan streaming audio suara...');
+  const encodedFull = encodeURIComponent(sentences[0] || cleanText.slice(0, 100));
   const streamUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodedFull}`;
 
   // Estimate duration adjusted by speed & pitch
-  const wordCount = text.trim().split(/\s+/).length;
+  const wordCount = cleanText.split(/\s+/).length;
   const baseDur = Math.max(2, Math.round((wordCount / 2.3) * 10) / 10);
   const estimatedDur = Math.max(1, Math.round((baseDur / (pitch * speed)) * 10) / 10);
 
