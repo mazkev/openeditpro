@@ -13,8 +13,10 @@ import {
   GripVertical,
   Volume2,
   VolumeX,
+  Sparkles,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Voiceover, BackgroundMusic } from '../types/editor';
+import { TRANSITION_PRESETS } from '../types/editor';
 import { formatTime } from '../utils/time';
 
 interface TimelineProps {
@@ -35,6 +37,7 @@ interface TimelineProps {
   bgm?: BackgroundMusic | null;
   setBgm?: React.Dispatch<React.SetStateAction<BackgroundMusic | null>>;
   onOpenMusicTab?: () => void;
+  onOpenTransitionTab?: (clipIndex: number) => void;
   onExtractAudio?: (clipId: string) => void;
   onToggleMuteClip?: (clipId: string) => void;
 }
@@ -57,6 +60,7 @@ export const Timeline: React.FC<TimelineProps> = ({
   bgm,
   setBgm,
   onOpenMusicTab,
+  onOpenTransitionTab,
   onExtractAudio,
   onToggleMuteClip,
 }) => {
@@ -475,6 +479,20 @@ export const Timeline: React.FC<TimelineProps> = ({
             </button>
           )}
 
+          {/* Transisi Tab Button */}
+          {clips.length > 1 && onOpenTransitionTab && (
+            <button
+              onClick={() => onOpenTransitionTab(0)}
+              className="flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg border bg-[#20222e] hover:bg-[#282b3a] text-purple-300 border-purple-500/40 hover:border-purple-500/70 transition-all font-semibold"
+              title="Buka panel efek transisi halus antar klip video"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <span>
+                Transisi ({clips.filter((c) => c.transition && c.transition.type !== 'none').length}/{clips.length - 1})
+              </span>
+            </button>
+          )}
+
           <div className="h-4 w-px bg-[#2b2d3d] mx-2" />
           <span className="text-[11px] text-gray-400 hidden md:inline">
             💡 Tips: Klik klip video, subtitle, atau narasi suara lalu klik <b>Hapus</b> (atau tekan tombol <b>Delete</b> di keyboard).
@@ -570,162 +588,204 @@ export const Timeline: React.FC<TimelineProps> = ({
                 const isBeingDraggedOver = dragOverClipIndex === index;
 
                 return (
-                  <div
-                    key={clip.id}
-                    onMouseDown={(e) => {
-                      // Clicking or dragging clip body scrubs playhead and selects clip
-                      setSelectedClipId(clip.id);
-                      setSelectedSubtitleId(null);
-                      setSelectedVoiceoverId(null);
-                      handleRulerMouseDown(e);
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOverClipIndex(index);
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverClipIndex === index) setDragOverClipIndex(null);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (draggedClipIndex !== null && draggedClipIndex !== index) {
-                        const updated = [...clips];
-                        const [moved] = updated.splice(draggedClipIndex, 1);
-                        updated.splice(index, 0, moved);
-                        setClips(updated);
-                        setSelectedClipId(moved.id);
-                      }
-                      setDraggedClipIndex(null);
-                      setDragOverClipIndex(null);
-                    }}
-                    style={{
-                      left: `${leftPx}px`,
-                      width: `${widthPx}px`,
-                    }}
-                    className={`absolute top-1 bottom-1 rounded-lg overflow-hidden flex flex-col justify-between border cursor-pointer transition-all ${
-                      isBeingDraggedOver
-                        ? 'border-yellow-400 ring-2 ring-yellow-400/50 scale-105 z-20'
-                        : isSelected
-                        ? 'border-cyan-400 bg-cyan-950/40 ring-2 ring-cyan-500/50 z-10'
-                        : 'border-[#2d3248] bg-[#1b1e2a] hover:border-gray-500'
-                    }`}
-                    title={`Klik untuk memilih klip video, tarik gagang ⠿ untuk tukar urutan, atau geser ujung samping untuk potong (Trim)`}
-                  >
-                    {/* Header info */}
-                    <div className="flex items-center justify-between px-2 pt-1 text-[11px] font-semibold text-gray-200 truncate">
-                      <div className="flex items-center space-x-1 truncate">
-                        <div
-                          draggable
-                          onDragStart={(e) => {
-                            e.stopPropagation();
-                            setDraggedClipIndex(index);
-                            e.dataTransfer.setData('text/plain', clip.id);
-                          }}
-                          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-white/10 rounded flex-shrink-0"
-                          title="Tarik ikon ini untuk menukar urutan klip"
-                        >
-                          <GripVertical className="w-3.5 h-3.5 text-cyan-400" />
-                        </div>
-                        <span className="truncate pointer-events-none">{clip.name}</span>
-                      </div>
-                      <div className="flex items-center space-x-1 ml-1 flex-shrink-0">
-                        {(clip.volume ?? 1) === 0 && (
-                          <span
-                            className="bg-red-950/80 text-red-300 border border-red-700/60 text-[9px] px-1 py-0.5 rounded font-bold flex items-center space-x-0.5"
-                            title="Suara asli video ini dibisukan (0%)"
+                  <React.Fragment key={clip.id}>
+                    <div
+                      onMouseDown={(e) => {
+                        // Clicking or dragging clip body scrubs playhead and selects clip
+                        setSelectedClipId(clip.id);
+                        setSelectedSubtitleId(null);
+                        setSelectedVoiceoverId(null);
+                        handleRulerMouseDown(e);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverClipIndex(index);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverClipIndex === index) setDragOverClipIndex(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedClipIndex !== null && draggedClipIndex !== index) {
+                          const updated = [...clips];
+                          const [moved] = updated.splice(draggedClipIndex, 1);
+                          updated.splice(index, 0, moved);
+                          setClips(updated);
+                          setSelectedClipId(moved.id);
+                        }
+                        setDraggedClipIndex(null);
+                        setDragOverClipIndex(null);
+                      }}
+                      style={{
+                        left: `${leftPx}px`,
+                        width: `${widthPx}px`,
+                      }}
+                      className={`absolute top-1 bottom-1 rounded-lg overflow-hidden flex flex-col justify-between border cursor-pointer transition-all ${
+                        isBeingDraggedOver
+                          ? 'border-yellow-400 ring-2 ring-yellow-400/50 scale-105 z-20'
+                          : isSelected
+                          ? 'border-cyan-400 bg-cyan-950/40 ring-2 ring-cyan-500/50 z-10'
+                          : 'border-[#2d3248] bg-[#1b1e2a] hover:border-gray-500'
+                      }`}
+                      title={`Klik untuk memilih klip video, tarik gagang ⠿ untuk tukar urutan, atau geser ujung samping untuk potong (Trim)`}
+                    >
+                      {/* Header info */}
+                      <div className="flex items-center justify-between px-2 pt-1 text-[11px] font-semibold text-gray-200 truncate">
+                        <div className="flex items-center space-x-1 truncate">
+                          <div
+                            draggable
+                            onDragStart={(e) => {
+                              e.stopPropagation();
+                              setDraggedClipIndex(index);
+                              e.dataTransfer.setData('text/plain', clip.id);
+                            }}
+                            className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-white/10 rounded flex-shrink-0"
+                            title="Tarik ikon ini untuk menukar urutan klip"
                           >
-                            <VolumeX className="w-2.5 h-2.5" />
-                            <span>Bisu</span>
+                            <GripVertical className="w-3.5 h-3.5 text-cyan-400" />
+                          </div>
+                          <span className="truncate pointer-events-none">{clip.name}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 ml-1 flex-shrink-0">
+                          {(clip.volume ?? 1) === 0 && (
+                            <span
+                              className="bg-red-950/80 text-red-300 border border-red-700/60 text-[9px] px-1 py-0.5 rounded font-bold flex items-center space-x-0.5"
+                              title="Suara asli video ini dibisukan (0%)"
+                            >
+                              <VolumeX className="w-2.5 h-2.5" />
+                              <span>Bisu</span>
+                            </span>
+                          )}
+                          {/* Quick Mute Toggle Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onToggleMuteClip) {
+                                onToggleMuteClip(clip.id);
+                              }
+                            }}
+                            className={`p-0.5 rounded transition-colors ${
+                              (clip.volume ?? 1) === 0
+                                ? 'text-red-400 hover:bg-red-500/20'
+                                : 'text-gray-400 hover:text-cyan-300 hover:bg-white/10'
+                            }`}
+                            title={(clip.volume ?? 1) === 0 ? 'Aktifkan Suara Asli Video' : 'Bisukan Suara Asli Video'}
+                          >
+                            {(clip.volume ?? 1) === 0 ? (
+                              <VolumeX className="w-3 h-3" />
+                            ) : (
+                              <Volume2 className="w-3 h-3" />
+                            )}
+                          </button>
+                          <span className="text-[10px] text-cyan-300 font-mono pointer-events-none">
+                            {formatTime(duration)}
                           </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClips((prev) => prev.filter((c) => c.id !== clip.id));
+                              if (selectedClipId === clip.id) setSelectedClipId(null);
+                            }}
+                            className="p-0.5 rounded hover:bg-red-500/30 text-gray-400 hover:text-red-400 transition-colors"
+                            title="Hapus Klip Video Ini"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Clip preview thumbnail strip */}
+                      <div className="h-6 flex items-center px-2 space-x-1 overflow-hidden opacity-75 pointer-events-none">
+                        {clip.thumbnailUrl && (
+                          <img
+                            src={clip.thumbnailUrl}
+                            alt=""
+                            className="h-5 w-8 object-cover rounded"
+                          />
                         )}
-                        {/* Quick Mute Toggle Button */}
+                        <div className="flex-1 h-1.5 bg-cyan-500/30 rounded" />
+                      </div>
+
+                      {/* DRAGGABLE LEFT TRIM HANDLE */}
+                      <div
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setDragAction({
+                            type: 'trim-start',
+                            targetId: clip.id,
+                            initialMouseX: e.clientX,
+                            initialValue: clip.trimStart,
+                            clipOriginalDuration: clip.duration,
+                          });
+                        }}
+                        className="absolute left-0 top-0 bottom-0 w-3 hover:w-4 bg-cyan-500/80 hover:bg-cyan-400 cursor-col-resize flex items-center justify-center transition-all z-20 group"
+                        title="Geser ke kanan/kiri untuk memotong titik awal klip (Trim In)"
+                      >
+                        <div className="w-0.5 h-4 bg-black rounded" />
+                      </div>
+
+                      {/* DRAGGABLE RIGHT TRIM HANDLE */}
+                      <div
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setDragAction({
+                            type: 'trim-end',
+                            targetId: clip.id,
+                            initialMouseX: e.clientX,
+                            initialValue: clip.trimEnd,
+                            clipOriginalDuration: clip.duration,
+                          });
+                        }}
+                        className="absolute right-0 top-0 bottom-0 w-3 hover:w-4 bg-cyan-500/80 hover:bg-cyan-400 cursor-col-resize flex items-center justify-center transition-all z-20 group"
+                        title="Geser ke kanan/kiri untuk memotong titik akhir klip (Trim Out)"
+                      >
+                        <div className="w-0.5 h-4 bg-black rounded" />
+                      </div>
+                    </div>
+
+                    {/* TRANSITION CUT BUTTON BETWEEN ADJACENT CLIPS */}
+                    {index < clipPositions.length - 1 && (
+                      <div
+                        style={{
+                          left: `${leftPx + widthPx - 11}px`,
+                        }}
+                        className="absolute top-1/2 -translate-y-1/2 z-30 pointer-events-auto"
+                      >
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (onToggleMuteClip) {
-                              onToggleMuteClip(clip.id);
+                            setCurrentTime(Math.max(0, startTime + duration - 0.3));
+                            if (onOpenTransitionTab) {
+                              onOpenTransitionTab(index);
                             }
                           }}
-                          className={`p-0.5 rounded transition-colors ${
-                            (clip.volume ?? 1) === 0
-                              ? 'text-red-400 hover:bg-red-500/20'
-                              : 'text-gray-400 hover:text-cyan-300 hover:bg-white/10'
+                          className={`w-5.5 h-5.5 rounded-md flex items-center justify-center transition-all shadow-lg group ${
+                            clip.transition && clip.transition.type !== 'none'
+                              ? 'bg-purple-900/90 text-purple-200 border-2 border-purple-400 hover:scale-120 hover:bg-purple-800 ring-2 ring-purple-500/50'
+                              : 'bg-[#181a24] text-gray-400 border border-[#3e4256] hover:border-purple-400 hover:text-purple-300 hover:scale-115'
                           }`}
-                          title={(clip.volume ?? 1) === 0 ? 'Aktifkan Suara Asli Video' : 'Bisukan Suara Asli Video'}
+                          title={
+                            clip.transition && clip.transition.type !== 'none'
+                              ? `Transisi: ${clip.transition.type} (${clip.transition.duration}s) - Klik untuk ubah`
+                              : 'Klik untuk tambah efek transisi antar video'
+                          }
                         >
-                          {(clip.volume ?? 1) === 0 ? (
-                            <VolumeX className="w-3 h-3" />
+                          {clip.transition && clip.transition.type !== 'none' ? (
+                            <span className="text-[10px] leading-none pointer-events-none">
+                              {TRANSITION_PRESETS.find((p) => p.id === clip.transition?.type)?.icon || '✨'}
+                            </span>
                           ) : (
-                            <Volume2 className="w-3 h-3" />
+                            <span className="text-[11px] font-bold leading-none text-gray-400 group-hover:text-purple-400 pointer-events-none">
+                              ⧉
+                            </span>
                           )}
                         </button>
-                        <span className="text-[10px] text-cyan-300 font-mono pointer-events-none">
-                          {formatTime(duration)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setClips((prev) => prev.filter((c) => c.id !== clip.id));
-                            if (selectedClipId === clip.id) setSelectedClipId(null);
-                          }}
-                          className="p-0.5 rounded hover:bg-red-500/30 text-gray-400 hover:text-red-400 transition-colors"
-                          title="Hapus Klip Video Ini"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
                       </div>
-                    </div>
-
-                    {/* Clip preview thumbnail strip */}
-                    <div className="h-6 flex items-center px-2 space-x-1 overflow-hidden opacity-75 pointer-events-none">
-                      {clip.thumbnailUrl && (
-                        <img
-                          src={clip.thumbnailUrl}
-                          alt=""
-                          className="h-5 w-8 object-cover rounded"
-                        />
-                      )}
-                      <div className="flex-1 h-1.5 bg-cyan-500/30 rounded" />
-                    </div>
-
-                    {/* DRAGGABLE LEFT TRIM HANDLE */}
-                    <div
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        setDragAction({
-                          type: 'trim-start',
-                          targetId: clip.id,
-                          initialMouseX: e.clientX,
-                          initialValue: clip.trimStart,
-                          clipOriginalDuration: clip.duration,
-                        });
-                      }}
-                      className="absolute left-0 top-0 bottom-0 w-3 hover:w-4 bg-cyan-500/80 hover:bg-cyan-400 cursor-col-resize flex items-center justify-center transition-all z-20 group"
-                      title="Geser ke kanan/kiri untuk memotong titik awal klip (Trim In)"
-                    >
-                      <div className="w-0.5 h-4 bg-black rounded" />
-                    </div>
-
-                    {/* DRAGGABLE RIGHT TRIM HANDLE */}
-                    <div
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        setDragAction({
-                          type: 'trim-end',
-                          targetId: clip.id,
-                          initialMouseX: e.clientX,
-                          initialValue: clip.trimEnd,
-                          clipOriginalDuration: clip.duration,
-                        });
-                      }}
-                      className="absolute right-0 top-0 bottom-0 w-3 hover:w-4 bg-cyan-500/80 hover:bg-cyan-400 cursor-col-resize flex items-center justify-center transition-all z-20 group"
-                      title="Geser ke kanan/kiri untuk memotong titik akhir klip (Trim Out)"
-                    >
-                      <div className="w-0.5 h-4 bg-black rounded" />
-                    </div>
-                  </div>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>

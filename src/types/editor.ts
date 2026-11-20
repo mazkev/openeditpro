@@ -1,3 +1,117 @@
+export type TransitionType =
+  | 'none'
+  | 'fade'
+  | 'fade-black'
+  | 'fade-white'
+  | 'slide-left'
+  | 'slide-right'
+  | 'slide-up'
+  | 'slide-down'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'wipe-left'
+  | 'wipe-right';
+
+export interface VideoTransition {
+  type: TransitionType;
+  duration: number; // in seconds, default 0.5s (0.2s to 1.5s)
+}
+
+export interface TransitionPreset {
+  id: TransitionType;
+  name: string;
+  category: 'basic' | 'motion' | 'zoom' | 'wipe';
+  icon: string;
+  description: string;
+}
+
+export const TRANSITION_PRESETS: TransitionPreset[] = [
+  {
+    id: 'none',
+    name: 'Tanpa Transisi (Cut)',
+    category: 'basic',
+    icon: '✂️',
+    description: 'Potongan langsung standar tanpa efek transisi',
+  },
+  {
+    id: 'fade',
+    name: 'Cross Dissolve',
+    category: 'basic',
+    icon: '🌫️',
+    description: 'Peleburan halus bertahap antar video (transisi klasik)',
+  },
+  {
+    id: 'fade-black',
+    name: 'Dip to Black',
+    category: 'basic',
+    icon: '⬛',
+    description: 'Memudar ke hitam lalu muncul video baru (gaya sinematik)',
+  },
+  {
+    id: 'fade-white',
+    name: 'Flash / Dip to White',
+    category: 'basic',
+    icon: '⚡',
+    description: 'Kilatan cahaya putih dramatis & berenergi antar adegan',
+  },
+  {
+    id: 'slide-left',
+    name: 'Slide Kiri',
+    category: 'motion',
+    icon: '⬅️',
+    description: 'Video baru masuk menggeser video lama ke arah kiri',
+  },
+  {
+    id: 'slide-right',
+    name: 'Slide Kanan',
+    category: 'motion',
+    icon: '➡️',
+    description: 'Video baru masuk menggeser video lama ke arah kanan',
+  },
+  {
+    id: 'slide-up',
+    name: 'Slide Naik',
+    category: 'motion',
+    icon: '⬆️',
+    description: 'Video baru bergeser mendorong video lama dari bawah ke atas',
+  },
+  {
+    id: 'slide-down',
+    name: 'Slide Turun',
+    category: 'motion',
+    icon: '⬇️',
+    description: 'Video baru bergeser mendorong video lama dari atas ke bawah',
+  },
+  {
+    id: 'zoom-in',
+    name: 'Zoom In',
+    category: 'zoom',
+    icon: '🔍',
+    description: 'Kamera melesat maju memperbesar klip baru secara dinamis',
+  },
+  {
+    id: 'zoom-out',
+    name: 'Zoom Out',
+    category: 'zoom',
+    icon: '🔎',
+    description: 'Kamera bergerak mundur memperkecil klip baru secara dramatis',
+  },
+  {
+    id: 'wipe-left',
+    name: 'Wipe Kiri',
+    category: 'wipe',
+    icon: '◀️',
+    description: 'Sapuan tirai mulus dari sisi kanan membuka ke kiri',
+  },
+  {
+    id: 'wipe-right',
+    name: 'Wipe Kanan',
+    category: 'wipe',
+    icon: '▶️',
+    description: 'Sapuan tirai mulus dari sisi kiri membuka ke kanan',
+  },
+];
+
 export interface VideoClip {
   id: string;
   name: string;
@@ -8,6 +122,7 @@ export interface VideoClip {
   thumbnailUrl?: string;
   volume: number; // 0 to 1
   speed: number; // 1.0 default
+  transition?: VideoTransition; // Transition applied into the next clip on timeline
 }
 
 export interface Subtitle {

@@ -25,7 +25,8 @@ import {
   Disc,
   VolumeX,
 } from 'lucide-react';
-import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition, BackgroundMusic } from '../types/editor';
+import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition, BackgroundMusic, TransitionType } from '../types/editor';
+import { TRANSITION_PRESETS } from '../types/editor';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
 import {
@@ -150,11 +151,21 @@ interface SidebarProps {
   setBgm?: React.Dispatch<React.SetStateAction<BackgroundMusic | null>>;
   activeTab?: TabType;
   setActiveTab?: (tab: TabType) => void;
+  selectedTransitionCutIndex?: number;
+  setSelectedTransitionCutIndex?: (idx: number) => void;
+  onPlayPreview?: () => void;
   onExtractAudio?: (clipId: string) => void;
   onToggleMuteClip?: (clipId: string) => void;
 }
 
-export type TabType = 'media' | 'edit' | 'subtitle' | 'watermark' | 'voiceover' | 'music';
+export type TabType =
+  | 'media'
+  | 'edit'
+  | 'transition'
+  | 'subtitle'
+  | 'watermark'
+  | 'voiceover'
+  | 'music';
 
 const SidebarComponent: React.FC<SidebarProps> = ({
   clips,
@@ -176,12 +187,24 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   setBgm,
   activeTab: controlledActiveTab,
   setActiveTab: controlledSetActiveTab,
+  selectedTransitionCutIndex: controlledCutIdx,
+  setSelectedTransitionCutIndex: controlledSetCutIdx,
+  onPlayPreview,
   onExtractAudio,
   onToggleMuteClip,
 }) => {
   const [internalActiveTab, setInternalActiveTab] = useState<TabType>('media');
   const activeTab = controlledActiveTab ?? internalActiveTab;
   const setActiveTab = controlledSetActiveTab ?? setInternalActiveTab;
+
+  // Selected transition cut index (0 means between clips[0] and clips[1])
+  const [internalCutIdx, setInternalCutIdx] = useState(0);
+  const activeCutIdx = controlledCutIdx ?? internalCutIdx;
+  const setActiveCutIdx = controlledSetCutIdx ?? setInternalCutIdx;
+
+  const [transitionCategory, setTransitionCategory] = useState<
+    'all' | 'basic' | 'motion' | 'zoom' | 'wipe'
+  >('all');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
@@ -615,6 +638,22 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('transition')}
+          className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all relative ${
+            activeTab === 'transition'
+              ? 'bg-purple-500/25 text-purple-400 border border-purple-500/50'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-[#1a1c24]'
+          }`}
+          title="Efek Transisi Antar Klip Video"
+        >
+          <Sparkles className="w-5 h-5 mb-0.5 text-purple-400" />
+          <span className="text-[10px] font-medium">Transisi</span>
+          {clips.some((c) => c.transition && c.transition.type !== 'none') && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-purple-400 shadow-sm" />
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveTab('subtitle')}
           className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all ${
             activeTab === 'subtitle'
@@ -1011,7 +1050,324 @@ const SidebarComponent: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* TAB 3: SUBTITLE */}
+        {/* TAB 3: TRANSISI (SMOOTH TRANSITIONS) */}
+        {activeTab === 'transition' && (
+          <div className="flex flex-col h-full overflow-y-auto pr-1 space-y-3.5">
+            <div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-gray-200 flex items-center space-x-1.5">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <span>Transisi Antar Video</span>
+                </h2>
+                {clips.length > 1 && (
+                  <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full font-medium">
+                    {clips.filter((c) => c.transition && c.transition.type !== 'none').length} / {clips.length - 1} Aktif
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Tambahkan efek transisi mulus dan sinematik pada sambungan antar klip video.
+              </p>
+            </div>
+
+            {clips.length < 2 ? (
+              <div className="bg-[#171820] p-4 rounded-xl border border-[#252834] text-center space-y-2.5">
+                <Sparkles className="w-8 h-8 text-purple-400/60 mx-auto animate-pulse" />
+                <p className="text-xs font-bold text-gray-200">Memerlukan Minimal 2 Klip Video</p>
+                <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
+                  Tambahkan atau potong klip video di timeline agar memiliki sambungan antar adegan untuk diberi transisi.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('media')}
+                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-all shadow"
+                >
+                  Buka Tab Media / Upload Video
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* 1. TARGET CUT SELECTOR */}
+                <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-200">Pilih Sambungan Klip:</span>
+                    <span className="text-[10px] text-purple-300 font-mono">
+                      Sambungan {activeCutIdx + 1} dari {clips.length - 1}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {Array.from({ length: clips.length - 1 }).map((_, idx) => {
+                      const cA = clips[idx];
+                      const cB = clips[idx + 1];
+                      const isTarget = idx === activeCutIdx;
+                      const cutTrans = cA?.transition?.type || 'none';
+                      const presetObj = TRANSITION_PRESETS.find((p) => p.id === cutTrans);
+
+                      return (
+                        <button
+                          key={`cut-select-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            setActiveCutIdx(idx);
+                            // Move playhead to cut time
+                            let cutTime = 0;
+                            for (let i = 0; i <= idx; i++) {
+                              cutTime += Math.max(0, clips[i].trimEnd - clips[i].trimStart);
+                            }
+                            if (setCurrentTime) {
+                              setCurrentTime(Math.max(0, cutTime - 0.4));
+                            }
+                          }}
+                          className={`flex items-center justify-between p-2 rounded-lg text-left text-xs transition-all border ${
+                            isTarget
+                              ? 'bg-purple-950/60 border-purple-500/80 text-white shadow ring-1 ring-purple-500/40'
+                              : 'bg-[#12131a] border-[#232532] text-gray-300 hover:border-gray-600'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2 truncate">
+                            <span className="w-5 h-5 rounded bg-[#1e202d] flex items-center justify-center text-[10px] font-bold text-purple-300 flex-shrink-0">
+                              {idx + 1}
+                            </span>
+                            <div className="truncate">
+                              <span className="font-semibold text-gray-200 truncate">{cA.name}</span>
+                              <span className="text-purple-400 mx-1">➡️</span>
+                              <span className="font-semibold text-gray-200 truncate">{cB.name}</span>
+                            </div>
+                          </div>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full flex items-center space-x-1 font-semibold flex-shrink-0 ml-1.5 ${
+                              cutTrans !== 'none'
+                                ? 'bg-purple-500/25 text-purple-200 border border-purple-500/40'
+                                : 'bg-gray-800 text-gray-400'
+                            }`}
+                          >
+                            <span>{presetObj?.icon || '✂️'}</span>
+                            <span>{cutTrans === 'none' ? 'Cut' : presetObj?.name.split(' ')[0]}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. DURATION SLIDER & TEST PREVIEW */}
+                {(() => {
+                  const targetClip = clips[activeCutIdx];
+                  const currentTrans = targetClip?.transition || { type: 'none', duration: 0.5 };
+                  const currentDuration = currentTrans.duration ?? 0.5;
+
+                  const handleUpdateDuration = (newDur: number) => {
+                    const clamped = Math.max(0.2, Math.min(1.5, Math.round(newDur * 10) / 10));
+                    setClips((prev) =>
+                      prev.map((c, i) =>
+                        i === activeCutIdx
+                          ? {
+                              ...c,
+                              transition: {
+                                type: c.transition?.type || 'fade',
+                                duration: clamped,
+                              },
+                            }
+                          : c
+                      )
+                    );
+                  };
+
+                  const handleSelectTransition = (type: TransitionType) => {
+                    setClips((prev) =>
+                      prev.map((c, i) =>
+                        i === activeCutIdx
+                          ? {
+                              ...c,
+                              transition: {
+                                type,
+                                duration: currentDuration,
+                              },
+                            }
+                          : c
+                      )
+                    );
+                  };
+
+                  const handleApplyToAll = () => {
+                    if (
+                      window.confirm(
+                        `Terapkan transisi "${
+                          TRANSITION_PRESETS.find((p) => p.id === currentTrans.type)?.name || 'ini'
+                        }" (${currentDuration}s) ke SEMUA ${clips.length - 1} sambungan klip?`
+                      )
+                    ) {
+                      setClips((prev) =>
+                        prev.map((c, i) =>
+                          i < prev.length - 1
+                            ? {
+                                ...c,
+                                transition: {
+                                  type: currentTrans.type === 'none' ? 'fade' : currentTrans.type,
+                                  duration: currentDuration,
+                                },
+                              }
+                            : c
+                        )
+                      );
+                    }
+                  };
+
+                  const handlePreviewTransition = () => {
+                    let cutTime = 0;
+                    for (let i = 0; i <= activeCutIdx; i++) {
+                      cutTime += Math.max(0, clips[i].trimEnd - clips[i].trimStart);
+                    }
+                    if (setCurrentTime) {
+                      setCurrentTime(Math.max(0, cutTime - currentDuration - 0.2));
+                    }
+                    if (onPlayPreview) {
+                      onPlayPreview();
+                    }
+                  };
+
+                  const filteredPresets = TRANSITION_PRESETS.filter(
+                    (p) => transitionCategory === 'all' || p.category === transitionCategory || p.id === 'none'
+                  );
+
+                  return (
+                    <div className="space-y-3">
+                      {/* DURATION & ACTIONS BAR */}
+                      <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-2.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-200 font-semibold flex items-center space-x-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                            <span>Durasi Efek Transisi:</span>
+                          </span>
+                          <span className="font-mono text-purple-300 font-bold bg-purple-950/60 border border-purple-500/40 px-2 py-0.5 rounded text-[11px]">
+                            {currentDuration.toFixed(1)} detik
+                          </span>
+                        </div>
+
+                        <input
+                          type="range"
+                          min="0.2"
+                          max="1.5"
+                          step="0.1"
+                          value={currentDuration}
+                          onChange={(e) => handleUpdateDuration(parseFloat(e.target.value))}
+                          className="w-full accent-purple-400 cursor-pointer"
+                        />
+
+                        {/* Quick Duration Chips */}
+                        <div className="flex items-center space-x-1.5 pt-0.5">
+                          {[0.3, 0.5, 0.8, 1.0].map((dur) => (
+                            <button
+                              key={`chip-${dur}`}
+                              type="button"
+                              onClick={() => handleUpdateDuration(dur)}
+                              className={`flex-1 py-1 text-[10px] rounded-md border font-semibold transition-all ${
+                                Math.abs(currentDuration - dur) < 0.05
+                                  ? 'bg-purple-600 text-white border-purple-400 shadow'
+                                  : 'bg-[#12131a] text-gray-400 border-[#232530] hover:text-gray-200 hover:bg-[#1a1c24]'
+                              }`}
+                            >
+                              {dur}s
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center space-x-2 pt-1 border-t border-[#232530]">
+                          <button
+                            type="button"
+                            onClick={handlePreviewTransition}
+                            className="flex-1 flex items-center justify-center space-x-1 py-1.5 px-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow"
+                            title="Putar video tepat sebelum titik transisi untuk melihat hasilnya"
+                          >
+                            <Play className="w-3 h-3 fill-current" />
+                            <span>Uji Coba Transisi</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleApplyToAll}
+                            className="flex-1 flex items-center justify-center space-x-1 py-1.5 px-2 bg-[#20222e] hover:bg-[#282b3a] text-purple-300 border border-purple-500/40 hover:border-purple-500/70 rounded-lg text-xs font-semibold transition-all"
+                            title="Terapkan efek transisi dan durasi ini ke seluruh sambungan di video"
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>Semua Klip</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 3. CATEGORY FILTERS */}
+                      <div className="flex items-center space-x-1 overflow-x-auto pb-1 text-[11px]">
+                        {[
+                          { id: 'all', label: 'Semua' },
+                          { id: 'basic', label: 'Dasar (Fade)' },
+                          { id: 'motion', label: 'Gerakan (Slide)' },
+                          { id: 'zoom', label: 'Zoom' },
+                          { id: 'wipe', label: 'Wipe (Sapuan)' },
+                        ].map((cat) => (
+                          <button
+                            key={`cat-${cat.id}`}
+                            type="button"
+                            onClick={() => setTransitionCategory(cat.id as any)}
+                            className={`px-2.5 py-1 rounded-full whitespace-nowrap font-medium transition-all ${
+                              transitionCategory === cat.id
+                                ? 'bg-purple-500 text-white font-bold shadow'
+                                : 'bg-[#171820] text-gray-400 hover:text-gray-200 border border-[#252834]'
+                            }`}
+                          >
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* 4. PRESET GRID CARDS */}
+                      <div className="grid grid-cols-2 gap-2 max-h-[380px] overflow-y-auto pr-1">
+                        {filteredPresets.map((preset) => {
+                          const isSelected = currentTrans.type === preset.id;
+
+                          return (
+                            <button
+                              key={`preset-${preset.id}`}
+                              type="button"
+                              onClick={() => handleSelectTransition(preset.id)}
+                              className={`flex flex-col p-2.5 rounded-xl text-left transition-all border relative overflow-hidden group ${
+                                isSelected
+                                  ? 'bg-gradient-to-b from-purple-950/80 to-[#1e1b2e] border-purple-400 shadow-lg ring-2 ring-purple-500/50'
+                                  : 'bg-[#171820] border-[#252834] hover:border-purple-500/50 hover:bg-[#1d1f2b]'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between w-full mb-1">
+                                <span className="text-xl group-hover:scale-110 transition-transform">
+                                  {preset.icon}
+                                </span>
+                                {isSelected && (
+                                  <span className="w-2 h-2 rounded-full bg-purple-400 shadow-sm" />
+                                )}
+                              </div>
+                              <span
+                                className={`text-xs font-bold leading-tight ${
+                                  isSelected ? 'text-white' : 'text-gray-200'
+                                }`}
+                              >
+                                {preset.name}
+                              </span>
+                              <span className="text-[10px] text-gray-400 mt-1 line-clamp-2 leading-relaxed">
+                                {preset.description}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: SUBTITLE */}
         {activeTab === 'subtitle' && (
           <div className="flex flex-col h-full overflow-y-auto pr-1">
             <div className="flex items-center justify-between mb-2">

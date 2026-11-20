@@ -39,6 +39,7 @@ export function App() {
 
   // Active Sidebar Tab
   const [sidebarTab, setSidebarTab] = useState<TabType>('media');
+  const [selectedTransitionCutIndex, setSelectedTransitionCutIndex] = useState(0);
 
   // Playback state
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -181,6 +182,10 @@ export function App() {
           thumbnailUrl: clip1.thumbnailUrl,
           volume: 1,
           speed: 1,
+          transition: {
+            type: 'fade',
+            duration: 0.6,
+          },
         },
         {
           id: `demo-2-${Date.now()}`,
@@ -389,6 +394,9 @@ export function App() {
           setBgm={setBgm}
           activeTab={sidebarTab}
           setActiveTab={setSidebarTab}
+          selectedTransitionCutIndex={selectedTransitionCutIndex}
+          setSelectedTransitionCutIndex={setSelectedTransitionCutIndex}
+          onPlayPreview={() => setIsPlaying(true)}
           onExtractAudio={handleExtractAudio}
           onToggleMuteClip={handleToggleMuteClip}
         />
@@ -428,6 +436,10 @@ export function App() {
         bgm={bgm}
         setBgm={setBgm}
         onOpenMusicTab={handleOpenMusicTab}
+        onOpenTransitionTab={(cutIdx) => {
+          setSelectedTransitionCutIndex(cutIdx);
+          setSidebarTab('transition');
+        }}
         onExtractAudio={handleExtractAudio}
         onToggleMuteClip={handleToggleMuteClip}
       />

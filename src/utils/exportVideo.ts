@@ -1,4 +1,5 @@
 import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic, ExportResolution, SharpenLevel } from '../types/editor';
+import { getActiveTransitionInfo, drawCanvasTransition } from './transition';
 
 export interface ExportProgress {
   progress: number; // 0 to 100
@@ -551,7 +552,10 @@ export async function exportVideo(
         status: `Merender frame (${elapsed.toFixed(1)}s / ${totalDuration.toFixed(1)}s)...`,
       });
 
-      // Find active clip
+      // Check for active transition between adjacent clips
+      const activeTrans = getActiveTransitionInfo(clips, elapsed);
+
+      // Find active clip (when outside of transition)
       const activeIdx = clipRanges.findIndex(
         (r) => elapsed >= r.start && elapsed < r.end
       );
@@ -560,7 +564,45 @@ export async function exportVideo(
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
 
-      if (activeIdx !== -1) {
+      if (activeTrans) {
+        // RENDER SMOOTH SEAMLESS TRANSITION
+        const idxA = activeTrans.cutIndex;
+        const idxB = activeTrans.cutIndex + 1;
+        const vElA = videoElements[idxA];
+        const vElB = videoElements[idxB];
+        const rangeA = clipRanges[idxA];
+        const rangeB = clipRanges[idxB];
+
+        const durA = Math.max(0, rangeA.clip.trimEnd - rangeA.clip.trimStart);
+        const expectedTimeA =
+          rangeA.clip.trimStart + Math.min(durA, Math.max(0, elapsed - rangeA.start));
+        const expectedTimeB =
+          rangeB.clip.trimStart + Math.max(0, elapsed - rangeB.start);
+
+        if (vElA.paused) vElA.play().catch(() => {});
+        if (vElB.paused) vElB.play().catch(() => {});
+
+        if (Math.abs(vElA.currentTime - expectedTimeA) > 0.12) {
+          vElA.currentTime = expectedTimeA;
+        }
+        if (Math.abs(vElB.currentTime - expectedTimeB) > 0.12) {
+          vElB.currentTime = expectedTimeB;
+        }
+
+        drawCanvasTransition(
+          ctx,
+          vElA,
+          vElB,
+          activeTrans.type,
+          activeTrans.progress,
+          width,
+          height,
+          sharpen,
+          sharpenLevel
+        );
+
+        currentClipIndex = idxB;
+      } else if (activeIdx !== -1) {
         const range = clipRanges[activeIdx];
         const vEl = videoElements[activeIdx];
         const expectedClipTime = range.clip.trimStart + (elapsed - range.start);
@@ -574,7 +616,6 @@ export async function exportVideo(
           vEl.play().catch(() => {});
         } else {
           // Drift Lock: Keep HTMLVideoElement locked within 100ms of master timeline clock
-          // Prevents video from outrunning export clock or freezing early
           if (vEl.paused && elapsed < range.end) {
             vEl.play().catch(() => {});
           }
@@ -595,7 +636,7 @@ export async function exportVideo(
           const centerShiftX = (width - vWidth * ratio) / 2;
           const centerShiftY = (height - vHeight * ratio) / 2;
 
-          // Apply video sharpening filter to upscale low-res (e.g. 360p/480p) footage crisply
+          // Apply video sharpening filter to upscale low-res footage crisply
           if (sharpen) {
             ctx.filter =
               sharpenLevel === 'high'

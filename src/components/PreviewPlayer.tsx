@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from '../types/editor';
 import { formatTime } from '../utils/time';
+import { getActiveTransitionInfo, getCssTransitionStyles } from '../utils/transition';
 
 interface PreviewPlayerProps {
   clips: VideoClip[];
@@ -42,14 +43,33 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
   bgm,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRefA = useRef<HTMLVideoElement>(null);
+  const videoRefB = useRef<HTMLVideoElement>(null);
+  const flashOverlayRef = useRef<HTMLDivElement>(null);
   const voiceoverAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const [masterVolume, setMasterVolume] = React.useState(1);
   const [isMuted, setIsMuted] = React.useState(false);
   const [isSharpenPreview, setIsSharpenPreview] = React.useState(true);
 
-  // Compute which clip is active at currentTime
+  // Compute active transition (if currentTime is within transition boundary)
+  const activeTransition = useMemo(
+    () => getActiveTransitionInfo(clips, currentTime),
+    [clips, currentTime]
+  );
+
+  const transitionStyles = useMemo(() => {
+    if (!activeTransition) {
+      return {
+        styleA: { opacity: 1 },
+        styleB: { opacity: 0, display: 'none' as const },
+        flashOpacity: 0,
+      };
+    }
+    return getCssTransitionStyles(activeTransition.type, activeTransition.progress);
+  }, [activeTransition]);
+
+  // Compute which clip is active at currentTime (when outside transition)
   let activeClipIndex = -1;
   let activeClipOffset = 0; // seconds into the active clip's trimmed window
   let runningTime = 0;
@@ -73,37 +93,91 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
 
   const activeClip = activeClipIndex !== -1 ? clips[activeClipIndex] : null;
 
-  // Sync video element with activeClip and currentTime
+  // Sync video elements with clips, transitions, and currentTime
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !activeClip) return;
+    const videoA = videoRefA.current;
+    const videoB = videoRefB.current;
+    if (!videoA) return;
 
-    const targetClipTime = activeClip.trimStart + activeClipOffset;
+    if (activeTransition) {
+      // In transition between clipA and clipB
+      const clipA = activeTransition.clipA;
+      const clipB = activeTransition.clipB;
 
-    if (video.src !== activeClip.url) {
-      video.src = activeClip.url;
-      video.currentTime = targetClipTime;
+      const durA = Math.max(0, clipA.trimEnd - clipA.trimStart);
+      const cutTime = activeTransition.cutTime;
+      const timeInClipA = clipA.trimStart + Math.min(durA, Math.max(0, currentTime - (cutTime - durA)));
+      const timeInClipB = clipB.trimStart + Math.max(0, currentTime - cutTime);
+
+      // Video A
+      if (videoA.src !== clipA.url) {
+        videoA.src = clipA.url;
+        videoA.currentTime = timeInClipA;
+      } else {
+        const driftA = Math.abs(videoA.currentTime - timeInClipA);
+        if (!isPlaying || driftA > 0.25) {
+          videoA.currentTime = timeInClipA;
+        }
+      }
+      videoA.volume = isMuted
+        ? 0
+        : (clipA.volume ?? 1) * masterVolume * Math.max(0, 1 - activeTransition.progress);
+
+      // Video B
+      if (videoB) {
+        if (videoB.src !== clipB.url) {
+          videoB.src = clipB.url;
+          videoB.currentTime = timeInClipB;
+        } else {
+          const driftB = Math.abs(videoB.currentTime - timeInClipB);
+          if (!isPlaying || driftB > 0.25) {
+            videoB.currentTime = timeInClipB;
+          }
+        }
+        videoB.volume = isMuted
+          ? 0
+          : (clipB.volume ?? 1) * masterVolume * Math.min(1, activeTransition.progress);
+      }
+
+      if (isPlaying) {
+        if (videoA.paused) videoA.play().catch(() => {});
+        if (videoB && videoB.paused) videoB.play().catch(() => {});
+      } else {
+        if (!videoA.paused) videoA.pause();
+        if (videoB && !videoB.paused) videoB.pause();
+      }
     } else {
-      // When paused or scrubbing backward/forward, sync video frame immediately!
-      // When playing, sync only if drift is noticeable (> 0.25s) to avoid stutter
-      const drift = Math.abs(video.currentTime - targetClipTime);
-      if (!isPlaying || drift > 0.25) {
-        video.currentTime = targetClipTime;
+      // Standard playback outside of transition
+      if (videoB && !videoB.paused) {
+        videoB.pause();
+      }
+
+      if (!activeClip) return;
+      const targetClipTime = activeClip.trimStart + activeClipOffset;
+
+      if (videoA.src !== activeClip.url) {
+        videoA.src = activeClip.url;
+        videoA.currentTime = targetClipTime;
+      } else {
+        const drift = Math.abs(videoA.currentTime - targetClipTime);
+        if (!isPlaying || drift > 0.25) {
+          videoA.currentTime = targetClipTime;
+        }
+      }
+
+      videoA.volume = isMuted ? 0 : (activeClip.volume ?? 1) * masterVolume;
+
+      if (isPlaying) {
+        if (videoA.paused) {
+          videoA.play().catch(() => {});
+        }
+      } else {
+        if (!videoA.paused) {
+          videoA.pause();
+        }
       }
     }
-
-    video.volume = isMuted ? 0 : (activeClip.volume ?? 1) * masterVolume;
-
-    if (isPlaying) {
-      if (video.paused) {
-        video.play().catch(() => {});
-      }
-    } else {
-      if (!video.paused) {
-        video.pause();
-      }
-    }
-  }, [activeClip, activeClipOffset, currentTime, isPlaying, masterVolume, isMuted]);
+  }, [activeTransition, activeClip, activeClipOffset, currentTime, isPlaying, masterVolume, isMuted]);
 
   // Sync voiceovers
   useEffect(() => {
@@ -286,20 +360,51 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         >
           {clips.length > 0 ? (
             <>
-              <video
-                ref={videoRef}
-                playsInline
-                className="w-full h-full object-contain pointer-events-none transition-[filter] duration-200"
-                style={{
-                  filter: isSharpenPreview
-                    ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
-                    : 'none',
-                }}
-              />
+              <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                <video
+                  ref={videoRefA}
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none transition-[filter] duration-200"
+                  style={{
+                    filter: isSharpenPreview
+                      ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
+                      : 'none',
+                    ...transitionStyles.styleA,
+                  }}
+                />
+                <video
+                  ref={videoRefB}
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none transition-[filter] duration-200"
+                  style={{
+                    filter: isSharpenPreview
+                      ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
+                      : 'none',
+                    ...transitionStyles.styleB,
+                  }}
+                />
+                {/* White Flash Overlay for Flash / Dip-to-White transition */}
+                <div
+                  ref={flashOverlayRef}
+                  className="absolute inset-0 bg-white pointer-events-none z-10 transition-opacity duration-75"
+                  style={{
+                    opacity: transitionStyles.flashOpacity,
+                    display: transitionStyles.flashOpacity > 0.01 ? 'block' : 'none',
+                  }}
+                />
+              </div>
+
               {isSharpenPreview && (
                 <div className="absolute top-2.5 left-2.5 z-20 pointer-events-none flex items-center space-x-1 px-2 py-0.5 rounded-full bg-teal-950/70 border border-teal-500/40 text-[10px] text-teal-300 font-semibold shadow-sm backdrop-blur-xs">
                   <Sparkles className="w-3 h-3 text-teal-400" />
                   <span>HD Sharpen Aktif</span>
+                </div>
+              )}
+
+              {activeTransition && (
+                <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-purple-950/80 border border-purple-500/50 text-[10px] text-purple-200 font-bold shadow-lg backdrop-blur-xs animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                  <span>Transisi: {activeTransition.type}</span>
                 </div>
               )}
             </>
@@ -415,8 +520,8 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
           <button
             onClick={() => {
               setCurrentTime(0);
-              if (videoRef.current && clips[0]) {
-                videoRef.current.currentTime = clips[0].trimStart;
+              if (videoRefA.current && clips[0]) {
+                videoRefA.current.currentTime = clips[0].trimStart;
               }
             }}
             className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-[#1f212b] rounded-lg transition-colors"
@@ -439,8 +544,8 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
               if (totalDuration > 0 && currentTime >= totalDuration - 0.05) {
                 // Replay from start
                 setCurrentTime(0);
-                if (videoRef.current && clips[0]) {
-                  videoRef.current.currentTime = clips[0].trimStart;
+                if (videoRefA.current && clips[0]) {
+                  videoRefA.current.currentTime = clips[0].trimStart;
                 }
                 setIsPlaying(true);
                 return;
