@@ -367,6 +367,29 @@ export const Timeline: React.FC<TimelineProps> = ({
             </span>
           </button>
 
+          {/* Button: Hapus Semua Narasi & Subtitle Sekaligus */}
+          {(voiceovers.length > 0 || subtitles.length > 0) && (
+            <button
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Hapus SEMUA (${voiceovers.length}) klip narasi suara DAN SEMUA (${subtitles.length}) baris subtitle sekaligus?`
+                  )
+                ) {
+                  setVoiceovers([]);
+                  setSubtitles([]);
+                  setSelectedVoiceoverId(null);
+                  setSelectedSubtitleId(null);
+                }
+              }}
+              className="flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg border bg-red-500/15 hover:bg-red-500/25 text-red-300 border-red-500/40 transition-all font-semibold shadow-sm"
+              title="Hapus semua klip narasi suara dan semua baris subtitle sekaligus"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+              <span>Hapus Semua Narasi & Subtitle</span>
+            </button>
+          )}
+
           <button
             onClick={handleDuplicateSelected}
             disabled={!selectedClipId}

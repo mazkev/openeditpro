@@ -198,6 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [ttsStatus, setTtsStatus] = useState('');
   const [createSubtitleFromTTS, setCreateSubtitleFromTTS] = useState(true);
   const [isPreviewingSpeech, setIsPreviewingSpeech] = useState(false);
+  const [ttsPlacementMode, setTtsPlacementMode] = useState<'start' | 'playhead'>('start');
 
   // Fetch native system OS speech synthesis voices
   useEffect(() => {
@@ -532,8 +533,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onProgress: (msg) => setTtsStatus(msg),
       });
 
-      // If currentTime is at the end of the video, place from 0 so it plays from beginning!
-      const targetStart = totalDuration > 0 && currentTime >= totalDuration - 0.2 ? 0 : currentTime;
+      // Placement offset: start from beginning (00:00) or from playhead (currentTime)
+      const targetStart =
+        ttsPlacementMode === 'start'
+          ? 0
+          : totalDuration > 0 && currentTime >= totalDuration - 0.2
+            ? 0
+            : currentTime;
 
       const newVoiceover: Voiceover = {
         id: `vo-tts-${Date.now()}`,
@@ -1005,13 +1011,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex flex-col h-full overflow-y-auto pr-1">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-bold text-gray-200">Subtitle & Teks</h2>
-              <button
-                onClick={handleAddSubtitle}
-                className="flex items-center space-x-1 px-2 py-1 bg-[#202230] hover:bg-[#282a3c] text-gray-300 text-xs rounded-lg border border-[#2f3246] transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Manual</span>
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {subtitles.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Hapus SEMUA (${subtitles.length}) baris subtitle?`)) {
+                        setSubtitles([]);
+                      }
+                    }}
+                    className="flex items-center space-x-1 px-2 py-1 bg-red-500/15 hover:bg-red-500/25 text-red-300 text-xs rounded-lg border border-red-500/40 transition-colors font-medium"
+                    title="Hapus semua baris subtitle sekaligus"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    <span>Hapus Semua ({subtitles.length})</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleAddSubtitle}
+                  className="flex items-center space-x-1 px-2 py-1 bg-[#202230] hover:bg-[#282a3c] text-gray-300 text-xs rounded-lg border border-[#2f3246] transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Manual</span>
+                </button>
+              </div>
             </div>
 
             {/* Smart Auto Subtitle Banner */}
@@ -2026,6 +2049,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </span>
                 </label>
 
+                {/* Posisi Mulai Narasi: Awal Video vs Garis Merah */}
+                <div className="bg-[#101116] p-2.5 rounded-lg border border-[#232535] space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-gray-300 font-semibold flex items-center space-x-1">
+                      <span>Mulai Narasi di:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentTime && setCurrentTime(0)}
+                      className="text-[10px] text-teal-400 hover:text-teal-300 underline font-medium"
+                      title="Geser garis merah (playhead) langsung ke awal (00:00)"
+                    >
+                      ⏮️ Geser Garis ke Awal
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setTtsPlacementMode('start')}
+                      className={`p-2 rounded-lg border text-left flex items-start space-x-1.5 transition-all ${
+                        ttsPlacementMode === 'start'
+                          ? 'bg-teal-500/20 border-teal-400 text-teal-200 shadow-sm font-bold'
+                          : 'bg-[#15161f] border-[#252838] text-gray-400 hover:text-gray-200'
+                      }`}
+                    >
+                      <span className="text-sm leading-none mt-0.5">⏮️</span>
+                      <div className="min-w-0">
+                        <p className="font-bold truncate">Awal Video (00:00)</p>
+                        <p className="text-[9px] text-gray-400 truncate">Default / Disarankan</p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTtsPlacementMode('playhead')}
+                      className={`p-2 rounded-lg border text-left flex items-start space-x-1.5 transition-all ${
+                        ttsPlacementMode === 'playhead'
+                          ? 'bg-teal-500/20 border-teal-400 text-teal-200 shadow-sm font-bold'
+                          : 'bg-[#15161f] border-[#252838] text-gray-400 hover:text-gray-200'
+                      }`}
+                    >
+                      <span className="text-sm leading-none mt-0.5">🔴</span>
+                      <div className="min-w-0">
+                        <p className="font-bold truncate">Garis Merah</p>
+                        <p className="text-[9px] text-gray-400 truncate">Detik {formatTime(currentTime)}</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Action buttons */}
                 <div className="flex space-x-2 pt-1">
                   <button
@@ -2075,7 +2149,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 <p className="text-[10px] text-gray-500 text-center">
-                  Audio narasi otomatis disisipkan di detik ke-{formatTime(currentTime)} pada linimasa.
+                  {ttsPlacementMode === 'start'
+                    ? 'Audio narasi & subtitle otomatis dimulai dari detik 00:00 (Awal Video).'
+                    : `Audio narasi & subtitle akan dimulai dari posisi garis merah (${formatTime(currentTime)}).`}
                 </p>
               </div>
             )}
@@ -2144,9 +2220,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Voiceovers list */}
             <div className="space-y-2 flex-1 overflow-y-auto">
-              <span className="text-xs font-semibold text-gray-300 block">
-                Daftar Klip Narasi ({voiceovers.length})
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-300">
+                  Daftar Klip Narasi ({voiceovers.length})
+                </span>
+                {voiceovers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Hapus SEMUA (${voiceovers.length}) klip narasi suara?`)) {
+                        setVoiceovers([]);
+                      }
+                    }}
+                    className="text-[10px] text-red-400 hover:text-red-300 flex items-center space-x-1 hover:underline font-semibold"
+                    title="Hapus semua klip narasi suara"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Hapus Semua ({voiceovers.length})</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Combined Clear Button for Narration & Subtitles */}
+              {(voiceovers.length > 0 || subtitles.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Hapus SEMUA (${voiceovers.length}) narasi suara DAN SEMUA (${subtitles.length}) baris subtitle sekaligus?`
+                      )
+                    ) {
+                      setVoiceovers([]);
+                      setSubtitles([]);
+                    }
+                  }}
+                  className="w-full py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/35 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all shadow-sm"
+                  title="Hapus semua klip narasi dan subtitle sekaligus"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <span>Hapus Semua Narasi & Subtitle Sekaligus</span>
+                </button>
+              )}
               {voiceovers.length === 0 ? (
                 <div className="text-center py-6 text-gray-500 text-xs bg-[#171820] rounded-xl border border-[#252834]">
                   Belum ada narasi suara.
