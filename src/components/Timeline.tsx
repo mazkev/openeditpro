@@ -11,6 +11,8 @@ import {
   Music,
   Plus,
   GripVertical,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Voiceover, BackgroundMusic } from '../types/editor';
 import { formatTime } from '../utils/time';
@@ -33,6 +35,8 @@ interface TimelineProps {
   bgm?: BackgroundMusic | null;
   setBgm?: React.Dispatch<React.SetStateAction<BackgroundMusic | null>>;
   onOpenMusicTab?: () => void;
+  onExtractAudio?: (clipId: string) => void;
+  onToggleMuteClip?: (clipId: string) => void;
 }
 
 export const Timeline: React.FC<TimelineProps> = ({
@@ -53,6 +57,8 @@ export const Timeline: React.FC<TimelineProps> = ({
   bgm,
   setBgm,
   onOpenMusicTab,
+  onExtractAudio,
+  onToggleMuteClip,
 }) => {
   const [zoom, setZoom] = useState(40); // pixels per second
   const timelineTracksRef = useRef<HTMLDivElement>(null);
@@ -375,6 +381,43 @@ export const Timeline: React.FC<TimelineProps> = ({
             <span>Duplikat</span>
           </button>
 
+          {/* Extract Audio Button */}
+          {selectedClipId && onExtractAudio && (
+            <button
+              onClick={() => onExtractAudio(selectedClipId)}
+              className="flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg border bg-[#20222e] hover:bg-[#282b3a] text-cyan-300 border-cyan-500/40 hover:border-cyan-500/70 transition-all font-semibold"
+              title="Pisahkan audio asli video ke trek audio (agar bisa dihapus atau diedit)"
+            >
+              <Scissors className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Pisahkan Audio</span>
+            </button>
+          )}
+
+          {/* Mute/Unmute Video Clip Button */}
+          {selectedClipId && onToggleMuteClip && (
+            <button
+              onClick={() => onToggleMuteClip(selectedClipId)}
+              className={`flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg border transition-all ${
+                (clips.find((c) => c.id === selectedClipId)?.volume ?? 1) === 0
+                  ? 'bg-red-500/20 text-red-300 border-red-500/50 hover:bg-red-500/30'
+                  : 'bg-[#20222e] hover:bg-[#282b3a] text-gray-300 border-[#2e3142]'
+              }`}
+              title="Bisukan atau aktifkan kembali suara asli video ini"
+            >
+              {(clips.find((c) => c.id === selectedClipId)?.volume ?? 1) === 0 ? (
+                <>
+                  <VolumeX className="w-3.5 h-3.5 text-red-400" />
+                  <span>Bisu (Aktifkan?)</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Bisukan Suara</span>
+                </>
+              )}
+            </button>
+          )}
+
           <div className="h-4 w-px bg-[#2b2d3d] mx-2" />
           <span className="text-[11px] text-gray-400 hidden md:inline">
             💡 Tips: Klik klip video, subtitle, atau narasi suara lalu klik <b>Hapus</b> (atau tekan tombol <b>Delete</b> di keyboard).
@@ -551,6 +594,37 @@ export const Timeline: React.FC<TimelineProps> = ({
                         <span className="truncate pointer-events-none">{clip.name}</span>
                       </div>
                       <div className="flex items-center space-x-1 ml-1 flex-shrink-0">
+                        {(clip.volume ?? 1) === 0 && (
+                          <span
+                            className="bg-red-950/80 text-red-300 border border-red-700/60 text-[9px] px-1 py-0.5 rounded font-bold flex items-center space-x-0.5"
+                            title="Suara asli video ini dibisukan (0%)"
+                          >
+                            <VolumeX className="w-2.5 h-2.5" />
+                            <span>Bisu</span>
+                          </span>
+                        )}
+                        {/* Quick Mute Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onToggleMuteClip) {
+                              onToggleMuteClip(clip.id);
+                            }
+                          }}
+                          className={`p-0.5 rounded transition-colors ${
+                            (clip.volume ?? 1) === 0
+                              ? 'text-red-400 hover:bg-red-500/20'
+                              : 'text-gray-400 hover:text-cyan-300 hover:bg-white/10'
+                          }`}
+                          title={(clip.volume ?? 1) === 0 ? 'Aktifkan Suara Asli Video' : 'Bisukan Suara Asli Video'}
+                        >
+                          {(clip.volume ?? 1) === 0 ? (
+                            <VolumeX className="w-3 h-3" />
+                          ) : (
+                            <Volume2 className="w-3 h-3" />
+                          )}
+                        </button>
                         <span className="text-[10px] text-cyan-300 font-mono pointer-events-none">
                           {formatTime(duration)}
                         </span>

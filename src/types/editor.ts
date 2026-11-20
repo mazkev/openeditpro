@@ -47,6 +47,7 @@ export interface Voiceover {
   duration: number; // in seconds
   startTime: number; // placement on timeline in seconds
   volume: number; // 0 to 1
+  trimStart?: number; // offset in source media file (for extracted video audio)
 }
 
 export interface BackgroundMusic {

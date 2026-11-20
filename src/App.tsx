@@ -114,6 +114,54 @@ export function App() {
     [clips]
   );
 
+  // Extract / Separate Audio from Video Clip to Voiceover Track
+  const handleExtractAudio = useCallback(
+    (clipId: string) => {
+      const clipIndex = clips.findIndex((c) => c.id === clipId);
+      if (clipIndex === -1) return;
+      const clip = clips[clipIndex];
+
+      // Calculate timeline start time for this clip
+      let clipStartTimeline = 0;
+      for (let i = 0; i < clipIndex; i++) {
+        clipStartTimeline += Math.max(0, clips[i].trimEnd - clips[i].trimStart);
+      }
+      const effectiveDur = Math.max(0, clip.trimEnd - clip.trimStart);
+
+      // 1. Mute original video clip (set volume = 0)
+      setClips((prev) =>
+        prev.map((c) => (c.id === clipId ? { ...c, volume: 0 } : c))
+      );
+
+      // 2. Add as detached audio track item
+      const extractedVo: Voiceover = {
+        id: `audio-ext-${Date.now()}`,
+        name: `Suara: ${clip.name}`,
+        url: clip.url,
+        duration: effectiveDur,
+        startTime: parseFloat(clipStartTimeline.toFixed(2)),
+        volume: clip.volume > 0 ? clip.volume : 1,
+        trimStart: clip.trimStart,
+      };
+
+      setVoiceovers((prev) => [...prev, extractedVo]);
+    },
+    [clips]
+  );
+
+  // Toggle Mute / Unmute for a Video Clip
+  const handleToggleMuteClip = useCallback((clipId: string) => {
+    setClips((prev) =>
+      prev.map((c) => {
+        if (c.id === clipId) {
+          const isCurrentlyMuted = (c.volume ?? 1) === 0;
+          return { ...c, volume: isCurrentlyMuted ? 1 : 0 };
+        }
+        return c;
+      })
+    );
+  }, []);
+
   // Load Sample Demo Video
   const handleLoadDemo = async () => {
     try {
@@ -298,6 +346,8 @@ export function App() {
           setBgm={setBgm}
           activeTab={sidebarTab}
           setActiveTab={setSidebarTab}
+          onExtractAudio={handleExtractAudio}
+          onToggleMuteClip={handleToggleMuteClip}
         />
 
         {/* Center Canvas Preview Player */}
@@ -335,6 +385,8 @@ export function App() {
         bgm={bgm}
         setBgm={setBgm}
         onOpenMusicTab={() => setSidebarTab('music')}
+        onExtractAudio={handleExtractAudio}
+        onToggleMuteClip={handleToggleMuteClip}
       />
 
       {/* Export Progress Modal */}

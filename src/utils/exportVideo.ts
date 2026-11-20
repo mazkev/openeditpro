@@ -387,7 +387,7 @@ export async function exportVideo(
         const voEnd = vo.startTime + vo.duration;
         if (elapsed >= voStart && elapsed <= voEnd) {
           if (el.paused) {
-            el.currentTime = elapsed - voStart;
+            el.currentTime = (vo.trimStart || 0) + (elapsed - voStart);
             el.play().catch(() => {});
           }
         } else {

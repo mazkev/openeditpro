@@ -117,7 +117,7 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       const voEnd = vo.startTime + vo.duration;
 
       if (currentTime >= voStart && currentTime <= voEnd) {
-        const targetAudioTime = currentTime - voStart;
+        const targetAudioTime = (vo.trimStart || 0) + (currentTime - voStart);
         if (!isPlaying || Math.abs(audio.currentTime - targetAudioTime) > 0.3) {
           audio.currentTime = targetAudioTime;
         }

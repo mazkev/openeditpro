@@ -23,6 +23,7 @@ import {
   Music,
   Check,
   Disc,
+  VolumeX,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition, BackgroundMusic } from '../types/editor';
 import { formatTime } from '../utils/time';
@@ -149,6 +150,8 @@ interface SidebarProps {
   setBgm?: React.Dispatch<React.SetStateAction<BackgroundMusic | null>>;
   activeTab?: TabType;
   setActiveTab?: (tab: TabType) => void;
+  onExtractAudio?: (clipId: string) => void;
+  onToggleMuteClip?: (clipId: string) => void;
 }
 
 export type TabType = 'media' | 'edit' | 'subtitle' | 'watermark' | 'voiceover' | 'music';
@@ -173,6 +176,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setBgm,
   activeTab: controlledActiveTab,
   setActiveTab: controlledSetActiveTab,
+  onExtractAudio,
+  onToggleMuteClip,
 }) => {
   const [internalActiveTab, setInternalActiveTab] = useState<TabType>('media');
   const activeTab = controlledActiveTab ?? internalActiveTab;
@@ -893,31 +898,98 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 </div>
 
-                {/* Volume of clip */}
-                <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-2">
-                  <div className="flex justify-between text-xs text-gray-300">
-                    <span className="flex items-center space-x-1">
-                      <Volume2 className="w-3.5 h-3.5 text-gray-400" />
-                      <span>Volume Klip:</span>
+                {/* Audio Asli Video & Pisahkan Suara */}
+                <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-200 flex items-center space-x-1.5">
+                      <Volume2 className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Suara Asli Video</span>
                     </span>
-                    <span className="font-mono text-teal-400">
-                      {Math.round((selectedClip.volume ?? 1) * 100)}%
-                    </span>
+                    {(selectedClip.volume ?? 1) === 0 ? (
+                      <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[9px] px-1.5 py-0.5 rounded font-semibold">
+                        🔇 Dibisukan
+                      </span>
+                    ) : (
+                      <span className="font-mono text-teal-400 text-xs font-bold">
+                        {Math.round((selectedClip.volume ?? 1) * 100)}%
+                      </span>
+                    )}
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={selectedClip.volume ?? 1}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      setClips((prev) =>
-                        prev.map((c) => (c.id === selectedClip.id ? { ...c, volume: val } : c))
-                      );
+
+                  {/* Volume Slider */}
+                  <div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={selectedClip.volume ?? 1}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setClips((prev) =>
+                          prev.map((c) => (c.id === selectedClip.id ? { ...c, volume: val } : c))
+                        );
+                      }}
+                      className="w-full accent-teal-400"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                      <span>0% (Hening)</span>
+                      <span>50%</span>
+                      <span>100% (Penuh)</span>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Mute / Unmute Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onToggleMuteClip) {
+                        onToggleMuteClip(selectedClip.id);
+                      } else {
+                        const isMuted = (selectedClip.volume ?? 1) === 0;
+                        setClips((prev) =>
+                          prev.map((c) => (c.id === selectedClip.id ? { ...c, volume: isMuted ? 1 : 0 } : c))
+                        );
+                      }
                     }}
-                    className="w-full accent-teal-400"
-                  />
+                    className={`w-full py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 border transition-all ${
+                      (selectedClip.volume ?? 1) === 0
+                        ? 'bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border-teal-500/50'
+                        : 'bg-red-500/15 hover:bg-red-500/25 text-red-300 border-red-500/40'
+                    }`}
+                  >
+                    {(selectedClip.volume ?? 1) === 0 ? (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5 text-teal-400" />
+                        <span>🔊 Aktifkan Kembali Suara Asli</span>
+                      </>
+                    ) : (
+                      <>
+                        <VolumeX className="w-3.5 h-3.5 text-red-400" />
+                        <span>🔇 Bisukan Suara Asli Video</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="pt-2 border-t border-[#252835]">
+                    {/* Separate Audio Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onExtractAudio) {
+                          onExtractAudio(selectedClip.id);
+                        }
+                      }}
+                      className="w-full py-2 bg-[#222533] hover:bg-[#2c3044] text-cyan-300 hover:text-cyan-200 text-xs font-bold rounded-lg border border-cyan-500/40 hover:border-cyan-500/70 flex items-center justify-center space-x-2 transition-all shadow-sm"
+                      title="Ekstrak audio video ini ke trek audio terpisah agar bisa dihapus atau diedit"
+                    >
+                      <Scissors className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Pisahkan Audio Video (Extract)</span>
+                    </button>
+                    <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed text-center">
+                      Audio akan dipindahkan ke trek audio di bawah, dan suara video otomatis dibisukan agar Anda bisa menghapus suaranya jika tidak diperlukan.
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
