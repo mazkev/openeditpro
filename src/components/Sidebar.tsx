@@ -51,70 +51,71 @@ interface SubtitleStylePreset {
 const SUBTITLE_PRESETS: SubtitleStylePreset[] = [
   {
     id: 'tiktok',
-    name: 'TikTok Viral',
+    name: 'TikTok Kuning (No BG)',
     preview: 'VIRAL',
     color: '#FACC15',
-    bgColor: '#000000',
+    bgColor: 'transparent',
     fontFamily: 'impact',
     strokeColor: '#000000',
-    strokeWidth: 3,
+    strokeWidth: 3.5,
     isUppercase: true,
   },
   {
+    id: 'minimalist',
+    name: 'Clean White (No BG)',
+    preview: 'BERSIH',
+    color: '#FFFFFF',
+    bgColor: 'transparent',
+    fontFamily: 'impact',
+    strokeColor: '#000000',
+    strokeWidth: 3.5,
+    isUppercase: true,
+  },
+  {
+    id: 'cyber',
+    name: 'Cyber Neon (No BG)',
+    preview: 'NEON',
+    color: '#2DD4BF',
+    bgColor: 'transparent',
+    fontFamily: 'impact',
+    strokeColor: '#0F766E',
+    strokeWidth: 2.5,
+    glowColor: '#14B8A6',
+    isUppercase: true,
+  },
+  {
+    id: 'aesthetic',
+    name: 'Pastel Glow (No BG)',
+    preview: 'PASTEL',
+    color: '#F472B6',
+    bgColor: 'transparent',
+    fontFamily: 'cursive',
+    strokeColor: '#701A75',
+    strokeWidth: 2.5,
+    glowColor: '#F472B6',
+    isUppercase: false,
+  },
+  {
+    id: 'cinematic',
+    name: 'Cinematic Box',
+    preview: 'BOX',
+    color: '#F3F4F6',
+    bgColor: 'rgba(0, 0, 0, 0.85)',
+    fontFamily: 'sans',
+    strokeColor: 'transparent',
+    strokeWidth: 0,
+    isUppercase: false,
+  },
+  {
     id: 'youtube',
-    name: 'YouTube Red',
-    preview: 'BOX RED',
+    name: 'YouTube Red Box',
+    preview: 'RED',
     color: '#FFFFFF',
     bgColor: '#DC2626',
     fontFamily: 'sans',
     strokeColor: 'transparent',
     strokeWidth: 0,
     isUppercase: true,
-  },
-  {
-    id: 'cyber',
-    name: 'Cyber Glow',
-    preview: 'NEON',
-    color: '#2DD4BF',
-    bgColor: 'rgba(15, 23, 42, 0.9)',
-    fontFamily: 'mono',
-    strokeColor: '#0F766E',
-    strokeWidth: 2,
-    glowColor: '#14B8A6',
-    isUppercase: true,
-  },
-  {
-    id: 'minimalist',
-    name: 'Clean White',
-    preview: 'Classic',
-    color: '#FFFFFF',
-    bgColor: 'transparent',
-    fontFamily: 'sans',
-    strokeColor: '#000000',
-    strokeWidth: 3,
-    isUppercase: false,
-  },
-  {
-    id: 'cinematic',
-    name: 'Cinematic',
-    preview: 'Cinema',
-    color: '#F3F4F6',
-    bgColor: 'rgba(0, 0, 0, 0.85)',
-    fontFamily: 'serif',
-    strokeColor: 'transparent',
-    strokeWidth: 0,
-    isUppercase: false,
-  },
-  {
-    id: 'aesthetic',
-    name: 'Pastel Glow',
-    preview: 'Pastel',
-    color: '#F472B6',
-    bgColor: 'rgba(30, 27, 75, 0.85)',
-    fontFamily: 'cursive',
-    strokeColor: '#701A75',
-    strokeWidth: 2,
-    isUppercase: false,
   },
 ];
 
@@ -319,8 +320,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       endTime: parseFloat((targetStart + 3).toFixed(1)),
       fontSize: 26,
       color: '#ffffff',
-      bgColor: 'rgba(0, 0, 0, 0.75)',
-      positionY: 80,
+      bgColor: 'transparent',
+      strokeColor: '#000000',
+      strokeWidth: 3,
+      fontFamily: 'impact',
+      isUppercase: true,
+      positionY: 82,
     };
     setSubtitles((prev) => [...prev, newSub]);
     if (setCurrentTime) setCurrentTime(targetStart);
@@ -897,8 +902,157 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
+            {/* GLOBAL SUBTITLE SETTINGS: UKURAN & BACKGROUND */}
+            <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] mb-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-200 flex items-center space-x-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Ukuran & Latar Subtitle</span>
+                </span>
+                <span className="text-[10px] text-teal-400 font-mono">Semua Subtitle</span>
+              </div>
+
+              {/* Quick Background Toggles: Tanpa Background vs Background Box */}
+              <div>
+                <span className="text-[11px] text-gray-400 block mb-1.5">
+                  Latar Belakang (Background):
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Remove background from all subtitles, set clean crisp stroke!
+                      setSubtitles((prev) =>
+                        prev.map((s) => ({
+                          ...s,
+                          bgColor: 'transparent',
+                          color: s.color || '#FFFFFF',
+                          strokeColor: '#000000',
+                          strokeWidth: Math.max(2.5, s.strokeWidth || 3),
+                        }))
+                      );
+                    }}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 border transition-all ${
+                      subtitles.length > 0 && subtitles.every((s) => s.bgColor === 'transparent')
+                        ? 'bg-teal-500 text-black border-teal-400 shadow-sm'
+                        : 'bg-[#121319] hover:bg-[#1a1c25] text-teal-300 border-teal-500/40'
+                    }`}
+                    title="Hilangkan background kotak pada semua subtitle (gaya TikTok/Reels)"
+                  >
+                    <span>🚫 Tanpa Background</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Apply dark transparent box to all subtitles
+                      setSubtitles((prev) =>
+                        prev.map((s) => ({
+                          ...s,
+                          bgColor: 'rgba(0, 0, 0, 0.75)',
+                          strokeWidth: 0,
+                        }))
+                      );
+                    }}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 border transition-all ${
+                      subtitles.length > 0 &&
+                      subtitles.some((s) => s.bgColor && s.bgColor !== 'transparent')
+                        ? 'bg-[#252838] text-gray-200 border-gray-500 shadow-sm'
+                        : 'bg-[#121319] hover:bg-[#1a1c25] text-gray-400 border-[#2b2d3e]'
+                    }`}
+                    title="Beri background kotak hitam transparan pada semua subtitle"
+                  >
+                    <span>⬛ Box Hitam</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Global Font Size Slider with - and + buttons */}
+              <div>
+                <div className="flex justify-between items-center text-[11px] text-gray-400 mb-1">
+                  <span>Ukuran Huruf (Font Size):</span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubtitles((prev) =>
+                          prev.map((s) => ({
+                            ...s,
+                            fontSize: Math.max(16, (s.fontSize || 26) - 2),
+                          }))
+                        );
+                      }}
+                      className="px-2 py-0.5 bg-[#121319] hover:bg-[#20222e] text-gray-300 rounded border border-[#2c2f42] text-[10px] font-bold"
+                      title="Perkecil semua subtitle (-2px)"
+                    >
+                      A-
+                    </button>
+                    <span className="text-teal-400 font-mono font-bold">
+                      {subtitles[0]?.fontSize || 26}px
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubtitles((prev) =>
+                          prev.map((s) => ({
+                            ...s,
+                            fontSize: Math.min(56, (s.fontSize || 26) + 2),
+                          }))
+                        );
+                      }}
+                      className="px-2 py-0.5 bg-[#121319] hover:bg-[#20222e] text-gray-300 rounded border border-[#2c2f42] text-[10px] font-bold"
+                      title="Perbesar semua subtitle (+2px)"
+                    >
+                      A+
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min="16"
+                  max="52"
+                  step="2"
+                  value={subtitles[0]?.fontSize || 26}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    setSubtitles((prev) => prev.map((s) => ({ ...s, fontSize: val })));
+                  }}
+                  className="w-full accent-teal-400"
+                />
+              </div>
+
+              {/* Global Position Y Slider */}
+              <div>
+                <div className="flex justify-between items-center text-[11px] text-gray-400 mb-1">
+                  <span>Tinggi Posisi Subtitle di Layar:</span>
+                  <span className="text-teal-400 font-mono text-[11px]">
+                    {subtitles[0]?.positionY ?? 82}%{' '}
+                    <span className="text-[10px] text-gray-500 font-sans">
+                      {(subtitles[0]?.positionY ?? 82) > 75
+                        ? '(Bawah)'
+                        : (subtitles[0]?.positionY ?? 82) > 55
+                          ? '(Tengah)'
+                          : '(Atas)'}
+                    </span>
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="50"
+                  max="92"
+                  step="2"
+                  value={subtitles[0]?.positionY ?? 82}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    setSubtitles((prev) => prev.map((s) => ({ ...s, positionY: val })));
+                  }}
+                  className="w-full accent-teal-400"
+                />
+              </div>
+            </div>
+
             <p className="text-[11px] text-gray-400 mb-3">
-              Keterangan teks akan ditampilkan otomatis sesuai rentang waktu yang diatur.
+              Keterangan teks akan ditampilkan otomatis sesuai rentang waktu yang diatur:
             </p>
 
             <div className="space-y-3 flex-1 overflow-y-auto">

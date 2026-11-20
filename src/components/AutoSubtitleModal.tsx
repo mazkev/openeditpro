@@ -236,8 +236,12 @@ export const AutoSubtitleModal: React.FC<AutoSubtitleModalProps> = ({
       endTime: item.endTime,
       fontSize: 26,
       color: '#ffffff',
-      bgColor: 'rgba(0,0,0,0.75)',
-      positionY: 85,
+      bgColor: 'transparent',
+      strokeColor: '#000000',
+      strokeWidth: 3,
+      fontFamily: 'impact',
+      isUppercase: true,
+      positionY: 82,
     }));
 
     onApplySubtitles(newSubs);

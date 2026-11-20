@@ -689,8 +689,12 @@ export function generateSyncedSubtitlesFromText(
       endTime: end,
       fontSize: 26,
       color: '#ffffff',
-      bgColor: 'rgba(0, 0, 0, 0.75)',
-      positionY: 80,
+      bgColor: 'transparent',
+      strokeColor: '#000000',
+      strokeWidth: 3,
+      fontFamily: 'impact',
+      isUppercase: true,
+      positionY: 82,
     });
 
     currentStart = end;
