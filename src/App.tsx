@@ -6,7 +6,7 @@ import { PreviewPlayer } from './components/PreviewPlayer';
 import { Timeline } from './components/Timeline';
 import { ExportModal } from './components/ExportModal';
 import { AutoSubtitleModal } from './components/AutoSubtitleModal';
-import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from './types/editor';
+import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic, ExportConfig } from './types/editor';
 import { exportVideo } from './utils/exportVideo';
 import type { ExportProgress } from './utils/exportVideo';
 import { createSampleVideo } from './utils/media';
@@ -240,13 +240,21 @@ export function App() {
     }
   };
 
-  // Export Video Handler
-  const handleExport = async () => {
+  // Open Export Modal (Config First)
+  const handleExport = () => {
+    if (clips.length === 0) return;
+    setIsPlaying(false);
+    setExportedBlob(null);
+    setExportProgress({ progress: 0, status: 'Menyiapkan...' });
+    setIsExportModalOpen(true);
+  };
+
+  // Start Export Handler with Configuration (Resolution + Sharpening)
+  const handleStartExport = async (config: ExportConfig) => {
     if (clips.length === 0) return;
     setIsPlaying(false);
     setIsExporting(true);
     setExportedBlob(null);
-    setIsExportModalOpen(true);
 
     try {
       const blob = await exportVideo(
@@ -258,13 +266,17 @@ export function App() {
         (progress) => {
           setExportProgress(progress);
         },
-        bgm
+        bgm,
+        {
+          resolution: config.resolution,
+          sharpen: config.sharpen,
+          sharpenLevel: config.sharpenLevel,
+        }
       );
       setExportedBlob(blob);
     } catch (err: unknown) {
       console.error('Export error:', err);
       alert(`Gagal mengekspor video: ${err instanceof Error ? err.message : 'Terjadi kesalahan'}`);
-      setIsExportModalOpen(false);
     } finally {
       setIsExporting(false);
     }
@@ -389,13 +401,16 @@ export function App() {
         onToggleMuteClip={handleToggleMuteClip}
       />
 
-      {/* Export Progress Modal */}
+      {/* Export Modal with Resolution & Sharpening Enhancer */}
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         progress={exportProgress}
         exportedBlob={exportedBlob}
         projectName={projectName}
+        isExporting={isExporting}
+        aspectRatio={aspectRatio}
+        onStartExport={handleStartExport}
       />
 
       {/* Auto Subtitle (Speech-to-Text) Modal */}

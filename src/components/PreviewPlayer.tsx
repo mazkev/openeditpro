@@ -9,6 +9,7 @@ import {
   Maximize2,
   Film,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from '../types/editor';
 import { formatTime } from '../utils/time';
@@ -46,6 +47,7 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const [masterVolume, setMasterVolume] = React.useState(1);
   const [isMuted, setIsMuted] = React.useState(false);
+  const [isSharpenPreview, setIsSharpenPreview] = React.useState(true);
 
   // Compute which clip is active at currentTime
   let activeClipIndex = -1;
@@ -280,11 +282,24 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
           className={`relative bg-black rounded-xl overflow-hidden shadow-2xl border border-[#232530] flex items-center justify-center ${aspectClass}`}
         >
           {clips.length > 0 ? (
-            <video
-              ref={videoRef}
-              playsInline
-              className="w-full h-full object-contain pointer-events-none"
-            />
+            <>
+              <video
+                ref={videoRef}
+                playsInline
+                className="w-full h-full object-contain pointer-events-none transition-[filter] duration-200"
+                style={{
+                  filter: isSharpenPreview
+                    ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
+                    : 'none',
+                }}
+              />
+              {isSharpenPreview && (
+                <div className="absolute top-2.5 left-2.5 z-20 pointer-events-none flex items-center space-x-1 px-2 py-0.5 rounded-full bg-teal-950/70 border border-teal-500/40 text-[10px] text-teal-300 font-semibold shadow-sm backdrop-blur-xs">
+                  <Sparkles className="w-3 h-3 text-teal-400" />
+                  <span>HD Sharpen Aktif</span>
+                </div>
+              )}
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center text-gray-500 p-6 text-center space-y-2">
               <Film className="w-12 h-12 text-gray-600 mb-1 animate-pulse" />
@@ -461,8 +476,22 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
           </button>
         </div>
 
-        {/* Right: Volume & Fullscreen */}
-        <div className="flex items-center space-x-4">
+        {/* Right: Sharpen HD Toggle, Volume & Fullscreen */}
+        <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={() => setIsSharpenPreview(!isSharpenPreview)}
+            className={`flex items-center space-x-1.5 px-2 py-1 rounded-lg text-xs font-semibold transition-all ${
+              isSharpenPreview
+                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/50 shadow-sm'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-[#1f212b] border border-transparent'
+            }`}
+            title="Klik untuk menghidupkan/mematikan penajam video (HD Enhancer) pada layar preview"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+            <span className="hidden sm:inline">{isSharpenPreview ? '✨ Tajam: ON' : 'Pertajam'}</span>
+          </button>
+
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setIsMuted(!isMuted)}

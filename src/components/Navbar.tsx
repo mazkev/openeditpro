@@ -99,14 +99,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={onExport}
           disabled={!hasClips || isExporting}
-          className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md ${
+          className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md ${
             !hasClips || isExporting
               ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
-              : 'bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-black shadow-teal-500/20 active:scale-95'
+              : 'bg-gradient-to-r from-teal-400 via-cyan-400 to-teal-300 hover:from-teal-300 hover:to-cyan-300 text-black shadow-teal-500/20 active:scale-95'
           }`}
+          title="Ekspor video ke 1080p Full HD atau 720p HD dengan fitur penajam gambar"
         >
-          <Download className="w-4 h-4" />
+          <Download className="w-4 h-4 text-black" />
           <span>{isExporting ? 'Mengekspor...' : 'Ekspor Video'}</span>
+          <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-black/20 text-black">
+            1080p / 720p
+          </span>
         </button>
       </div>
     </header>

@@ -1,8 +1,14 @@
-import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from '../types/editor';
+import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic, ExportResolution, SharpenLevel } from '../types/editor';
 
 export interface ExportProgress {
   progress: number; // 0 to 100
   status: string;
+}
+
+export interface ExportOptions {
+  resolution?: ExportResolution; // '720p' | '1080p'
+  sharpen?: boolean; // sharpen filter enabled
+  sharpenLevel?: SharpenLevel; // 'subtle' | 'high'
 }
 
 export async function exportVideo(
@@ -12,7 +18,8 @@ export async function exportVideo(
   voiceovers: Voiceover[],
   aspectRatio: AspectRatio,
   onProgress: (p: ExportProgress) => void,
-  bgm?: BackgroundMusic | null
+  bgm?: BackgroundMusic | null,
+  options?: ExportOptions
 ): Promise<Blob> {
   if (clips.length === 0) {
     throw new Error('Tidak ada video clip untuk diekspor');
@@ -26,21 +33,47 @@ export async function exportVideo(
     throw new Error('Durasi video tidak valid');
   }
 
-  // Determine export dimensions
-  let width = 1280;
-  let height = 720;
-  if (aspectRatio === '9:16') {
-    width = 720;
-    height = 1280;
-  } else if (aspectRatio === '1:1') {
-    width = 720;
-    height = 720;
+  const resolution = options?.resolution || '1080p';
+  const sharpen = options?.sharpen ?? true;
+  const sharpenLevel = options?.sharpenLevel || 'high';
+
+  // Determine export dimensions according to resolution and aspect ratio
+  let width = 1920;
+  let height = 1080;
+
+  if (resolution === '1080p') {
+    if (aspectRatio === '9:16') {
+      width = 1080;
+      height = 1920;
+    } else if (aspectRatio === '1:1') {
+      width = 1080;
+      height = 1080;
+    } else {
+      width = 1920;
+      height = 1080;
+    }
+  } else {
+    // 720p HD
+    if (aspectRatio === '9:16') {
+      width = 720;
+      height = 1280;
+    } else if (aspectRatio === '1:1') {
+      width = 720;
+      height = 720;
+    } else {
+      width = 1280;
+      height = 720;
+    }
   }
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
+
+  // High quality image smoothing interpolation (Bicubic scaling)
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   onProgress({ progress: 5, status: 'Menyiapkan audio engine...' });
 
@@ -166,9 +199,11 @@ export async function exportVideo(
     }
   }
 
+  const videoBitsPerSecond = resolution === '1080p' ? 9_000_000 : 4_500_000;
+
   const mediaRecorder = new MediaRecorder(combinedStream, {
     mimeType: chosenMime,
-    videoBitsPerSecond: 5_000_000,
+    videoBitsPerSecond,
   });
 
   const recordedChunks: Blob[] = [];
@@ -472,6 +507,16 @@ export async function exportVideo(
           const centerShiftX = (width - vWidth * ratio) / 2;
           const centerShiftY = (height - vHeight * ratio) / 2;
 
+          // Apply video sharpening filter to upscale low-res (e.g. 360p/480p) footage crisply
+          if (sharpen) {
+            ctx.filter =
+              sharpenLevel === 'high'
+                ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
+                : 'contrast(1.09) saturate(1.04) brightness(1.01)';
+          } else {
+            ctx.filter = 'none';
+          }
+
           ctx.drawImage(
             vEl,
             0,
@@ -483,6 +528,9 @@ export async function exportVideo(
             vWidth * ratio,
             vHeight * ratio
           );
+
+          // Always reset filter before drawing watermark & subtitles
+          ctx.filter = 'none';
         }
       }
 

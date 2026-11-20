@@ -61,3 +61,12 @@ export interface BackgroundMusic {
 }
 
 export type AspectRatio = '16:9' | '9:16' | '1:1';
+
+export type ExportResolution = '720p' | '1080p';
+export type SharpenLevel = 'subtle' | 'high';
+
+export interface ExportConfig {
+  resolution: ExportResolution;
+  sharpen: boolean;
+  sharpenLevel: SharpenLevel;
+}
