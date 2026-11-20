@@ -130,15 +130,45 @@ export async function exportVideo(
     ...audioTracks,
   ]);
 
-  // Setup MediaRecorder
-  let mimeType = 'video/webm;codecs=vp9,opus';
-  if (!MediaRecorder.isTypeSupported(mimeType)) {
-    mimeType = 'video/webm';
+  // Setup MediaRecorder with MP4 or WebM support
+  let chosenMime = 'video/mp4;codecs=avc1';
+  let isNativeMp4 = false;
+
+  const mp4Candidates = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=avc1,opus',
+    'video/mp4;codecs=avc1',
+    'video/mp4;codecs=h264,aac',
+    'video/mp4;codecs=h264',
+    'video/mp4',
+  ];
+
+  for (const m of mp4Candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) {
+      chosenMime = m;
+      isNativeMp4 = true;
+      break;
+    }
+  }
+
+  if (!isNativeMp4) {
+    const webmCandidates = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=h264,opus',
+      'video/webm',
+    ];
+    for (const m of webmCandidates) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) {
+        chosenMime = m;
+        break;
+      }
+    }
   }
 
   const mediaRecorder = new MediaRecorder(combinedStream, {
-    mimeType,
-    videoBitsPerSecond: 3_500_000,
+    mimeType: chosenMime,
+    videoBitsPerSecond: 5_000_000,
   });
 
   const recordedChunks: Blob[] = [];
@@ -154,7 +184,8 @@ export async function exportVideo(
 
     mediaRecorder.onstop = () => {
       audioCtx.close();
-      const outputBlob = new Blob(recordedChunks, { type: 'video/webm' });
+      const outputType = isNativeMp4 ? 'video/mp4' : 'video/mp4';
+      const outputBlob = new Blob(recordedChunks, { type: outputType });
       resolve(outputBlob);
     };
 
@@ -178,16 +209,20 @@ export async function exportVideo(
       ctx.save();
       ctx.globalAlpha = watermark.opacity;
 
-      const padding = 30;
+      // Scaling relative to preview player height (~450px reference)
+      const refPreviewHeight = aspectRatio === '9:16' ? 460 : aspectRatio === '1:1' ? 440 : 450;
+      const scale = height / refPreviewHeight;
+
+      const padding = Math.round(24 * scale);
       let x = padding;
       let y = padding;
 
       if (watermark.type === 'text' && watermark.text) {
-        const fontSize = Math.round(28 * watermark.scale);
+        const fontSize = Math.round(24 * watermark.scale * scale);
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.fillStyle = watermark.color || '#ffffff';
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = Math.round(4 * scale);
 
         const metrics = ctx.measureText(watermark.text);
         const textWidth = metrics.width;
@@ -212,7 +247,7 @@ export async function exportVideo(
 
         ctx.fillText(watermark.text, x, y);
       } else if (watermark.type === 'image' && watermarkImg) {
-        const imgW = 120 * watermark.scale;
+        const imgW = 120 * watermark.scale * scale;
         const imgH = (watermarkImg.naturalHeight / watermarkImg.naturalWidth) * imgW;
 
         if (watermark.position === 'top-left') {
@@ -238,20 +273,27 @@ export async function exportVideo(
       ctx.restore();
     };
 
-    // Helper to draw subtitles
+    // Helper to draw subtitles (PROPORTIONALLY SCALED TO MATCH PREVIEW 100%)
     const drawSubtitles = (currentTime: number) => {
       const activeSubs = subtitles.filter(
         (s) => currentTime >= s.startTime && currentTime <= s.endTime && s.text.trim().length > 0
       );
 
+      // Height reference of preview player is ~450px.
+      // Scaling font size by (height / 450) ensures the subtitle occupies the EXACT SAME
+      // percentage of video height in export as it does on the live screen preview!
+      const refPreviewHeight = aspectRatio === '9:16' ? 460 : aspectRatio === '1:1' ? 440 : 450;
+      const scale = height / refPreviewHeight;
+
       for (const sub of activeSubs) {
         ctx.save();
-        const fontSize = Math.round((sub.fontSize || 26) * (width / 1280));
+        const baseFontSize = Math.max(14, sub.fontSize || 24);
+        const fontSize = Math.round(baseFontSize * scale);
 
         let fontFamilyName = 'sans-serif';
-        if (sub.fontFamily === 'impact') fontFamilyName = 'Impact, sans-serif';
-        else if (sub.fontFamily === 'serif') fontFamilyName = 'Georgia, serif';
-        else if (sub.fontFamily === 'mono') fontFamilyName = 'Consolas, monospace';
+        if (sub.fontFamily === 'impact') fontFamilyName = 'Impact, "Arial Black", sans-serif';
+        else if (sub.fontFamily === 'serif') fontFamilyName = 'Georgia, "Times New Roman", serif';
+        else if (sub.fontFamily === 'mono') fontFamilyName = 'ui-monospace, Consolas, monospace';
         else if (sub.fontFamily === 'cursive') fontFamilyName = '"Comic Sans MS", cursive';
 
         ctx.font = `bold ${fontSize}px ${fontFamilyName}`;
@@ -260,15 +302,16 @@ export async function exportVideo(
 
         const rawText = sub.isUppercase ? sub.text.toUpperCase() : sub.text;
         const lines = rawText.split('\n');
-        const lineHeight = fontSize * 1.35;
+        const lineHeight = fontSize * 1.30;
         const totalTextHeight = lines.length * lineHeight;
         const targetY = ((sub.positionY ?? 80) / 100) * height;
 
         lines.forEach((line, index) => {
           const lineY = targetY - totalTextHeight / 2 + index * lineHeight + lineHeight / 2;
           const metrics = ctx.measureText(line);
-          const bgPaddingX = 20;
-          const bgPaddingY = 10;
+          const bgPaddingX = Math.round(18 * scale);
+          const bgPaddingY = Math.round(8 * scale);
+          const bgRadius = Math.round(10 * scale);
 
           // Draw background pill
           if (sub.bgColor && sub.bgColor !== 'transparent') {
@@ -281,7 +324,7 @@ export async function exportVideo(
               lineY - bgHeight / 2,
               bgWidth,
               bgHeight,
-              12
+              bgRadius
             );
             ctx.fill();
           }
@@ -289,15 +332,16 @@ export async function exportVideo(
           // Text Glow & Shadow
           if (sub.glowColor) {
             ctx.shadowColor = sub.glowColor;
-            ctx.shadowBlur = 14;
+            ctx.shadowBlur = Math.round(14 * scale);
           } else {
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-            ctx.shadowBlur = 4;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+            ctx.shadowBlur = Math.round(4 * scale);
+            ctx.shadowOffsetY = Math.round(2 * scale);
           }
 
           // Draw text stroke & fill (Fill on top so solid white fill ALWAYS dominates!)
-          const rawStroke = sub.strokeWidth ?? 1.5;
-          const effectiveStroke = Math.min(rawStroke, Math.max(0.8, fontSize * 0.08));
+          const rawStroke = (sub.strokeWidth ?? 1.5) * scale;
+          const effectiveStroke = Math.min(rawStroke, Math.max(1.0 * scale, fontSize * 0.08));
           if (effectiveStroke > 0) {
             ctx.lineWidth = effectiveStroke * 2;
             ctx.strokeStyle = sub.strokeColor || 'rgba(0, 0, 0, 0.9)';
