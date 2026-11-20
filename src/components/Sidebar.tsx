@@ -50,6 +50,17 @@ interface SubtitleStylePreset {
 
 const SUBTITLE_PRESETS: SubtitleStylePreset[] = [
   {
+    id: 'minimalist',
+    name: 'Clean White (No BG)',
+    preview: 'PUTIH',
+    color: '#FFFFFF',
+    bgColor: 'transparent',
+    fontFamily: 'impact',
+    strokeColor: '#000000',
+    strokeWidth: 1.5,
+    isUppercase: true,
+  },
+  {
     id: 'tiktok',
     name: 'TikTok Kuning (No BG)',
     preview: 'VIRAL',
@@ -57,18 +68,7 @@ const SUBTITLE_PRESETS: SubtitleStylePreset[] = [
     bgColor: 'transparent',
     fontFamily: 'impact',
     strokeColor: '#000000',
-    strokeWidth: 3.5,
-    isUppercase: true,
-  },
-  {
-    id: 'minimalist',
-    name: 'Clean White (No BG)',
-    preview: 'BERSIH',
-    color: '#FFFFFF',
-    bgColor: 'transparent',
-    fontFamily: 'impact',
-    strokeColor: '#000000',
-    strokeWidth: 3.5,
+    strokeWidth: 1.5,
     isUppercase: true,
   },
   {
@@ -79,7 +79,7 @@ const SUBTITLE_PRESETS: SubtitleStylePreset[] = [
     bgColor: 'transparent',
     fontFamily: 'impact',
     strokeColor: '#0F766E',
-    strokeWidth: 2.5,
+    strokeWidth: 1.5,
     glowColor: '#14B8A6',
     isUppercase: true,
   },
@@ -921,14 +921,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      // Remove background from all subtitles, set clean crisp stroke!
+                      // Remove background from all subtitles, set clean crisp stroke where white dominates!
                       setSubtitles((prev) =>
                         prev.map((s) => ({
                           ...s,
                           bgColor: 'transparent',
-                          color: s.color || '#FFFFFF',
+                          color: '#FFFFFF',
                           strokeColor: '#000000',
-                          strokeWidth: Math.max(2.5, s.strokeWidth || 3),
+                          strokeWidth: 1.5,
                         }))
                       );
                     }}
@@ -1016,6 +1016,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChange={(e) => {
                     const val = parseInt(e.target.value);
                     setSubtitles((prev) => prev.map((s) => ({ ...s, fontSize: val })));
+                  }}
+                  className="w-full accent-teal-400"
+                />
+              </div>
+
+              {/* Global Stroke Width Slider */}
+              <div>
+                <div className="flex justify-between items-center text-[11px] text-gray-400 mb-1">
+                  <span>Tebal Garis Tepi (Stroke Outline):</span>
+                  <span className="text-teal-400 font-mono text-[11px]">
+                    {subtitles[0]?.strokeWidth ?? 1.5}px{' '}
+                    <span className="text-[10px] text-gray-500 font-sans">
+                      {(subtitles[0]?.strokeWidth ?? 1.5) === 0
+                        ? '(Polos)'
+                        : (subtitles[0]?.strokeWidth ?? 1.5) <= 1.5
+                          ? '(Putih Dominan ✨)'
+                          : '(Garis Tebal)'}
+                    </span>
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="4"
+                  step="0.5"
+                  value={subtitles[0]?.strokeWidth ?? 1.5}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setSubtitles((prev) => prev.map((s) => ({ ...s, strokeWidth: val })));
                   }}
                   className="w-full accent-teal-400"
                 />

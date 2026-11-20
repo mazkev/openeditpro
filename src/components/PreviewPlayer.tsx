@@ -267,9 +267,14 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
             else if (sub.fontFamily === 'mono') fontFamilyStyle = 'ui-monospace, Consolas, monospace';
             else if (sub.fontFamily === 'cursive') fontFamilyStyle = '"Comic Sans MS", "Segoe Print", cursive';
 
+            const baseFontSize = Math.max(14, sub.fontSize || 24);
+            // Proportional stroke: dynamically scaled with font size so stroke NEVER swallows white text!
+            const rawStroke = sub.strokeWidth ?? 1.5;
+            const effectiveStroke = Math.min(rawStroke, Math.max(0.8, baseFontSize * 0.08));
+
             const strokeStyle =
-              sub.strokeWidth && sub.strokeWidth > 0
-                ? `${sub.strokeWidth}px ${sub.strokeColor || '#000000'}`
+              effectiveStroke > 0
+                ? `${effectiveStroke.toFixed(1)}px ${sub.strokeColor || '#000000'}`
                 : undefined;
 
             return (
@@ -282,18 +287,19 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                 }}
               >
                 <div
-                  className="max-w-[90%] px-4 py-2 rounded-xl text-center font-bold tracking-wide shadow-2xl transition-all"
+                  className="max-w-[90%] px-4 py-1.5 rounded-xl text-center font-black tracking-wide transition-all select-none"
                   style={{
                     color: sub.color || '#ffffff',
-                    backgroundColor: sub.bgColor || 'rgba(0, 0, 0, 0.8)',
-                    fontSize: `${Math.max(16, sub.fontSize || 24)}px`,
+                    backgroundColor: sub.bgColor || 'transparent',
+                    fontSize: `${baseFontSize}px`,
                     fontFamily: fontFamilyStyle,
                     textTransform: sub.isUppercase ? 'uppercase' : 'none',
+                    paintOrder: 'stroke fill',
                     WebkitTextStroke: strokeStyle,
-                    lineHeight: 1.35,
+                    lineHeight: 1.28,
                     textShadow: sub.glowColor
-                      ? `0 0 14px ${sub.glowColor}, 0 2px 4px rgba(0,0,0,0.9)`
-                      : '0 2px 4px rgba(0,0,0,0.95), 0 0 2px #000',
+                      ? `0 0 14px ${sub.glowColor}, 0 2px 4px rgba(0,0,0,0.8)`
+                      : '0 2px 4px rgba(0, 0, 0, 0.85)',
                     border:
                       sub.bgColor && sub.bgColor !== 'transparent'
                         ? '1px solid rgba(255, 255, 255, 0.2)'

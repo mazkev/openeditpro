@@ -277,10 +277,11 @@ export async function exportVideo(
             ctx.shadowBlur = 4;
           }
 
-          // Draw text stroke & fill
-          const strokeWidth = sub.strokeWidth ?? 3;
-          if (strokeWidth > 0) {
-            ctx.lineWidth = strokeWidth;
+          // Draw text stroke & fill (Fill on top so solid white fill ALWAYS dominates!)
+          const rawStroke = sub.strokeWidth ?? 1.5;
+          const effectiveStroke = Math.min(rawStroke, Math.max(0.8, fontSize * 0.08));
+          if (effectiveStroke > 0) {
+            ctx.lineWidth = effectiveStroke * 2;
             ctx.strokeStyle = sub.strokeColor || 'rgba(0, 0, 0, 0.9)';
             ctx.strokeText(line, width / 2, lineY);
           }
