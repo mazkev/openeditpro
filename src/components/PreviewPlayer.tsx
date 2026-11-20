@@ -10,7 +10,7 @@ import {
   Film,
   RotateCcw,
 } from 'lucide-react';
-import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio } from '../types/editor';
+import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from '../types/editor';
 import { formatTime } from '../utils/time';
 
 interface PreviewPlayerProps {
@@ -24,6 +24,7 @@ interface PreviewPlayerProps {
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
   totalDuration: number;
+  bgm?: BackgroundMusic | null;
 }
 
 export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
@@ -37,10 +38,12 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
   isPlaying,
   setIsPlaying,
   totalDuration,
+  bgm,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const voiceoverAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const [masterVolume, setMasterVolume] = React.useState(1);
   const [isMuted, setIsMuted] = React.useState(false);
 
@@ -139,6 +142,65 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       }
     });
   }, [voiceovers, isPlaying, currentTime, masterVolume, isMuted]);
+
+  // Sync background music (BGM)
+  useEffect(() => {
+    if (!bgm || !bgm.url) {
+      if (bgmAudioRef.current) {
+        bgmAudioRef.current.pause();
+        bgmAudioRef.current = null;
+      }
+      return;
+    }
+
+    if (!bgmAudioRef.current || bgmAudioRef.current.src !== bgm.url) {
+      if (bgmAudioRef.current) {
+        bgmAudioRef.current.pause();
+      }
+      bgmAudioRef.current = new Audio(bgm.url);
+    }
+
+    const audio = bgmAudioRef.current;
+    audio.volume = isMuted ? 0 : (bgm.volume ?? 0.2) * masterVolume;
+    audio.loop = bgm.loop ?? true;
+
+    if (isPlaying) {
+      const targetTime = bgm.loop && bgm.duration > 0
+        ? currentTime % bgm.duration
+        : currentTime;
+
+      if (targetTime < (bgm.duration || Infinity)) {
+        if (Math.abs(audio.currentTime - targetTime) > 0.35) {
+          audio.currentTime = targetTime;
+        }
+        if (audio.paused) {
+          audio.play().catch(() => {});
+        }
+      } else {
+        if (!audio.paused) audio.pause();
+      }
+    } else {
+      if (!audio.paused) {
+        audio.pause();
+      }
+      const targetTime = bgm.loop && bgm.duration > 0
+        ? currentTime % bgm.duration
+        : currentTime;
+      if (targetTime < (bgm.duration || Infinity)) {
+        audio.currentTime = targetTime;
+      }
+    }
+  }, [bgm, isPlaying, currentTime, masterVolume, isMuted]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (bgmAudioRef.current) {
+        bgmAudioRef.current.pause();
+        bgmAudioRef.current = null;
+      }
+    };
+  }, []);
 
   // Main playback tick interval
   useEffect(() => {

@@ -20,8 +20,11 @@ import {
   Loader2,
   Palette,
   Sliders,
+  Music,
+  Check,
+  Disc,
 } from 'lucide-react';
-import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition } from '../types/editor';
+import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition, BackgroundMusic } from '../types/editor';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
 import {
@@ -34,6 +37,13 @@ import {
   getSystemVoices,
   type VoiceEffectPreset,
 } from '../utils/tts';
+import {
+  BGM_PRESETS,
+  generateBgmAudio,
+  playBgmPreview,
+  stopBgmPreview,
+  type BgmPreset,
+} from '../utils/audioPresets';
 
 interface SubtitleStylePreset {
   id: string;
@@ -135,9 +145,13 @@ interface SidebarProps {
   totalDuration?: number;
   onSplitClip: (clipId: string, splitTime: number) => void;
   onOpenAutoSubtitle: () => void;
+  bgm?: BackgroundMusic | null;
+  setBgm?: React.Dispatch<React.SetStateAction<BackgroundMusic | null>>;
+  activeTab?: TabType;
+  setActiveTab?: (tab: TabType) => void;
 }
 
-type TabType = 'media' | 'edit' | 'subtitle' | 'watermark' | 'voiceover';
+export type TabType = 'media' | 'edit' | 'subtitle' | 'watermark' | 'voiceover' | 'music';
 
 export const Sidebar: React.FC<SidebarProps> = ({
   clips,
@@ -155,8 +169,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   totalDuration = 0,
   onSplitClip,
   onOpenAutoSubtitle,
+  bgm,
+  setBgm,
+  activeTab: controlledActiveTab,
+  setActiveTab: controlledSetActiveTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('media');
+  const [internalActiveTab, setInternalActiveTab] = useState<TabType>('media');
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+  const setActiveTab = controlledSetActiveTab ?? setInternalActiveTab;
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
@@ -188,10 +208,91 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const bgmUploadRef = useRef<HTMLInputElement>(null);
   const watermarkImgRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordTimerRef = useRef<number | null>(null);
+
+  // BGM states
+  const [bgmCategoryFilter, setBgmCategoryFilter] = useState<'all' | 'chill' | 'acoustic' | 'cinematic' | 'energy' | 'vlog'>('all');
+  const [generatingBgmId, setGeneratingBgmId] = useState<string | null>(null);
+  const [previewingBgmId, setPreviewingBgmId] = useState<string | null>(null);
+
+  // Stop BGM preview on unmount
+  useEffect(() => {
+    return () => {
+      stopBgmPreview();
+    };
+  }, []);
+
+  const handlePreviewBgm = async (preset: BgmPreset) => {
+    if (previewingBgmId === preset.id) {
+      stopBgmPreview();
+      setPreviewingBgmId(null);
+      return;
+    }
+
+    stopBgmPreview();
+    setGeneratingBgmId(preset.id);
+    try {
+      const { url } = await generateBgmAudio(preset.id);
+      playBgmPreview(url, () => setPreviewingBgmId(null));
+      setPreviewingBgmId(preset.id);
+    } catch (err) {
+      console.error('Failed to preview BGM:', err);
+    } finally {
+      setGeneratingBgmId(null);
+    }
+  };
+
+  const handleApplyBgmPreset = async (preset: BgmPreset) => {
+    if (!setBgm) return;
+    setGeneratingBgmId(preset.id);
+    try {
+      const { url, duration } = await generateBgmAudio(preset.id);
+      setBgm({
+        id: `bgm-${preset.id}`,
+        name: preset.name,
+        url,
+        duration,
+        volume: bgm?.volume ?? 0.20,
+        loop: true,
+        category: preset.category,
+      });
+      stopBgmPreview();
+      setPreviewingBgmId(null);
+    } catch (err) {
+      console.error('Failed to apply BGM:', err);
+      alert('Gagal menerapkan musik latar');
+    } finally {
+      setGeneratingBgmId(null);
+    }
+  };
+
+  const handleUploadBgm = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !setBgm) return;
+    try {
+      const { url, duration } = await processAudioFile(file);
+      setBgm({
+        id: `bgm-upload-${Date.now()}`,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        url,
+        duration,
+        volume: bgm?.volume ?? 0.20,
+        loop: true,
+        category: 'custom',
+      });
+      stopBgmPreview();
+      setPreviewingBgmId(null);
+    } catch (err) {
+      console.error('Failed to upload BGM:', err);
+      alert('Gagal memproses file audio');
+    } finally {
+      if (bgmUploadRef.current) bgmUploadRef.current.value = '';
+    }
+  };
 
   // Handle Video Upload
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -534,6 +635,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Mic className="w-5 h-5 mb-0.5" />
           <span className="text-[10px] font-medium">Narasi</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('music')}
+          className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all ${
+            activeTab === 'music'
+              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-[#1a1c24]'
+          }`}
+          title="Musik Latar (BGM)"
+        >
+          <Music className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px] font-medium">Musik</span>
         </button>
       </div>
 
@@ -2027,6 +2141,266 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: MUSIK LATAR (BGM) */}
+        {activeTab === 'music' && (
+          <div className="flex flex-col h-full overflow-y-auto pr-1 space-y-3.5">
+            <div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-gray-200 flex items-center space-x-1.5">
+                  <Music className="w-4 h-4 text-purple-400" />
+                  <span>Musik Latar (BGM)</span>
+                </h2>
+                {bgm && (
+                  <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full font-medium">
+                    1 Musik Aktif
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Tambahkan musik latar bebas royalti untuk menghidupkan suasana video Anda.
+              </p>
+            </div>
+
+            {/* ACTIVE BGM CARD */}
+            {bgm ? (
+              <div className="bg-gradient-to-br from-purple-950/40 via-[#181524] to-[#12131a] p-3 rounded-xl border border-purple-500/40 shadow-lg space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center flex-shrink-0">
+                      <Disc className="w-4 h-4 text-purple-300 animate-spin" style={{ animationDuration: '4s' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{bgm.name}</p>
+                      <p className="text-[10px] text-purple-300/80">
+                        {formatTime(bgm.duration)} · {bgm.loop ? '🔁 Loop Aktif' : 'Sekali Putar'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBgm && setBgm(null)}
+                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                    title="Hapus Musik Latar"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Volume Slider with Recommendation Note */}
+                <div className="bg-[#101116]/80 p-2.5 rounded-lg border border-purple-900/40 space-y-1.5">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-gray-300 font-medium flex items-center space-x-1">
+                      <Volume2 className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Volume Musik Latar:</span>
+                    </span>
+                    <span className="text-purple-300 font-mono font-bold">
+                      {Math.round((bgm.volume ?? 0.2) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={bgm.volume ?? 0.2}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (setBgm) {
+                        setBgm((prev) => (prev ? { ...prev, volume: val } : null));
+                      }
+                    }}
+                    className="w-full accent-purple-400"
+                  />
+                  <div className="flex justify-between items-center text-[10px] text-gray-400 pt-0.5">
+                    <span className="text-purple-300/90 font-medium">✨ Disarankan 15% - 25%</span>
+                    <span>agar suara narasi tetap jelas</span>
+                  </div>
+                </div>
+
+                {/* Loop Checkbox */}
+                <label className="flex items-center space-x-2 text-[11px] text-gray-300 cursor-pointer pt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={bgm.loop ?? true}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (setBgm) {
+                        setBgm((prev) => (prev ? { ...prev, loop: checked } : null));
+                      }
+                    }}
+                    className="rounded accent-purple-400 w-3.5 h-3.5"
+                  />
+                  <span>🔁 Ulang Otomatis (Loop sepanjang durasi video)</span>
+                </label>
+              </div>
+            ) : (
+              <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] text-center space-y-2">
+                <Music className="w-8 h-8 text-gray-500 mx-auto" />
+                <p className="text-xs font-medium text-gray-300">Belum ada musik latar aktif</p>
+                <p className="text-[10px] text-gray-400">
+                  Pilih salah satu lagu bebas royalti di bawah atau upload lagu favorit Anda.
+                </p>
+              </div>
+            )}
+
+            {/* UPLOAD CUSTOM AUDIO FILE */}
+            <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-2">
+              <span className="text-xs font-semibold text-gray-200 block">
+                Punya Lagu Sendiri? Upload di Sini
+              </span>
+              <input
+                ref={bgmUploadRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleUploadBgm}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => bgmUploadRef.current?.click()}
+                className="w-full py-2 bg-[#20222d] hover:bg-[#282a38] text-purple-300 text-xs font-semibold rounded-lg border border-purple-500/30 hover:border-purple-500/50 flex items-center justify-center space-x-2 transition-all shadow-sm"
+              >
+                <Upload className="w-3.5 h-3.5 text-purple-400" />
+                <span>Upload File Musik (MP3 / WAV)</span>
+              </button>
+            </div>
+
+            {/* PRESET ROYALTY-FREE MUSIC LIBRARY */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-200">
+                  Koleksi Bebas Royalti (Siap Pakai):
+                </span>
+                <span className="text-[10px] text-purple-400 font-mono">
+                  100% Free
+                </span>
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex space-x-1 overflow-x-auto pb-1 text-[10px]">
+                {[
+                  { id: 'all', label: 'Semua (6)' },
+                  { id: 'chill', label: '☕ Chill' },
+                  { id: 'acoustic', label: '✨ Akustik' },
+                  { id: 'cinematic', label: '🎬 Sinematik' },
+                  { id: 'energy', label: '⚡ Energik' },
+                  { id: 'vlog', label: '🎉 Vlog' },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setBgmCategoryFilter(cat.id as typeof bgmCategoryFilter)}
+                    className={`px-2.5 py-1 rounded-md whitespace-nowrap transition-colors font-medium ${
+                      bgmCategoryFilter === cat.id
+                        ? 'bg-purple-600 text-white font-semibold shadow-sm'
+                        : 'bg-[#101115] text-gray-400 hover:text-gray-200 border border-[#262836]'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Preset Cards List */}
+              <div className="space-y-2">
+                {BGM_PRESETS.filter(
+                  (p) => bgmCategoryFilter === 'all' || p.category === bgmCategoryFilter
+                ).map((preset) => {
+                  const isCurrentActive = bgm?.id === `bgm-${preset.id}`;
+                  const isPreviewing = previewingBgmId === preset.id;
+                  const isGenerating = generatingBgmId === preset.id;
+
+                  return (
+                    <div
+                      key={preset.id}
+                      className={`p-2.5 rounded-xl border transition-all space-y-2 ${
+                        isCurrentActive
+                          ? 'bg-purple-950/30 border-purple-500/60 shadow-md ring-1 ring-purple-500/30'
+                          : 'bg-[#171820] border-[#252834] hover:border-[#383c4e]'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between space-x-2">
+                        <div className="flex items-start space-x-2 min-w-0">
+                          <span className="text-xl leading-none mt-0.5">{preset.icon}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-1.5 flex-wrap">
+                              <span className="text-xs font-bold text-gray-100">{preset.name}</span>
+                              <span className="text-[9px] bg-[#101116] text-purple-300 px-1.5 py-0.5 rounded border border-[#2b2d3d] font-medium">
+                                {preset.vibe}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
+                              {preset.description}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-[#232535]">
+                        <span className="text-[10px] text-gray-400 font-mono">
+                          ~{preset.duration}s Loop · {preset.bpm} BPM
+                        </span>
+
+                        <div className="flex items-center space-x-1.5">
+                          {/* Preview / Listen button */}
+                          <button
+                            type="button"
+                            onClick={() => handlePreviewBgm(preset)}
+                            disabled={isGenerating}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition-colors ${
+                              isPreviewing
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                : 'bg-[#222430] hover:bg-[#2c2f3e] text-gray-300 border border-[#303346]'
+                            }`}
+                          >
+                            {isGenerating ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
+                            ) : isPreviewing ? (
+                              <>
+                                <Square className="w-3 h-3 text-amber-400 fill-amber-400" />
+                                <span>Stop</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3 h-3 text-purple-400 fill-purple-400" />
+                                <span>Tes</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Apply as BGM button */}
+                          <button
+                            type="button"
+                            onClick={() => handleApplyBgmPreset(preset)}
+                            disabled={isGenerating}
+                            className={`px-3 py-1 rounded-md text-[11px] font-bold flex items-center space-x-1 transition-all ${
+                              isCurrentActive
+                                ? 'bg-purple-600 text-white shadow-sm ring-1 ring-purple-400'
+                                : 'bg-purple-600/80 hover:bg-purple-500 text-white shadow-sm'
+                            }`}
+                          >
+                            {isCurrentActive ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>Dipakai</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3 h-3" />
+                                <span>Gunakan</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

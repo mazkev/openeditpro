@@ -1,4 +1,4 @@
-import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio } from '../types/editor';
+import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from '../types/editor';
 
 export interface ExportProgress {
   progress: number; // 0 to 100
@@ -11,7 +11,8 @@ export async function exportVideo(
   watermark: Watermark,
   voiceovers: Voiceover[],
   aspectRatio: AspectRatio,
-  onProgress: (p: ExportProgress) => void
+  onProgress: (p: ExportProgress) => void,
+  bgm?: BackgroundMusic | null
 ): Promise<Blob> {
   if (clips.length === 0) {
     throw new Error('Tidak ada video clip untuk diekspor');
@@ -102,6 +103,23 @@ export async function exportVideo(
       console.warn('Voiceover audio source error:', e);
     }
     voiceoverElements.push({ el: a, vo });
+  }
+
+  // Pre-load background music (BGM)
+  let bgmAudio: HTMLAudioElement | null = null;
+  if (bgm && bgm.url) {
+    bgmAudio = document.createElement('audio');
+    bgmAudio.crossOrigin = 'anonymous';
+    bgmAudio.src = bgm.url;
+    try {
+      const source = audioCtx.createMediaElementSource(bgmAudio);
+      const gain = audioCtx.createGain();
+      gain.gain.value = bgm.volume ?? 0.2;
+      source.connect(gain);
+      gain.connect(dest);
+    } catch (e) {
+      console.warn('BGM audio source error:', e);
+    }
   }
 
   // Combine Canvas Stream with Audio Stream
@@ -305,6 +323,7 @@ export async function exportVideo(
         onProgress({ progress: 100, status: 'Menyelesaikan file ekspor...' });
         videoElements.forEach((v) => v.pause());
         voiceoverElements.forEach(({ el }) => el.pause());
+        if (bgmAudio) bgmAudio.pause();
         mediaRecorder.stop();
         return;
       }
@@ -377,6 +396,25 @@ export async function exportVideo(
           }
         }
       });
+
+      // Sync background music (BGM)
+      if (bgmAudio && bgm) {
+        if (elapsed < totalDuration) {
+          if (bgmAudio.paused) {
+            const targetTime = bgm.loop && bgm.duration > 0
+              ? elapsed % bgm.duration
+              : elapsed;
+            if (targetTime < bgm.duration) {
+              bgmAudio.currentTime = targetTime;
+              bgmAudio.play().catch(() => {});
+            }
+          }
+        } else {
+          if (!bgmAudio.paused) {
+            bgmAudio.pause();
+          }
+        }
+      }
 
       // Draw overlays
       drawWatermark();

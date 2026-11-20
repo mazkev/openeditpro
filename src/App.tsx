@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
+import type { TabType } from './components/Sidebar';
 import { PreviewPlayer } from './components/PreviewPlayer';
 import { Timeline } from './components/Timeline';
 import { ExportModal } from './components/ExportModal';
 import { AutoSubtitleModal } from './components/AutoSubtitleModal';
-import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio } from './types/editor';
+import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from './types/editor';
 import { exportVideo } from './utils/exportVideo';
 import type { ExportProgress } from './utils/exportVideo';
 import { createSampleVideo } from './utils/media';
@@ -32,6 +33,12 @@ export function App() {
 
   // Voiceovers
   const [voiceovers, setVoiceovers] = useState<Voiceover[]>([]);
+
+  // Background Music (BGM)
+  const [bgm, setBgm] = useState<BackgroundMusic | null>(null);
+
+  // Active Sidebar Tab
+  const [sidebarTab, setSidebarTab] = useState<TabType>('media');
 
   // Playback state
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -202,7 +209,8 @@ export function App() {
         aspectRatio,
         (progress) => {
           setExportProgress(progress);
-        }
+        },
+        bgm
       );
       setExportedBlob(blob);
     } catch (err: unknown) {
@@ -286,6 +294,10 @@ export function App() {
           totalDuration={totalDuration}
           onSplitClip={handleSplitClip}
           onOpenAutoSubtitle={() => setIsAutoSubtitleModalOpen(true)}
+          bgm={bgm}
+          setBgm={setBgm}
+          activeTab={sidebarTab}
+          setActiveTab={setSidebarTab}
         />
 
         {/* Center Canvas Preview Player */}
@@ -300,6 +312,7 @@ export function App() {
           isPlaying={isPlaying}
           setIsPlaying={setIsPlaying}
           totalDuration={totalDuration}
+          bgm={bgm}
         />
       </div>
 
@@ -319,6 +332,9 @@ export function App() {
         onSplitClip={handleSplitClip}
         isPlaying={isPlaying}
         setIsPlaying={setIsPlaying}
+        bgm={bgm}
+        setBgm={setBgm}
+        onOpenMusicTab={() => setSidebarTab('music')}
       />
 
       {/* Export Progress Modal */}

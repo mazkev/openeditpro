@@ -8,9 +8,11 @@ import {
   Film,
   Type,
   Mic,
+  Music,
+  Plus,
   GripVertical,
 } from 'lucide-react';
-import type { VideoClip, Subtitle, Voiceover } from '../types/editor';
+import type { VideoClip, Subtitle, Voiceover, BackgroundMusic } from '../types/editor';
 import { formatTime } from '../utils/time';
 
 interface TimelineProps {
@@ -28,6 +30,9 @@ interface TimelineProps {
   onSplitClip: (clipId: string, splitTime: number) => void;
   isPlaying?: boolean;
   setIsPlaying?: (playing: boolean) => void;
+  bgm?: BackgroundMusic | null;
+  setBgm?: React.Dispatch<React.SetStateAction<BackgroundMusic | null>>;
+  onOpenMusicTab?: () => void;
 }
 
 export const Timeline: React.FC<TimelineProps> = ({
@@ -45,6 +50,9 @@ export const Timeline: React.FC<TimelineProps> = ({
   onSplitClip,
   isPlaying,
   setIsPlaying,
+  bgm,
+  setBgm,
+  onOpenMusicTab,
 }) => {
   const [zoom, setZoom] = useState(40); // pixels per second
   const timelineTracksRef = useRef<HTMLDivElement>(null);
@@ -419,6 +427,10 @@ export const Timeline: React.FC<TimelineProps> = ({
             <Mic className="w-4 h-4 text-teal-400" />
             <span>Narasi</span>
           </div>
+          <div className="h-11 border-b border-[#232530] flex items-center px-3 space-x-2 text-xs font-semibold text-gray-300">
+            <Music className="w-4 h-4 text-purple-400" />
+            <span>Musik (BGM)</span>
+          </div>
         </div>
 
         {/* Scrollable Timeline Area */}
@@ -750,6 +762,66 @@ export const Timeline: React.FC<TimelineProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            {/* 5. TRACK: MUSIK LATAR (BGM) */}
+            <div
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                  setSelectedSubtitleId(null);
+                  setSelectedClipId(null);
+                  setSelectedVoiceoverId(null);
+                  handleRulerMouseDown(e);
+                }
+              }}
+              className="h-11 border-b border-[#232530] bg-[#111218] relative flex items-center"
+            >
+              {bgm ? (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onOpenMusicTab) onOpenMusicTab();
+                  }}
+                  style={{
+                    left: '0px',
+                    width: `${Math.max(timeToPx(totalDuration || bgm.duration || 10), 80)}px`,
+                  }}
+                  className="absolute top-1.5 bottom-1.5 rounded-md px-2.5 flex items-center justify-between text-[10px] font-medium overflow-hidden shadow-sm bg-purple-600/25 border border-purple-500/60 hover:border-purple-400 text-purple-200 hover:bg-purple-600/35 transition-all cursor-pointer group"
+                  title={`Musik Latar: ${bgm.name} (Volume: ${Math.round((bgm.volume ?? 0.2) * 100)}%${bgm.loop ? ', Loop Aktif' : ''}) - Klik untuk buka pengaturan musik`}
+                >
+                  <div className="flex items-center space-x-2 min-w-0 flex-1 truncate pr-1">
+                    <Music className="w-3.5 h-3.5 text-purple-400 flex-shrink-0 animate-pulse" />
+                    <span className="font-bold truncate text-white">{bgm.name}</span>
+                    <span className="bg-purple-900/60 text-purple-300 text-[9px] px-1.5 py-0.5 rounded border border-purple-700/50 flex-shrink-0 font-mono">
+                      Vol {Math.round((bgm.volume ?? 0.2) * 100)}%
+                    </span>
+                    {bgm.loop && (
+                      <span className="bg-purple-950/80 text-purple-300 text-[9px] px-1 py-0.5 rounded border border-purple-700/40 flex-shrink-0">
+                        🔁 Loop
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (setBgm) setBgm(null);
+                    }}
+                    className="p-1 rounded hover:bg-red-500/30 text-purple-300 hover:text-red-400 flex-shrink-0 transition-colors ml-1"
+                    title="Hapus Musik Latar"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => onOpenMusicTab && onOpenMusicTab()}
+                  className="px-3 text-[10px] text-gray-500 hover:text-purple-300 cursor-pointer flex items-center space-x-1.5 transition-colors select-none"
+                >
+                  <Plus className="w-3 h-3 text-purple-400" />
+                  <span>Klik untuk menambahkan musik latar (BGM)...</span>
+                </div>
+              )}
             </div>
 
             {/* RED PLAYHEAD LINE & DRAGGABLE SCRUBBER HANDLE */}

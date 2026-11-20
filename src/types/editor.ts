@@ -49,4 +49,14 @@ export interface Voiceover {
   volume: number; // 0 to 1
 }
 
+export interface BackgroundMusic {
+  id: string;
+  name: string;
+  url: string; // Object URL or source URL
+  duration: number; // in seconds
+  volume: number; // 0 to 1 (default 0.20)
+  loop: boolean; // default true
+  category?: 'chill' | 'vlog' | 'cinematic' | 'acoustic' | 'energy' | 'custom';
+}
+
 export type AspectRatio = '16:9' | '9:16' | '1:1';
