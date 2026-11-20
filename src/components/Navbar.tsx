@@ -13,7 +13,7 @@ interface NavbarProps {
   hasClips: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
+const NavbarComponent: React.FC<NavbarProps> = ({
   projectName,
   setProjectName,
   aspectRatio,
@@ -116,3 +116,5 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+
+export const Navbar = React.memo(NavbarComponent);

@@ -28,6 +28,8 @@ export async function processVideoFile(file: File): Promise<{
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
+          canvas.width = 0;
+          canvas.height = 0;
           resolve({
             url,
             duration: video.duration,
@@ -47,6 +49,10 @@ export async function processVideoFile(file: File): Promise<{
           duration: video.duration,
           thumbnailUrl: '',
         });
+      } finally {
+        // Free GPU video decoder resources immediately
+        video.src = '';
+        video.load();
       }
     };
 

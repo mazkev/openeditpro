@@ -156,7 +156,7 @@ interface SidebarProps {
 
 export type TabType = 'media' | 'edit' | 'subtitle' | 'watermark' | 'voiceover' | 'music';
 
-export const Sidebar: React.FC<SidebarProps> = ({
+const SidebarComponent: React.FC<SidebarProps> = ({
   clips,
   setClips,
   selectedClipId,
@@ -322,7 +322,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         };
         setClips((prev) => [...prev, newClip]);
         if (!selectedClipId) setSelectedClipId(newClip.id);
-      } catch (err) {
+      } catch {
         alert(`Gagal memuat file ${file.name}`);
       }
     }
@@ -346,7 +346,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         volume: 1,
       };
       setVoiceovers((prev) => [...prev, newVoiceover]);
-    } catch (err) {
+    } catch {
       alert(`Gagal memuat audio: ${file.name}`);
     }
     if (audioInputRef.current) audioInputRef.current.value = '';
@@ -388,7 +388,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       recordTimerRef.current = window.setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
-    } catch (err) {
+    } catch {
       alert('Tidak dapat mengakses mikrofon. Pastikan izin mic diberikan.');
     }
   };
@@ -2595,3 +2595,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </div>
   );
 };
+
+export const Sidebar = React.memo(SidebarComponent, (prevProps, nextProps) => {
+  if (prevProps.clips !== nextProps.clips) return false;
+  if (prevProps.selectedClipId !== nextProps.selectedClipId) return false;
+  if (prevProps.subtitles !== nextProps.subtitles) return false;
+  if (prevProps.watermark !== nextProps.watermark) return false;
+  if (prevProps.voiceovers !== nextProps.voiceovers) return false;
+  if (prevProps.activeTab !== nextProps.activeTab) return false;
+  if (prevProps.bgm !== nextProps.bgm) return false;
+  if (prevProps.totalDuration !== nextProps.totalDuration) return false;
+
+  // Throttle currentTime updates in Sidebar during fast playback ticks to prevent UI stutter
+  if (Math.abs(prevProps.currentTime - nextProps.currentTime) >= 0.5) return false;
+
+  return true;
+});

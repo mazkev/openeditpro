@@ -25,7 +25,7 @@ interface ExportModalProps {
   onStartExport: (config: ExportConfig) => void;
 }
 
-export const ExportModal: React.FC<ExportModalProps> = ({
+const ExportModalComponent: React.FC<ExportModalProps> = ({
   isOpen,
   onClose,
   progress,
@@ -420,3 +420,5 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     </div>
   );
 };
+
+export const ExportModal = React.memo(ExportModalComponent);

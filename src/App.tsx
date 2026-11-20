@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import type { TabType } from './components/Sidebar';
@@ -241,48 +241,74 @@ export function App() {
   };
 
   // Open Export Modal (Config First)
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     if (clips.length === 0) return;
     setIsPlaying(false);
     setExportedBlob(null);
     setExportProgress({ progress: 0, status: 'Menyiapkan...' });
     setIsExportModalOpen(true);
-  };
+  }, [clips.length]);
 
   // Start Export Handler with Configuration (Resolution + Sharpening)
-  const handleStartExport = async (config: ExportConfig) => {
-    if (clips.length === 0) return;
-    setIsPlaying(false);
-    setIsExporting(true);
-    setExportedBlob(null);
+  const handleStartExport = useCallback(
+    async (config: ExportConfig) => {
+      if (clips.length === 0) return;
+      setIsPlaying(false);
+      setIsExporting(true);
+      setExportedBlob(null);
 
-    try {
-      const blob = await exportVideo(
-        clips,
-        subtitles,
-        watermark,
-        voiceovers,
-        aspectRatio,
-        (progress) => {
-          setExportProgress(progress);
-        },
-        bgm,
-        {
-          resolution: config.resolution,
-          sharpen: config.sharpen,
-          sharpenLevel: config.sharpenLevel,
-        }
-      );
-      setExportedBlob(blob);
-    } catch (err: unknown) {
-      console.error('Export error:', err);
-      alert(`Gagal mengekspor video: ${err instanceof Error ? err.message : 'Terjadi kesalahan'}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
+      try {
+        const blob = await exportVideo(
+          clips,
+          subtitles,
+          watermark,
+          voiceovers,
+          aspectRatio,
+          (progress) => {
+            setExportProgress(progress);
+          },
+          bgm,
+          {
+            resolution: config.resolution,
+            sharpen: config.sharpen,
+            sharpenLevel: config.sharpenLevel,
+          }
+        );
+        setExportedBlob(blob);
+      } catch (err: unknown) {
+        console.error('Export error:', err);
+        alert(`Gagal mengekspor video: ${err instanceof Error ? err.message : 'Terjadi kesalahan'}`);
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [clips, subtitles, watermark, voiceovers, aspectRatio, bgm]
+  );
 
-  // Keyboard Shortcuts (Space for Play/Pause)
+  const handleCloseExport = useCallback(() => setIsExportModalOpen(false), []);
+  const handleOpenAutoSubtitle = useCallback(() => setIsAutoSubtitleModalOpen(true), []);
+  const handleCloseAutoSubtitle = useCallback(() => setIsAutoSubtitleModalOpen(false), []);
+  const handleApplySubtitles = useCallback((newSubs: Subtitle[]) => {
+    setSubtitles((prev) => [...prev, ...newSubs]);
+  }, []);
+  const handleOpenMusicTab = useCallback(() => setSidebarTab('music'), []);
+
+  // Performance refs to allow single-registration event listeners without tearing down on playback ticks
+  const currentTimeRef = useRef(currentTime);
+  const isPlayingRef = useRef(isPlaying);
+  const totalDurationRef = useRef(totalDuration);
+  const selectedClipIdRef = useRef(selectedClipId);
+  const clipsRef = useRef(clips);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+    isPlayingRef.current = isPlaying;
+    totalDurationRef.current = totalDuration;
+    selectedClipIdRef.current = selectedClipId;
+    clipsRef.current = clips;
+  }, [currentTime, isPlaying, totalDuration, selectedClipId, clips]);
+
+  // Keyboard Shortcuts (Space for Play/Pause, Arrow Left/Right to seek, Delete to delete clip)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input or textarea
@@ -293,10 +319,14 @@ export function App() {
         return;
       }
 
+      const curTime = currentTimeRef.current;
+      const totalDur = totalDurationRef.current;
+      const curClips = clipsRef.current;
+
       if (e.code === 'Space') {
         e.preventDefault();
-        if (clips.length > 0) {
-          if (currentTime >= totalDuration - 0.05) {
+        if (curClips.length > 0) {
+          if (curTime >= totalDur - 0.05) {
             setCurrentTime(0);
             setIsPlaying(true);
           } else {
@@ -308,10 +338,11 @@ export function App() {
         setCurrentTime((t) => Math.max(0, t - 1));
       } else if (e.code === 'ArrowRight') {
         e.preventDefault();
-        setCurrentTime((t) => Math.min(totalDuration, t + 1));
+        setCurrentTime((t) => Math.min(totalDur, t + 1));
       } else if (e.code === 'Delete' || e.code === 'Backspace') {
-        if (selectedClipId) {
-          setClips((prev) => prev.filter((c) => c.id !== selectedClipId));
+        const selId = selectedClipIdRef.current;
+        if (selId) {
+          setClips((prev) => prev.filter((c) => c.id !== selId));
           setSelectedClipId(null);
         }
       }
@@ -319,7 +350,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clips, selectedClipId, totalDuration]);
+  }, []);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#0f0f12] text-gray-200 overflow-hidden select-none font-sans">
@@ -353,7 +384,7 @@ export function App() {
           setCurrentTime={setCurrentTime}
           totalDuration={totalDuration}
           onSplitClip={handleSplitClip}
-          onOpenAutoSubtitle={() => setIsAutoSubtitleModalOpen(true)}
+          onOpenAutoSubtitle={handleOpenAutoSubtitle}
           bgm={bgm}
           setBgm={setBgm}
           activeTab={sidebarTab}
@@ -396,7 +427,7 @@ export function App() {
         setIsPlaying={setIsPlaying}
         bgm={bgm}
         setBgm={setBgm}
-        onOpenMusicTab={() => setSidebarTab('music')}
+        onOpenMusicTab={handleOpenMusicTab}
         onExtractAudio={handleExtractAudio}
         onToggleMuteClip={handleToggleMuteClip}
       />
@@ -404,7 +435,7 @@ export function App() {
       {/* Export Modal with Resolution & Sharpening Enhancer */}
       <ExportModal
         isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
+        onClose={handleCloseExport}
         progress={exportProgress}
         exportedBlob={exportedBlob}
         projectName={projectName}
@@ -416,9 +447,9 @@ export function App() {
       {/* Auto Subtitle (Speech-to-Text) Modal */}
       <AutoSubtitleModal
         isOpen={isAutoSubtitleModalOpen}
-        onClose={() => setIsAutoSubtitleModalOpen(false)}
+        onClose={handleCloseAutoSubtitle}
         clips={clips}
-        onApplySubtitles={(newSubs) => setSubtitles((prev) => [...prev, ...newSubs])}
+        onApplySubtitles={handleApplySubtitles}
         totalDuration={totalDuration}
       />
     </div>

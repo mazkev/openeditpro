@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -131,8 +131,8 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       } else {
         if (!audio.paused) {
           audio.pause();
+          audio.currentTime = 0;
         }
-        audio.currentTime = 0;
       }
     });
 
@@ -188,7 +188,7 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       const targetTime = bgm.loop && bgm.duration > 0
         ? currentTime % bgm.duration
         : currentTime;
-      if (targetTime < (bgm.duration || Infinity)) {
+      if (targetTime < (bgm.duration || Infinity) && Math.abs(audio.currentTime - targetTime) > 0.15) {
         audio.currentTime = targetTime;
       }
     }
@@ -231,9 +231,12 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [isPlaying, totalDuration, setCurrentTime, setIsPlaying]);
 
-  // Active Subtitles for current time
-  const activeSubtitles = subtitles.filter(
-    (s) => currentTime >= s.startTime && currentTime <= s.endTime && s.text.trim().length > 0
+  // Active Subtitles for current time (Memoized to prevent array re-allocation on every frame)
+  const activeSubtitles = useMemo(
+    () => subtitles.filter(
+      (s) => currentTime >= s.startTime && currentTime <= s.endTime && s.text.trim().length > 0
+    ),
+    [subtitles, currentTime]
   );
 
   // Aspect ratio styles

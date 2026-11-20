@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   Sparkles,
   X,
@@ -25,7 +25,7 @@ interface IWindow extends Window {
   SpeechRecognition?: any;
 }
 
-export const AutoSubtitleModal: React.FC<AutoSubtitleModalProps> = ({
+const AutoSubtitleModalComponent: React.FC<AutoSubtitleModalProps> = ({
   isOpen,
   onClose,
   clips,
@@ -39,24 +39,34 @@ export const AutoSubtitleModal: React.FC<AutoSubtitleModalProps> = ({
   >([]);
   const [currentSentence, setCurrentSentence] = useState('');
   const [progressTime, setProgressTime] = useState(0);
-  const [isSupported, setIsSupported] = useState(true);
+  const [isSupported] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const win = window as unknown as IWindow;
+    return !!(win.SpeechRecognition || win.webkitSpeechRecognition);
+  });
   const [statusMessage, setStatusMessage] = useState('Siap mendeteksi percakapan video...');
 
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
 
-  // Check Web Speech API support
-  useEffect(() => {
-    const win = window as unknown as IWindow;
-    if (!win.SpeechRecognition && !win.webkitSpeechRecognition) {
-      setIsSupported(false);
+  const stopTranscription = useCallback(() => {
+    setIsListening(false);
+    setStatusMessage('Transkripsi selesai! Periksa hasil subtitle di bawah.');
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // Ignore stop error
+      }
     }
   }, []);
 
-  if (!isOpen) return null;
-
-  const startAutoTranscription = async () => {
+  const startAutoTranscription = useCallback(async () => {
     const win = window as unknown as IWindow;
     const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
 
@@ -150,7 +160,9 @@ export const AutoSubtitleModal: React.FC<AutoSubtitleModalProps> = ({
           if (elapsed < totalDuration) {
             try {
               recognition.start();
-            } catch (e) {}
+            } catch {
+              // Ignore restart error if busy
+            }
           } else {
             stopTranscription();
           }
@@ -169,26 +181,12 @@ export const AutoSubtitleModal: React.FC<AutoSubtitleModalProps> = ({
           testAudio.pause();
         }
       }, 200);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
       setIsListening(false);
       setStatusMessage('Gagal mengaktifkan pengenalan suara.');
     }
-  };
-
-  const stopTranscription = () => {
-    setIsListening(false);
-    setStatusMessage('Transkripsi selesai! Periksa hasil subtitle di bawah.');
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {}
-    }
-  };
+  }, [clips, isListening, language, stopTranscription, totalDuration]);
 
   // Simulate AI transcription for demo or quick auto captions
   const handleSimulateAutoCaptions = () => {
@@ -247,6 +245,8 @@ export const AutoSubtitleModal: React.FC<AutoSubtitleModalProps> = ({
     onApplySubtitles(newSubs);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 select-none">
@@ -441,3 +441,5 @@ export const AutoSubtitleModal: React.FC<AutoSubtitleModalProps> = ({
     </div>
   );
 };
+
+export const AutoSubtitleModal = React.memo(AutoSubtitleModalComponent);

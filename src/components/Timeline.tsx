@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Scissors,
   Trash2,
@@ -94,8 +94,8 @@ export const Timeline: React.FC<TimelineProps> = ({
   const maxTimelineDuration = Math.max(totalDuration + 5, 20);
   const totalTimelineWidth = Math.max(maxTimelineDuration * zoom, 800);
 
-  const timeToPx = (sec: number) => sec * zoom;
-  const pxToTime = (px: number) => Math.max(0, px / zoom);
+  const timeToPx = useCallback((sec: number) => sec * zoom, [zoom]);
+  const pxToTime = useCallback((px: number) => Math.max(0, px / zoom), [zoom]);
 
   // Global MouseMove and MouseUp event listener for smooth dragging
   useEffect(() => {
@@ -178,7 +178,7 @@ export const Timeline: React.FC<TimelineProps> = ({
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [dragAction, zoom, clips, totalDuration, setCurrentTime, setClips, setVoiceovers, setSubtitles]);
+  }, [dragAction, zoom, clips, totalDuration, setCurrentTime, setClips, setVoiceovers, setSubtitles, pxToTime]);
 
   // Click on ruler or track background to scrub playhead
   const handleRulerMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -308,18 +308,52 @@ export const Timeline: React.FC<TimelineProps> = ({
     setSelectedClipId(newClip.id);
   };
 
-  // Compute positions of video clips
-  let accumulatedTime = 0;
-  const clipPositions = clips.map((c) => {
-    const start = accumulatedTime;
-    const effDur = Math.max(0, c.trimEnd - c.trimStart);
-    accumulatedTime += effDur;
-    return {
-      clip: c,
-      startTime: start,
-      duration: effDur,
-    };
-  });
+  // Compute positions of video clips (Memoized to prevent recalculations on every frame)
+  const clipPositions = useMemo(() => {
+    const positions = [];
+    let currentStart = 0;
+    for (let i = 0; i < clips.length; i++) {
+      const c = clips[i];
+      const effDur = Math.max(0, c.trimEnd - c.trimStart);
+      positions.push({
+        clip: c,
+        startTime: currentStart,
+        duration: effDur,
+      });
+      currentStart += effDur;
+    }
+    return positions;
+  }, [clips]);
+
+  // Memoize Ruler Marks to avoid recreating hundreds of JSX DOM elements 60x/second during playback
+  const rulerMarks = useMemo(() => {
+    const totalSecs = Math.ceil(maxTimelineDuration);
+    const marks = [];
+    for (let sec = 0; sec <= totalSecs; sec++) {
+      const isMajor = sec % 5 === 0;
+      marks.push(
+        <div
+          key={sec}
+          style={{ left: `${sec * zoom}px` }}
+          className="absolute top-0 bottom-0 flex flex-col justify-end pointer-events-none"
+        >
+          <span
+            className={`text-[9px] font-mono pl-1 ${
+              isMajor ? 'text-gray-300 font-bold' : 'text-gray-600'
+            }`}
+          >
+            {isMajor ? `${sec}s` : '·'}
+          </span>
+          <div
+            className={`w-px ${
+              isMajor ? 'h-3 bg-gray-500' : 'h-1.5 bg-gray-700'
+            }`}
+          />
+        </div>
+      );
+    }
+    return marks;
+  }, [maxTimelineDuration, zoom]);
 
   return (
     <div className="h-64 bg-[#111217] border-t border-[#232530] flex flex-col select-none">
@@ -513,29 +547,7 @@ export const Timeline: React.FC<TimelineProps> = ({
               onMouseDown={handleRulerMouseDown}
               className="h-7 bg-[#14151c] border-b border-[#232530] flex relative cursor-pointer"
             >
-              {Array.from({ length: Math.ceil(maxTimelineDuration) }).map((_, sec) => {
-                const isMajor = sec % 5 === 0;
-                return (
-                  <div
-                    key={sec}
-                    style={{ left: `${sec * zoom}px` }}
-                    className="absolute top-0 bottom-0 flex flex-col justify-end pointer-events-none"
-                  >
-                    <span
-                      className={`text-[9px] font-mono pl-1 ${
-                        isMajor ? 'text-gray-300 font-bold' : 'text-gray-600'
-                      }`}
-                    >
-                      {isMajor ? `${sec}s` : '·'}
-                    </span>
-                    <div
-                      className={`w-px ${
-                        isMajor ? 'h-3 bg-gray-500' : 'h-1.5 bg-gray-700'
-                      }`}
-                    />
-                  </div>
-                );
-              })}
+              {rulerMarks}
             </div>
 
             {/* 2. TRACK: VIDEO CLIPS */}
