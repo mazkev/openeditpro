@@ -49,6 +49,19 @@ export const Timeline: React.FC<TimelineProps> = ({
   const [zoom, setZoom] = useState(40); // pixels per second
   const timelineTracksRef = useRef<HTMLDivElement>(null);
 
+  // Selected tracks on timeline
+  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
+  const [selectedVoiceoverId, setSelectedVoiceoverId] = useState<string | null>(null);
+
+  const hasSelection = Boolean(selectedClipId || selectedSubtitleId || selectedVoiceoverId);
+  const selectionType: 'video' | 'subtitle' | 'voiceover' | null = selectedClipId
+    ? 'video'
+    : selectedSubtitleId
+    ? 'subtitle'
+    : selectedVoiceoverId
+    ? 'voiceover'
+    : null;
+
   // Dragging states
   const [dragAction, setDragAction] = useState<{
     type: 'playhead' | 'trim-start' | 'trim-end' | 'voiceover' | 'subtitle';
@@ -173,10 +186,27 @@ export const Timeline: React.FC<TimelineProps> = ({
     });
   };
 
-  // Split selected clip at current playhead
+  // Split selected clip or subtitle at current playhead
   const handleSplitCurrent = () => {
     if (selectedClipId) {
       onSplitClip(selectedClipId, currentTime);
+    } else if (selectedSubtitleId) {
+      const sub = subtitles.find((s) => s.id === selectedSubtitleId);
+      if (sub && currentTime > sub.startTime + 0.2 && currentTime < sub.endTime - 0.2) {
+        const firstPart: Subtitle = {
+          ...sub,
+          endTime: parseFloat(currentTime.toFixed(2)),
+        };
+        const secondPart: Subtitle = {
+          ...sub,
+          id: `sub-${Date.now()}`,
+          startTime: parseFloat(currentTime.toFixed(2)),
+        };
+        setSubtitles((prev) =>
+          prev.flatMap((s) => (s.id === sub.id ? [firstPart, secondPart] : [s]))
+        );
+        setSelectedSubtitleId(secondPart.id);
+      }
     } else {
       let runningTime = 0;
       for (const clip of clips) {
@@ -190,13 +220,60 @@ export const Timeline: React.FC<TimelineProps> = ({
     }
   };
 
-  // Delete selected clip
+  // Delete selected item (video clip, subtitle, or voiceover)
   const handleDeleteSelected = () => {
     if (selectedClipId) {
       setClips((prev) => prev.filter((c) => c.id !== selectedClipId));
       setSelectedClipId(null);
+    } else if (selectedSubtitleId) {
+      setSubtitles((prev) => prev.filter((s) => s.id !== selectedSubtitleId));
+      setSelectedSubtitleId(null);
+    } else if (selectedVoiceoverId) {
+      setVoiceovers((prev) => prev.filter((v) => v.id !== selectedVoiceoverId));
+      setSelectedVoiceoverId(null);
     }
   };
+
+  // Global Keyboard shortcut listener for Delete / Backspace
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedClipId) {
+          e.preventDefault();
+          setClips((prev) => prev.filter((c) => c.id !== selectedClipId));
+          setSelectedClipId(null);
+        } else if (selectedSubtitleId) {
+          e.preventDefault();
+          setSubtitles((prev) => prev.filter((s) => s.id !== selectedSubtitleId));
+          setSelectedSubtitleId(null);
+        } else if (selectedVoiceoverId) {
+          e.preventDefault();
+          setVoiceovers((prev) => prev.filter((v) => v.id !== selectedVoiceoverId));
+          setSelectedVoiceoverId(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    selectedClipId,
+    selectedSubtitleId,
+    selectedVoiceoverId,
+    setClips,
+    setSubtitles,
+    setVoiceovers,
+    setSelectedClipId,
+  ]);
 
   // Duplicate selected clip
   const handleDuplicateSelected = () => {
@@ -239,7 +316,7 @@ export const Timeline: React.FC<TimelineProps> = ({
           <button
             onClick={handleSplitCurrent}
             className="flex items-center space-x-1.5 px-3 py-1 bg-[#20222e] hover:bg-teal-500 hover:text-black text-gray-200 text-xs font-semibold rounded-lg transition-all border border-[#2e3142]"
-            title="Potong / Belah Klip di Playhead"
+            title="Potong / Belah Klip Video atau Subtitle di Playhead"
           >
             <Scissors className="w-3.5 h-3.5" />
             <span>Potong (Split)</span>
@@ -247,16 +324,33 @@ export const Timeline: React.FC<TimelineProps> = ({
 
           <button
             onClick={handleDeleteSelected}
-            disabled={!selectedClipId}
-            className={`flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg border transition-all ${
-              selectedClipId
-                ? 'bg-[#20222e] hover:bg-red-500/20 text-red-400 border-red-500/30'
+            disabled={!hasSelection}
+            className={`flex items-center space-x-1.5 px-2.5 py-1 text-xs rounded-lg border transition-all ${
+              hasSelection
+                ? 'bg-[#20222e] hover:bg-red-500/20 text-red-400 border-red-500/30 font-semibold shadow-sm'
                 : 'text-gray-600 border-transparent cursor-not-allowed'
             }`}
-            title="Hapus Klip Terpilih"
+            title={
+              selectionType === 'video'
+                ? 'Hapus Klip Video Terpilih (Tombol Delete / Backspace)'
+                : selectionType === 'subtitle'
+                ? 'Hapus Subtitle Terpilih (Tombol Delete / Backspace)'
+                : selectionType === 'voiceover'
+                ? 'Hapus Narasi Suara Terpilih (Tombol Delete / Backspace)'
+                : 'Pilih klip video, subtitle, atau narasi suara terlebih dahulu untuk menghapusnya'
+            }
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Hapus</span>
+            <span>
+              Hapus{' '}
+              {selectionType === 'video'
+                ? 'Video'
+                : selectionType === 'subtitle'
+                ? 'Subtitle'
+                : selectionType === 'voiceover'
+                ? 'Narasi'
+                : ''}
+            </span>
           </button>
 
           <button
@@ -267,7 +361,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                 ? 'bg-[#20222e] hover:bg-[#282b3a] text-gray-300 border-[#2e3142]'
                 : 'text-gray-600 border-transparent cursor-not-allowed'
             }`}
-            title="Duplikat Klip"
+            title="Duplikat Klip Video"
           >
             <Copy className="w-3.5 h-3.5" />
             <span>Duplikat</span>
@@ -275,7 +369,7 @@ export const Timeline: React.FC<TimelineProps> = ({
 
           <div className="h-4 w-px bg-[#2b2d3d] mx-2" />
           <span className="text-[11px] text-gray-400 hidden md:inline">
-            💡 Tips: Geser ujung balok klip untuk potong (Trim), geser balok narasi/subtitle untuk atur waktu.
+            💡 Tips: Klik klip video, subtitle, atau narasi suara lalu klik <b>Hapus</b> (atau tekan tombol <b>Delete</b> di keyboard).
           </span>
         </div>
 
@@ -371,6 +465,9 @@ export const Timeline: React.FC<TimelineProps> = ({
               onMouseDown={(e) => {
                 // If clicked on track background, scrub playhead
                 if (e.target === e.currentTarget) {
+                  setSelectedClipId(null);
+                  setSelectedSubtitleId(null);
+                  setSelectedVoiceoverId(null);
                   handleRulerMouseDown(e);
                 }
               }}
@@ -388,6 +485,8 @@ export const Timeline: React.FC<TimelineProps> = ({
                     onMouseDown={(e) => {
                       // Clicking or dragging clip body scrubs playhead and selects clip
                       setSelectedClipId(clip.id);
+                      setSelectedSubtitleId(null);
+                      setSelectedVoiceoverId(null);
                       handleRulerMouseDown(e);
                     }}
                     onDragOver={(e) => {
@@ -420,7 +519,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                         ? 'border-cyan-400 bg-cyan-950/40 ring-2 ring-cyan-500/50 z-10'
                         : 'border-[#2d3248] bg-[#1b1e2a] hover:border-gray-500'
                     }`}
-                    title={`Klik untuk arahkan playhead, tarik gagang ⠿ untuk tukar urutan, atau geser ujung samping untuk potong (Trim)`}
+                    title={`Klik untuk memilih klip video, tarik gagang ⠿ untuk tukar urutan, atau geser ujung samping untuk potong (Trim)`}
                   >
                     {/* Header info */}
                     <div className="flex items-center justify-between px-2 pt-1 text-[11px] font-semibold text-gray-200 truncate">
@@ -439,9 +538,23 @@ export const Timeline: React.FC<TimelineProps> = ({
                         </div>
                         <span className="truncate pointer-events-none">{clip.name}</span>
                       </div>
-                      <span className="text-[10px] text-cyan-300 font-mono ml-1 flex-shrink-0 pointer-events-none">
-                        {formatTime(duration)}
-                      </span>
+                      <div className="flex items-center space-x-1 ml-1 flex-shrink-0">
+                        <span className="text-[10px] text-cyan-300 font-mono pointer-events-none">
+                          {formatTime(duration)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClips((prev) => prev.filter((c) => c.id !== clip.id));
+                            if (selectedClipId === clip.id) setSelectedClipId(null);
+                          }}
+                          className="p-0.5 rounded hover:bg-red-500/30 text-gray-400 hover:text-red-400 transition-colors"
+                          title="Hapus Klip Video Ini"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Clip preview thumbnail strip */}
@@ -499,24 +612,36 @@ export const Timeline: React.FC<TimelineProps> = ({
             {/* 3. TRACK: SUBTITLES (DRAGGABLE ALONG TIMELINE) */}
             <div
               onMouseDown={(e) => {
-                if (e.target === e.currentTarget) handleRulerMouseDown(e);
+                if (e.target === e.currentTarget) {
+                  setSelectedSubtitleId(null);
+                  setSelectedClipId(null);
+                  setSelectedVoiceoverId(null);
+                  handleRulerMouseDown(e);
+                }
               }}
               className="h-11 border-b border-[#232530] bg-[#111218] relative flex items-center"
             >
               {subtitles.map((sub) => {
+                const isSelected = sub.id === selectedSubtitleId;
                 const leftPx = timeToPx(sub.startTime);
                 const dur = Math.max(0.5, sub.endTime - sub.startTime);
-                const widthPx = Math.max(timeToPx(dur), 24);
+                const widthPx = Math.max(timeToPx(dur), 28);
 
                 return (
                   <div
                     key={sub.id}
                     onClick={(e) => {
                       e.stopPropagation();
+                      setSelectedSubtitleId(sub.id);
+                      setSelectedClipId(null);
+                      setSelectedVoiceoverId(null);
                       setCurrentTime(sub.startTime);
                     }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
+                      setSelectedSubtitleId(sub.id);
+                      setSelectedClipId(null);
+                      setSelectedVoiceoverId(null);
                       setDragAction({
                         type: 'subtitle',
                         targetId: sub.id,
@@ -529,12 +654,28 @@ export const Timeline: React.FC<TimelineProps> = ({
                       left: `${leftPx}px`,
                       width: `${widthPx}px`,
                     }}
-                    className="absolute top-1.5 bottom-1.5 rounded-md bg-amber-500/20 border border-amber-500/60 hover:border-amber-400 text-amber-200 px-2 flex items-center justify-between text-[10px] font-medium overflow-hidden truncate shadow-sm cursor-grab active:cursor-grabbing hover:bg-amber-500/30 transition-colors"
-                    title={`Klik untuk lihat, atau geser balok ini ke kiri/kanan untuk mengatur timing (${formatTime(sub.startTime)} - ${formatTime(sub.endTime)})`}
+                    className={`absolute top-1.5 bottom-1.5 rounded-md px-2 flex items-center justify-between text-[10px] font-medium overflow-hidden shadow-sm cursor-grab active:cursor-grabbing transition-all ${
+                      isSelected
+                        ? 'bg-amber-500/35 border-2 border-amber-300 text-amber-100 ring-2 ring-amber-400/50 z-10'
+                        : 'bg-amber-500/20 border border-amber-500/60 hover:border-amber-400 text-amber-200 hover:bg-amber-500/30'
+                    }`}
+                    title={`Klik untuk memilih subtitle (${formatTime(sub.startTime)} - ${formatTime(sub.endTime)}), tekan tombol Hapus/Del untuk menghapus`}
                   >
-                    <span className="truncate select-none pointer-events-none">
+                    <span className="truncate select-none pointer-events-none flex-1 min-w-0 pr-1">
                       {sub.text || '(Teks kosong)'}
                     </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSubtitles((prev) => prev.filter((s) => s.id !== sub.id));
+                        if (selectedSubtitleId === sub.id) setSelectedSubtitleId(null);
+                      }}
+                      className="p-0.5 rounded hover:bg-red-500/30 text-amber-300 hover:text-red-400 flex-shrink-0 transition-colors"
+                      title="Hapus Subtitle Ini"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 );
               })}
@@ -543,19 +684,35 @@ export const Timeline: React.FC<TimelineProps> = ({
             {/* 4. TRACK: NARASI SUARA (DRAGGABLE ALONG TIMELINE) */}
             <div
               onMouseDown={(e) => {
-                if (e.target === e.currentTarget) handleRulerMouseDown(e);
+                if (e.target === e.currentTarget) {
+                  setSelectedSubtitleId(null);
+                  setSelectedClipId(null);
+                  setSelectedVoiceoverId(null);
+                  handleRulerMouseDown(e);
+                }
               }}
               className="h-11 border-b border-[#232530] bg-[#111218] relative flex items-center"
             >
               {voiceovers.map((vo) => {
+                const isSelected = vo.id === selectedVoiceoverId;
                 const leftPx = timeToPx(vo.startTime);
                 const widthPx = Math.max(timeToPx(vo.duration), 28);
 
                 return (
                   <div
                     key={vo.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedVoiceoverId(vo.id);
+                      setSelectedClipId(null);
+                      setSelectedSubtitleId(null);
+                      setCurrentTime(vo.startTime);
+                    }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
+                      setSelectedVoiceoverId(vo.id);
+                      setSelectedClipId(null);
+                      setSelectedSubtitleId(null);
                       setDragAction({
                         type: 'voiceover',
                         targetId: vo.id,
@@ -567,11 +724,29 @@ export const Timeline: React.FC<TimelineProps> = ({
                       left: `${leftPx}px`,
                       width: `${widthPx}px`,
                     }}
-                    className="absolute top-1.5 bottom-1.5 rounded-md bg-teal-500/20 border border-teal-500/60 hover:border-teal-400 text-teal-200 px-2 flex items-center space-x-1.5 text-[10px] font-medium overflow-hidden shadow-sm cursor-grab active:cursor-grabbing hover:bg-teal-500/30 transition-colors"
-                    title={`Geser balok ini ke kiri/kanan untuk menyelaraskan narasi suara dengan momen video (${formatTime(vo.startTime)} - ${formatTime(vo.startTime + vo.duration)})`}
+                    className={`absolute top-1.5 bottom-1.5 rounded-md px-2 flex items-center justify-between text-[10px] font-medium overflow-hidden shadow-sm cursor-grab active:cursor-grabbing transition-all ${
+                      isSelected
+                        ? 'bg-teal-500/35 border-2 border-teal-300 text-teal-100 ring-2 ring-teal-400/50 z-10'
+                        : 'bg-teal-500/20 border border-teal-500/60 hover:border-teal-400 text-teal-200 hover:bg-teal-500/30'
+                    }`}
+                    title={`Klik untuk memilih narasi (${formatTime(vo.startTime)} - ${formatTime(vo.startTime + vo.duration)}), tekan tombol Hapus/Del untuk menghapus`}
                   >
-                    <Mic className="w-3 h-3 text-teal-400 flex-shrink-0 pointer-events-none" />
-                    <span className="truncate select-none pointer-events-none">{vo.name}</span>
+                    <div className="flex items-center space-x-1.5 min-w-0 flex-1 truncate pr-1 pointer-events-none">
+                      <Mic className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                      <span className="truncate select-none">{vo.name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setVoiceovers((prev) => prev.filter((v) => v.id !== vo.id));
+                        if (selectedVoiceoverId === vo.id) setSelectedVoiceoverId(null);
+                      }}
+                      className="p-0.5 rounded hover:bg-red-500/30 text-teal-300 hover:text-red-400 flex-shrink-0 transition-colors"
+                      title="Hapus Narasi Suara Ini"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 );
               })}
