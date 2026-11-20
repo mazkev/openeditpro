@@ -75,12 +75,30 @@ export async function exportVideo(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
+  // Mount hidden container in document.body to enable full GPU hardware acceleration in Chromium
+  // (Unattached video and canvas elements are severely throttled by browsers, causing stutter)
+  const exportMount = document.createElement('div');
+  exportMount.id = 'openedit-export-gpu-mount';
+  exportMount.style.cssText =
+    'position:fixed;left:-9999px;top:-9999px;width:320px;height:180px;opacity:0.01;pointer-events:none;z-index:-9999;';
+  document.body.appendChild(exportMount);
+  exportMount.appendChild(canvas);
+
   onProgress({ progress: 5, status: 'Menyiapkan audio engine...' });
 
   // Setup Web Audio Context for audio mixing
   const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const audioCtx = new AudioCtxClass();
   const dest = audioCtx.createMediaStreamDestination();
+
+  // Ensure AudioContext is active and running (prevents media element stall)
+  if (audioCtx.state === 'suspended') {
+    try {
+      await audioCtx.resume();
+    } catch (e) {
+      console.warn('Could not resume AudioContext:', e);
+    }
+  }
 
   // Pre-load watermark image if needed
   let watermarkImg: HTMLImageElement | null = null;
@@ -95,16 +113,35 @@ export async function exportVideo(
     });
   }
 
-  // Pre-load video elements
-  onProgress({ progress: 15, status: 'Menyiapkan elemen video...' });
+  // Pre-load and buffer video elements with hardware acceleration
+  onProgress({ progress: 12, status: 'Memuat dan menyinkronkan video...' });
   const videoElements: HTMLVideoElement[] = [];
   for (let i = 0; i < clips.length; i++) {
     const v = document.createElement('video');
     v.crossOrigin = 'anonymous';
+    v.playsInline = true;
+    v.preload = 'auto';
     v.src = clips[i].url;
     v.muted = false;
-    v.playsInline = true;
     v.volume = clips[i].volume ?? 1;
+    exportMount.appendChild(v);
+
+    // Wait until video data is buffered and seeked to trimStart
+    await new Promise<void>((resolve) => {
+      v.currentTime = clips[i].trimStart;
+      if (v.readyState >= 2) {
+        resolve();
+        return;
+      }
+      const onReady = () => {
+        v.removeEventListener('loadeddata', onReady);
+        v.removeEventListener('canplay', onReady);
+        resolve();
+      };
+      v.addEventListener('loadeddata', onReady);
+      v.addEventListener('canplay', onReady);
+      setTimeout(resolve, 2500);
+    });
 
     // Connect to Web Audio
     try {
@@ -125,7 +162,10 @@ export async function exportVideo(
   for (const vo of voiceovers) {
     const a = document.createElement('audio');
     a.crossOrigin = 'anonymous';
+    a.preload = 'auto';
     a.src = vo.url;
+    exportMount.appendChild(a);
+
     try {
       const source = audioCtx.createMediaElementSource(a);
       const gain = audioCtx.createGain();
@@ -143,7 +183,10 @@ export async function exportVideo(
   if (bgm && bgm.url) {
     bgmAudio = document.createElement('audio');
     bgmAudio.crossOrigin = 'anonymous';
+    bgmAudio.preload = 'auto';
     bgmAudio.src = bgm.url;
+    exportMount.appendChild(bgmAudio);
+
     try {
       const source = audioCtx.createMediaElementSource(bgmAudio);
       const gain = audioCtx.createGain();
@@ -211,14 +254,44 @@ export async function exportVideo(
     if (e.data.size > 0) recordedChunks.push(e.data);
   };
 
+  const cleanupAll = () => {
+    try {
+      videoElements.forEach((v) => {
+        v.pause();
+        v.src = '';
+        v.load();
+      });
+      voiceoverElements.forEach(({ el }) => {
+        el.pause();
+        el.src = '';
+      });
+      if (bgmAudio) {
+        bgmAudio.pause();
+        bgmAudio.src = '';
+      }
+      if (exportMount.parentNode) {
+        exportMount.parentNode.removeChild(exportMount);
+      }
+      if (audioCtx.state !== 'closed') {
+        audioCtx.close().catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Cleanup error:', e);
+    }
+  };
+
   return new Promise((resolve, reject) => {
+    let animId: number | null = null;
+
     mediaRecorder.onerror = (err) => {
-      audioCtx.close();
+      if (animId) cancelAnimationFrame(animId);
+      cleanupAll();
       reject(err);
     };
 
     mediaRecorder.onstop = () => {
-      audioCtx.close();
+      if (animId) cancelAnimationFrame(animId);
+      cleanupAll();
       const outputType = isNativeMp4 ? 'video/mp4' : 'video/mp4';
       const outputBlob = new Blob(recordedChunks, { type: outputType });
       resolve(outputBlob);
@@ -233,10 +306,12 @@ export async function exportVideo(
       return { clip: c, start, end: runningTime };
     });
 
-    mediaRecorder.start(200);
+    // Start recorder with 1000ms chunk timeslice for optimal container integrity
+    mediaRecorder.start(1000);
 
     const exportStartTime = performance.now();
     let currentClipIndex = -1;
+    let isFinished = false;
 
     // Helper to draw watermark
     const drawWatermark = () => {
@@ -452,19 +527,21 @@ export async function exportVideo(
       }
     };
 
-    // Render loop
-    const frameInterval = 1000 / 30; // 30 FPS
-
+    // Hardware-synchronized render loop via requestAnimationFrame (avoids setTimeout timer jitter)
     const renderLoop = () => {
+      if (isFinished) return;
+
       const elapsed = (performance.now() - exportStartTime) / 1000;
 
       if (elapsed >= totalDuration) {
-        // Finished!
+        isFinished = true;
         onProgress({ progress: 100, status: 'Menyelesaikan file ekspor...' });
         videoElements.forEach((v) => v.pause());
         voiceoverElements.forEach(({ el }) => el.pause());
         if (bgmAudio) bgmAudio.pause();
-        mediaRecorder.stop();
+        if (mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
         return;
       }
 
@@ -486,6 +563,7 @@ export async function exportVideo(
       if (activeIdx !== -1) {
         const range = clipRanges[activeIdx];
         const vEl = videoElements[activeIdx];
+        const expectedClipTime = range.clip.trimStart + (elapsed - range.start);
 
         if (activeIdx !== currentClipIndex) {
           if (currentClipIndex >= 0) {
@@ -494,6 +572,16 @@ export async function exportVideo(
           currentClipIndex = activeIdx;
           vEl.currentTime = range.clip.trimStart;
           vEl.play().catch(() => {});
+        } else {
+          // Drift Lock: Keep HTMLVideoElement locked within 100ms of master timeline clock
+          // Prevents video from outrunning export clock or freezing early
+          if (vEl.paused && elapsed < range.end) {
+            vEl.play().catch(() => {});
+          }
+          const drift = vEl.currentTime - expectedClipTime;
+          if (Math.abs(drift) > 0.10) {
+            vEl.currentTime = expectedClipTime;
+          }
         }
 
         // Draw video frame to canvas maintaining aspect ratio
@@ -534,14 +622,17 @@ export async function exportVideo(
         }
       }
 
-      // Check voiceovers
+      // Check voiceovers with tight synchronization
       voiceoverElements.forEach(({ el, vo }) => {
         const voStart = vo.startTime;
         const voEnd = vo.startTime + vo.duration;
         if (elapsed >= voStart && elapsed <= voEnd) {
+          const expectedAudioTime = (vo.trimStart || 0) + (elapsed - voStart);
           if (el.paused) {
-            el.currentTime = (vo.trimStart || 0) + (elapsed - voStart);
+            el.currentTime = expectedAudioTime;
             el.play().catch(() => {});
+          } else if (Math.abs(el.currentTime - expectedAudioTime) > 0.15) {
+            el.currentTime = expectedAudioTime;
           }
         } else {
           if (!el.paused) {
@@ -553,13 +644,15 @@ export async function exportVideo(
       // Sync background music (BGM)
       if (bgmAudio && bgm) {
         if (elapsed < totalDuration) {
-          if (bgmAudio.paused) {
-            const targetTime = bgm.loop && bgm.duration > 0
-              ? elapsed % bgm.duration
-              : elapsed;
-            if (targetTime < bgm.duration) {
-              bgmAudio.currentTime = targetTime;
+          const expectedBgmTime = bgm.loop && bgm.duration > 0
+            ? elapsed % bgm.duration
+            : elapsed;
+          if (expectedBgmTime < (bgm.duration || Infinity)) {
+            if (bgmAudio.paused) {
+              bgmAudio.currentTime = expectedBgmTime;
               bgmAudio.play().catch(() => {});
+            } else if (Math.abs(bgmAudio.currentTime - expectedBgmTime) > 0.2) {
+              bgmAudio.currentTime = expectedBgmTime;
             }
           }
         } else {
@@ -573,9 +666,9 @@ export async function exportVideo(
       drawWatermark();
       drawSubtitles(elapsed);
 
-      window.setTimeout(renderLoop, frameInterval);
+      animId = requestAnimationFrame(renderLoop);
     };
 
-    renderLoop();
+    animId = requestAnimationFrame(renderLoop);
   });
 }
