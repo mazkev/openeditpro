@@ -329,7 +329,10 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
             else if (sub.fontFamily === 'mono') fontFamilyStyle = 'ui-monospace, Consolas, monospace';
             else if (sub.fontFamily === 'cursive') fontFamilyStyle = '"Comic Sans MS", "Segoe Print", cursive';
 
-            const baseFontSize = Math.max(14, sub.fontSize || 24);
+            const baseFontSize =
+              aspectRatio === '9:16'
+                ? Math.min(22, Math.max(13, sub.fontSize || 20))
+                : Math.max(14, sub.fontSize || 24);
             // Proportional stroke: dynamically scaled with font size so stroke NEVER swallows white text!
             const rawStroke = sub.strokeWidth ?? 1.5;
             const effectiveStroke = Math.min(rawStroke, Math.max(0.8, baseFontSize * 0.08));
@@ -342,14 +345,16 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
             return (
               <div
                 key={sub.id}
-                className="absolute left-0 right-0 flex justify-center pointer-events-none z-30 px-6 transition-all"
+                className={`absolute left-0 right-0 flex justify-center pointer-events-none z-30 transition-all ${
+                  aspectRatio === '9:16' ? 'px-2' : 'px-6'
+                }`}
                 style={{
-                  top: `${sub.positionY ?? 80}%`,
+                  top: `${Math.min(92, Math.max(8, sub.positionY ?? 80))}%`,
                   transform: 'translateY(-50%)',
                 }}
               >
                 <div
-                  className="max-w-[90%] px-4 py-1.5 rounded-xl text-center font-black tracking-wide transition-all select-none"
+                  className="max-w-[94%] px-3 py-1.5 rounded-xl text-center font-black tracking-wide transition-all select-none break-words whitespace-pre-wrap overflow-hidden"
                   style={{
                     color: sub.color || '#ffffff',
                     backgroundColor: sub.bgColor || 'transparent',
@@ -359,6 +364,8 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                     paintOrder: 'stroke fill',
                     WebkitTextStroke: strokeStyle,
                     lineHeight: 1.28,
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
                     textShadow: sub.glowColor
                       ? `0 0 14px ${sub.glowColor}, 0 2px 4px rgba(0,0,0,0.8)`
                       : '0 2px 4px rgba(0, 0, 0, 0.85)',

@@ -273,7 +273,44 @@ export async function exportVideo(
       ctx.restore();
     };
 
-    // Helper to draw subtitles (PROPORTIONALLY SCALED TO MATCH PREVIEW 100%)
+    // Helper to auto-wrap text so sentences NEVER get cut off on vertical (9:16) or narrow screens
+    const wrapCanvasText = (
+      context: CanvasRenderingContext2D,
+      text: string,
+      maxAllowedWidth: number
+    ): string[] => {
+      const paragraphs = text.split('\n');
+      const wrappedLines: string[] = [];
+
+      for (const para of paragraphs) {
+        const cleanPara = para.trim();
+        if (!cleanPara) continue;
+
+        const words = cleanPara.split(/\s+/);
+        let currentLine = words[0] || '';
+
+        for (let i = 1; i < words.length; i++) {
+          const word = words[i];
+          const testLine = `${currentLine} ${word}`;
+          const metrics = context.measureText(testLine);
+
+          if (metrics.width <= maxAllowedWidth) {
+            currentLine = testLine;
+          } else {
+            wrappedLines.push(currentLine);
+            currentLine = word;
+          }
+        }
+
+        if (currentLine) {
+          wrappedLines.push(currentLine);
+        }
+      }
+
+      return wrappedLines.length > 0 ? wrappedLines : [text];
+    };
+
+    // Helper to draw subtitles (PROPORTIONALLY SCALED & AUTO-WRAPPED TO PREVENT CUTOFF)
     const drawSubtitles = (currentTime: number) => {
       const activeSubs = subtitles.filter(
         (s) => currentTime >= s.startTime && currentTime <= s.endTime && s.text.trim().length > 0
@@ -288,7 +325,13 @@ export async function exportVideo(
       for (const sub of activeSubs) {
         ctx.save();
         const baseFontSize = Math.max(14, sub.fontSize || 24);
-        const fontSize = Math.round(baseFontSize * scale);
+        let fontSize = Math.round(baseFontSize * scale);
+
+        // On portrait / vertical screen (9:16, width < height), ensure font size
+        // fits comfortably within the narrow screen width (max 7.2% of width)
+        if (width < height) {
+          fontSize = Math.min(fontSize, Math.round(width * 0.072));
+        }
 
         let fontFamilyName = 'sans-serif';
         if (sub.fontFamily === 'impact') fontFamilyName = 'Impact, "Arial Black", sans-serif';
@@ -301,10 +344,28 @@ export async function exportVideo(
         ctx.textBaseline = 'middle';
 
         const rawText = sub.isUppercase ? sub.text.toUpperCase() : sub.text;
-        const lines = rawText.split('\n');
+
+        // Auto-wrap lines within 84% of canvas width so text NEVER overflows outside screen
+        const maxLineWidth = Math.round(width * 0.84);
+        let lines = wrapCanvasText(ctx, rawText, maxLineWidth);
+
+        // If wrapping produced more than 3 lines on vertical screen, slightly scale down font size
+        if (lines.length > 3 && width < height) {
+          fontSize = Math.round(fontSize * 0.88);
+          ctx.font = `bold ${fontSize}px ${fontFamilyName}`;
+          lines = wrapCanvasText(ctx, rawText, maxLineWidth);
+        }
+
         const lineHeight = fontSize * 1.30;
         const totalTextHeight = lines.length * lineHeight;
-        const targetY = ((sub.positionY ?? 80) / 100) * height;
+
+        // Clamp targetY so subtitle never gets cut off at top or bottom edge
+        const marginY = Math.round(20 * scale);
+        const rawTargetY = ((sub.positionY ?? 80) / 100) * height;
+        const targetY = Math.min(
+          height - totalTextHeight / 2 - marginY,
+          Math.max(totalTextHeight / 2 + marginY, rawTargetY)
+        );
 
         lines.forEach((line, index) => {
           const lineY = targetY - totalTextHeight / 2 + index * lineHeight + lineHeight / 2;
@@ -316,7 +377,7 @@ export async function exportVideo(
           // Draw background pill
           if (sub.bgColor && sub.bgColor !== 'transparent') {
             ctx.fillStyle = sub.bgColor;
-            const bgWidth = metrics.width + bgPaddingX * 2;
+            const bgWidth = Math.min(width - 24, metrics.width + bgPaddingX * 2);
             const bgHeight = fontSize + bgPaddingY * 2;
             ctx.beginPath();
             ctx.roundRect(
