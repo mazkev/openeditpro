@@ -9,6 +9,9 @@ interface StickmanRig {
   head: THREE.Group;
   leftEye: THREE.Mesh;
   rightEye: THREE.Mesh;
+  leftBrow: THREE.Mesh;
+  rightBrow: THREE.Mesh;
+  mouth: THREE.Mesh;
   leftShoulder: THREE.Group;
   leftElbow: THREE.Group;
   rightShoulder: THREE.Group;
@@ -18,6 +21,7 @@ interface StickmanRig {
   rightHip: THREE.Group;
   rightKnee: THREE.Group;
   bodyMaterial: THREE.MeshStandardMaterial;
+  outlineMaterial: THREE.MeshBasicMaterial;
 }
 
 const THEME_PALETTES: Record<
@@ -58,168 +62,241 @@ const THEME_PALETTES: Record<
   },
 };
 
-function createLimbMesh(
-  radiusTop: number,
-  radiusBottom: number,
+/**
+ * Helper to create a crisp stickman limb with optional cel-shaded outline so it never looks like a wax candle.
+ */
+function createStickLimb(
+  radius: number,
   length: number,
-  material: THREE.Material
-): THREE.Mesh {
-  const geo = new THREE.CapsuleGeometry(
-    (radiusTop + radiusBottom) / 2,
-    Math.max(0.05, length - (radiusTop + radiusBottom)),
-    8,
-    16
-  );
+  material: THREE.Material,
+  outlineMaterial: THREE.Material
+): THREE.Group {
+  const group = new THREE.Group();
+
+  const geo = new THREE.CylinderGeometry(radius, radius * 0.92, length, 14);
   const mesh = new THREE.Mesh(geo, material);
   mesh.position.y = -length / 2;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
-  return mesh;
+  group.add(mesh);
+
+  const outlineGeo = new THREE.CylinderGeometry(
+    radius + 0.008,
+    radius * 0.92 + 0.008,
+    length + 0.01,
+    14
+  );
+  const outlineMesh = new THREE.Mesh(outlineGeo, outlineMaterial);
+  outlineMesh.position.y = -length / 2;
+  group.add(outlineMesh);
+
+  return group;
+}
+
+function createJointSphere(
+  radius: number,
+  material: THREE.Material,
+  outlineMaterial: THREE.Material
+): THREE.Group {
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 14), material);
+  m.castShadow = true;
+  g.add(m);
+  const o = new THREE.Mesh(new THREE.SphereGeometry(radius + 0.008, 14, 14), outlineMaterial);
+  g.add(o);
+  return g;
 }
 
 function buildStickmanRig(colorHex: string): StickmanRig {
   const root = new THREE.Group();
 
+  // Matte toon-like finish (high roughness, 0 metalness) so it looks like clean 3D animation, not glossy wax
   const bodyMaterial = new THREE.MeshStandardMaterial({
     color: new THREE.Color(colorHex),
-    roughness: 0.35,
-    metalness: 0.08,
+    roughness: 0.88,
+    metalness: 0.0,
   });
 
-  const eyeColor =
-    colorHex.toLowerCase() === '#1e293b' || colorHex.toLowerCase() === '#000000'
-      ? 0x38bdf8
-      : 0x0f172a;
-  const eyeMaterial = new THREE.MeshStandardMaterial({
-    color: eyeColor,
-    roughness: 0.2,
-    emissive: colorHex.toLowerCase() === '#1e293b' ? 0x0ea5e9 : 0x000000,
-    emissiveIntensity: 0.6,
+  const isDarkBody =
+    colorHex.toLowerCase() === '#1e293b' || colorHex.toLowerCase() === '#000000';
+
+  const outlineMaterial = new THREE.MeshBasicMaterial({
+    color: isDarkBody ? 0x38bdf8 : 0x0f172a,
+    side: THREE.BackSide,
   });
 
-  // Hips (pelvis center at y = 0.95)
+  const featureMaterial = new THREE.MeshBasicMaterial({
+    color: isDarkBody ? 0x38bdf8 : 0x0f172a,
+  });
+
+  // Hips (pelvis center at y = 0.96)
   const hips = new THREE.Group();
-  hips.position.y = 0.95;
+  hips.position.y = 0.96;
   root.add(hips);
+  hips.add(createJointSphere(0.036, bodyMaterial, outlineMaterial));
 
-  const pelvisMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.11, 16, 16),
-    bodyMaterial
-  );
-  pelvisMesh.castShadow = true;
-  hips.add(pelvisMesh);
-
-  // Torso
+  // Torso (slim iconic stickman spine)
   const torso = new THREE.Group();
   hips.add(torso);
 
-  const spineGeo = new THREE.CapsuleGeometry(0.085, 0.45, 8, 16);
+  const spineLen = 0.56;
+  const spineGeo = new THREE.CylinderGeometry(0.028, 0.026, spineLen, 14);
   const spineMesh = new THREE.Mesh(spineGeo, bodyMaterial);
-  spineMesh.position.y = 0.3;
+  spineMesh.position.y = spineLen / 2;
   spineMesh.castShadow = true;
   torso.add(spineMesh);
 
-  // Head
-  const head = new THREE.Group();
-  head.position.y = 0.64;
-  torso.add(head);
+  const spineOutline = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.036, 0.034, spineLen + 0.01, 14),
+    outlineMaterial
+  );
+  spineOutline.position.y = spineLen / 2;
+  torso.add(spineOutline);
 
-  const headMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.24, 24, 24),
+  // Chest / Shoulder crossbar
+  const shoulderBar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022, 0.022, 0.34, 12),
     bodyMaterial
   );
-  headMesh.position.y = 0.18;
+  shoulderBar.rotation.z = Math.PI / 2;
+  shoulderBar.position.y = 0.52;
+  shoulderBar.castShadow = true;
+  torso.add(shoulderBar);
+
+  const shoulderBarOutline = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.03, 0.35, 12),
+    outlineMaterial
+  );
+  shoulderBarOutline.rotation.z = Math.PI / 2;
+  shoulderBarOutline.position.y = 0.52;
+  torso.add(shoulderBarOutline);
+
+  // Pelvis crossbar
+  const pelvisBar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022, 0.022, 0.22, 12),
+    bodyMaterial
+  );
+  pelvisBar.rotation.z = Math.PI / 2;
+  hips.add(pelvisBar);
+
+  // Head (classic larger stickman head)
+  const head = new THREE.Group();
+  head.position.y = 0.62;
+  torso.add(head);
+
+  const headRadius = 0.235;
+  const headMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(headRadius, 24, 24),
+    bodyMaterial
+  );
+  headMesh.position.y = 0.21;
   headMesh.castShadow = true;
   head.add(headMesh);
 
+  const headOutline = new THREE.Mesh(
+    new THREE.SphereGeometry(headRadius + 0.013, 24, 24),
+    outlineMaterial
+  );
+  headOutline.position.y = 0.21;
+  head.add(headOutline);
+
   // Expressive Eyes
-  const eyeGeo = new THREE.SphereGeometry(0.036, 12, 12);
-  const leftEye = new THREE.Mesh(eyeGeo, eyeMaterial);
-  leftEye.position.set(-0.085, 0.2, 0.21);
-  leftEye.scale.set(1, 1.35, 0.6);
+  const eyeGeo = new THREE.SphereGeometry(0.032, 12, 12);
+  const leftEye = new THREE.Mesh(eyeGeo, featureMaterial);
+  leftEye.position.set(-0.08, 0.23, 0.215);
+  leftEye.scale.set(1, 1.35, 0.5);
   head.add(leftEye);
 
-  const rightEye = new THREE.Mesh(eyeGeo, eyeMaterial);
-  rightEye.position.set(0.085, 0.2, 0.21);
-  rightEye.scale.set(1, 1.35, 0.6);
+  const rightEye = new THREE.Mesh(eyeGeo, featureMaterial);
+  rightEye.position.set(0.08, 0.23, 0.215);
+  rightEye.scale.set(1, 1.35, 0.5);
   head.add(rightEye);
 
-  // Left Arm
+  // Expressive Eyebrows
+  const browGeo = new THREE.BoxGeometry(0.07, 0.018, 0.02);
+  const leftBrow = new THREE.Mesh(browGeo, featureMaterial);
+  leftBrow.position.set(-0.08, 0.3, 0.215);
+  head.add(leftBrow);
+
+  const rightBrow = new THREE.Mesh(browGeo, featureMaterial);
+  rightBrow.position.set(0.08, 0.3, 0.215);
+  head.add(rightBrow);
+
+  // Animated Mouth
+  const mouthGeo = new THREE.SphereGeometry(0.035, 12, 12);
+  const mouth = new THREE.Mesh(mouthGeo, featureMaterial);
+  mouth.position.set(0, 0.13, 0.22);
+  mouth.scale.set(1.3, 0.35, 0.4);
+  head.add(mouth);
+
+  // Left Arm (slim stick limbs + round joints)
   const leftShoulder = new THREE.Group();
-  leftShoulder.position.set(-0.16, 0.52, 0);
+  leftShoulder.position.set(-0.17, 0.52, 0);
   torso.add(leftShoulder);
-  leftShoulder.add(createLimbMesh(0.05, 0.045, 0.34, bodyMaterial));
+  leftShoulder.add(createJointSphere(0.03, bodyMaterial, outlineMaterial));
+  leftShoulder.add(createStickLimb(0.023, 0.34, bodyMaterial, outlineMaterial));
 
   const leftElbow = new THREE.Group();
   leftElbow.position.y = -0.34;
   leftShoulder.add(leftElbow);
-  leftElbow.add(createLimbMesh(0.045, 0.04, 0.32, bodyMaterial));
+  leftElbow.add(createJointSphere(0.026, bodyMaterial, outlineMaterial));
+  leftElbow.add(createStickLimb(0.021, 0.33, bodyMaterial, outlineMaterial));
 
-  const leftHand = new THREE.Mesh(
-    new THREE.SphereGeometry(0.06, 12, 12),
-    bodyMaterial
-  );
+  const leftHand = createJointSphere(0.048, bodyMaterial, outlineMaterial);
   leftHand.position.y = -0.34;
-  leftHand.castShadow = true;
   leftElbow.add(leftHand);
 
   // Right Arm
   const rightShoulder = new THREE.Group();
-  rightShoulder.position.set(0.16, 0.52, 0);
+  rightShoulder.position.set(0.17, 0.52, 0);
   torso.add(rightShoulder);
-  rightShoulder.add(createLimbMesh(0.05, 0.045, 0.34, bodyMaterial));
+  rightShoulder.add(createJointSphere(0.03, bodyMaterial, outlineMaterial));
+  rightShoulder.add(createStickLimb(0.023, 0.34, bodyMaterial, outlineMaterial));
 
   const rightElbow = new THREE.Group();
   rightElbow.position.y = -0.34;
   rightShoulder.add(rightElbow);
-  rightElbow.add(createLimbMesh(0.045, 0.04, 0.32, bodyMaterial));
+  rightElbow.add(createJointSphere(0.026, bodyMaterial, outlineMaterial));
+  rightElbow.add(createStickLimb(0.021, 0.33, bodyMaterial, outlineMaterial));
 
-  const rightHand = new THREE.Mesh(
-    new THREE.SphereGeometry(0.06, 12, 12),
-    bodyMaterial
-  );
+  const rightHand = createJointSphere(0.048, bodyMaterial, outlineMaterial);
   rightHand.position.y = -0.34;
-  rightHand.castShadow = true;
   rightElbow.add(rightHand);
 
   // Left Leg
   const leftHip = new THREE.Group();
-  leftHip.position.set(-0.11, -0.02, 0);
+  leftHip.position.set(-0.11, 0, 0);
   hips.add(leftHip);
-  leftHip.add(createLimbMesh(0.058, 0.05, 0.44, bodyMaterial));
+  leftHip.add(createJointSphere(0.03, bodyMaterial, outlineMaterial));
+  leftHip.add(createStickLimb(0.026, 0.46, bodyMaterial, outlineMaterial));
 
   const leftKnee = new THREE.Group();
-  leftKnee.position.y = -0.44;
+  leftKnee.position.y = -0.46;
   leftHip.add(leftKnee);
-  leftKnee.add(createLimbMesh(0.05, 0.045, 0.44, bodyMaterial));
+  leftKnee.add(createJointSphere(0.028, bodyMaterial, outlineMaterial));
+  leftKnee.add(createStickLimb(0.024, 0.46, bodyMaterial, outlineMaterial));
 
-  const leftFoot = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.055, 0.1, 6, 12),
-    bodyMaterial
-  );
-  leftFoot.rotation.x = Math.PI / 2;
-  leftFoot.position.set(0, -0.45, 0.05);
-  leftFoot.castShadow = true;
+  const leftFoot = createJointSphere(0.048, bodyMaterial, outlineMaterial);
+  leftFoot.scale.set(0.9, 0.65, 1.8);
+  leftFoot.position.set(0, -0.47, 0.045);
   leftKnee.add(leftFoot);
 
   // Right Leg
   const rightHip = new THREE.Group();
-  rightHip.position.set(0.11, -0.02, 0);
+  rightHip.position.set(0.11, 0, 0);
   hips.add(rightHip);
-  rightHip.add(createLimbMesh(0.058, 0.05, 0.44, bodyMaterial));
+  rightHip.add(createJointSphere(0.03, bodyMaterial, outlineMaterial));
+  rightHip.add(createStickLimb(0.026, 0.46, bodyMaterial, outlineMaterial));
 
   const rightKnee = new THREE.Group();
-  rightKnee.position.y = -0.44;
+  rightKnee.position.y = -0.46;
   rightHip.add(rightKnee);
-  rightKnee.add(createLimbMesh(0.05, 0.045, 0.44, bodyMaterial));
+  rightKnee.add(createJointSphere(0.028, bodyMaterial, outlineMaterial));
+  rightKnee.add(createStickLimb(0.024, 0.46, bodyMaterial, outlineMaterial));
 
-  const rightFoot = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.055, 0.1, 6, 12),
-    bodyMaterial
-  );
-  rightFoot.rotation.x = Math.PI / 2;
-  rightFoot.position.set(0, -0.45, 0.05);
-  rightFoot.castShadow = true;
+  const rightFoot = createJointSphere(0.048, bodyMaterial, outlineMaterial);
+  rightFoot.scale.set(0.9, 0.65, 1.8);
+  rightFoot.position.set(0, -0.47, 0.045);
   rightKnee.add(rightFoot);
 
   return {
@@ -229,6 +306,9 @@ function buildStickmanRig(colorHex: string): StickmanRig {
     head,
     leftEye,
     rightEye,
+    leftBrow,
+    rightBrow,
+    mouth,
     leftShoulder,
     leftElbow,
     rightShoulder,
@@ -238,138 +318,191 @@ function buildStickmanRig(colorHex: string): StickmanRig {
     rightHip,
     rightKnee,
     bodyMaterial,
+    outlineMaterial,
   };
 }
 
 function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
-  // Reset transforms before applying pose
+  // Reset transforms
   rig.root.position.set(0, 0, 0);
   rig.root.rotation.set(0, 0, 0);
-  rig.hips.position.set(0, 0.95, 0);
+  rig.hips.position.set(0, 0.96, 0);
   rig.hips.rotation.set(0, 0, 0);
   rig.torso.rotation.set(0, 0, 0);
   rig.head.rotation.set(0, 0, 0);
-  rig.leftEye.scale.set(1, 1.35, 0.6);
-  rig.rightEye.scale.set(1, 1.35, 0.6);
-  rig.leftShoulder.rotation.set(0, 0, 0.12);
-  rig.leftElbow.rotation.set(-0.2, 0, 0);
-  rig.rightShoulder.rotation.set(0, 0, -0.12);
-  rig.rightElbow.rotation.set(-0.2, 0, 0);
-  rig.leftHip.rotation.set(0, 0, 0.03);
+  rig.leftEye.scale.set(1, 1.35, 0.5);
+  rig.rightEye.scale.set(1, 1.35, 0.5);
+  rig.leftBrow.position.set(-0.08, 0.3, 0.215);
+  rig.leftBrow.rotation.set(0, 0, 0);
+  rig.rightBrow.position.set(0.08, 0.3, 0.215);
+  rig.rightBrow.rotation.set(0, 0, 0);
+  rig.mouth.scale.set(1.3, 0.35, 0.4);
+  rig.leftShoulder.rotation.set(0, 0, 0.14);
+  rig.leftElbow.rotation.set(-0.25, 0, 0);
+  rig.rightShoulder.rotation.set(0, 0, -0.14);
+  rig.rightElbow.rotation.set(-0.25, 0, 0);
+  rig.leftHip.rotation.set(0, 0, 0.04);
   rig.leftKnee.rotation.set(0, 0, 0);
-  rig.rightHip.rotation.set(0, 0, -0.03);
+  rig.rightHip.rotation.set(0, 0, -0.04);
   rig.rightKnee.rotation.set(0, 0, 0);
 
   switch (pose) {
     case 'explain': {
-      // Energetic presenter talking & gesturing
-      const bob = Math.abs(Math.sin(t * 4.5)) * 0.03;
-      rig.hips.position.y = 0.95 + bob;
-      rig.torso.rotation.y = Math.sin(t * 2.2) * 0.12;
-      rig.head.rotation.y = Math.sin(t * 2.2 + 0.5) * 0.14;
-      rig.head.rotation.x = Math.sin(t * 4.5) * 0.06;
+      // Energetic presenter talking, gesturing, and bouncing rhythmically
+      const bounce = Math.abs(Math.sin(t * 5.0)) * 0.055;
+      rig.hips.position.y = 0.94 + bounce;
+      rig.torso.rotation.y = Math.sin(t * 2.6) * 0.24;
+      rig.torso.rotation.z = Math.cos(t * 2.6) * 0.08;
+      rig.head.rotation.y = Math.sin(t * 2.6 + 0.5) * 0.22;
+      rig.head.rotation.x = Math.sin(t * 5.0) * 0.12;
 
-      rig.leftShoulder.rotation.set(-0.7 + Math.sin(t * 5) * 0.25, 0, 0.35);
-      rig.leftElbow.rotation.set(-1.1 + Math.cos(t * 5) * 0.25, 0, 0);
+      // Animated talking mouth
+      const talkOpen = 0.35 + Math.abs(Math.sin(t * 14)) * 0.95;
+      rig.mouth.scale.set(1.25, talkOpen, 0.45);
+      rig.leftBrow.position.y = 0.31 + Math.sin(t * 4) * 0.015;
+      rig.rightBrow.position.y = 0.31 + Math.sin(t * 4) * 0.015;
 
-      rig.rightShoulder.rotation.set(-0.8 + Math.cos(t * 4.5) * 0.25, 0, -0.35);
-      rig.rightElbow.rotation.set(-1.15 + Math.sin(t * 4.5) * 0.25, 0, 0);
+      // Expressive hand gestures
+      rig.leftShoulder.rotation.set(-0.85 + Math.sin(t * 5.2) * 0.45, 0.2, 0.45);
+      rig.leftElbow.rotation.set(-1.2 + Math.cos(t * 5.2) * 0.4, 0, 0);
+
+      rig.rightShoulder.rotation.set(-0.95 + Math.cos(t * 4.8) * 0.45, -0.2, -0.45);
+      rig.rightElbow.rotation.set(-1.25 + Math.sin(t * 4.8) * 0.4, 0, 0);
+
+      // Slight knee bend on bounce
+      rig.leftHip.rotation.x = -bounce * 1.4;
+      rig.leftKnee.rotation.x = bounce * 2.5;
+      rig.rightHip.rotation.x = -bounce * 1.4;
+      rig.rightKnee.rotation.x = bounce * 2.5;
       break;
     }
 
     case 'think': {
-      // Hand on chin, head tilted curiously
-      rig.torso.rotation.z = -0.06;
-      rig.torso.rotation.y = -0.15;
-      rig.head.rotation.z = 0.15 + Math.sin(t * 1.8) * 0.05;
-      rig.head.rotation.x = -0.08;
-      // Squinted thoughtful eyes
-      rig.leftEye.scale.set(1, 0.75, 0.6);
-      rig.rightEye.scale.set(1.1, 1.4, 0.6);
+      // Clearly thinking: body sways, head tilts & nods, hand taps chin, foot taps floor!
+      const sway = Math.sin(t * 2.2);
+      rig.hips.position.y = 0.95 + Math.abs(Math.sin(t * 2.2)) * 0.025;
+      rig.torso.rotation.z = -0.1 + sway * 0.06;
+      rig.torso.rotation.y = -0.22 + sway * 0.14;
+      rig.head.rotation.z = 0.22 + Math.sin(t * 2.8) * 0.1;
+      rig.head.rotation.x = -0.1 + Math.cos(t * 2.4) * 0.08;
 
-      // Right hand raised to chin
-      rig.rightShoulder.rotation.set(-1.35, -0.3, -0.15);
-      rig.rightElbow.rotation.set(-1.65, 0, 0.35);
+      // Asymmetric curious eyebrows & squinting eye
+      rig.leftEye.scale.set(1.0, 0.7, 0.5);
+      rig.rightEye.scale.set(1.15, 1.45, 0.5);
+      rig.leftBrow.rotation.z = -0.22;
+      rig.rightBrow.position.y = 0.325;
+      rig.rightBrow.rotation.z = 0.15;
+      rig.mouth.scale.set(0.75, 0.3, 0.4);
 
-      // Left arm crossed across waist
-      rig.leftShoulder.rotation.set(-0.5, 0.4, 0.15);
-      rig.leftElbow.rotation.set(-1.3, 0, -0.5);
+      // Right hand tapping chin
+      const chinTap = Math.sin(t * 5.5) * 0.14;
+      rig.rightShoulder.rotation.set(-1.4 + chinTap * 0.4, -0.3, -0.15);
+      rig.rightElbow.rotation.set(-1.7 + chinTap, 0, 0.35);
+
+      // Left arm folded across waist
+      rig.leftShoulder.rotation.set(-0.55, 0.45, 0.2);
+      rig.leftElbow.rotation.set(-1.35, 0, -0.55);
+
+      // Impatient/curious foot tapping!
+      const tap = Math.max(0, Math.sin(t * 6.5)) * 0.3;
+      rig.leftHip.rotation.x = -0.15;
+      rig.leftKnee.rotation.x = 0.25 + tap;
       break;
     }
 
     case 'shock': {
-      // Mindblown jump + wide eyes + hands raised
-      const jump = Math.max(0, Math.sin(t * 6)) * 0.22;
+      // Dramatic mindblown jump, wide eyes, O-mouth, waving arms!
+      const jump = Math.max(0, Math.sin(t * 6.5)) * 0.3;
       rig.hips.position.y = 0.95 + jump;
-      rig.torso.rotation.x = -0.15;
-      rig.head.rotation.x = -0.2;
-      rig.leftEye.scale.set(1.35, 1.8, 0.6);
-      rig.rightEye.scale.set(1.35, 1.8, 0.6);
+      rig.torso.rotation.x = -0.22 + Math.sin(t * 10) * 0.08;
+      rig.torso.rotation.y = Math.sin(t * 5) * 0.15;
+      rig.head.rotation.x = -0.25;
+      rig.head.rotation.z = Math.sin(t * 12) * 0.12;
 
-      rig.leftShoulder.rotation.set(-2.3 + Math.sin(t * 8) * 0.15, 0, 0.55);
-      rig.leftElbow.rotation.set(-0.6, 0, 0);
-      rig.rightShoulder.rotation.set(-2.3 + Math.cos(t * 8) * 0.15, 0, -0.55);
-      rig.rightElbow.rotation.set(-0.6, 0, 0);
+      rig.leftEye.scale.set(1.45, 1.9, 0.5);
+      rig.rightEye.scale.set(1.45, 1.9, 0.5);
+      rig.leftBrow.position.y = 0.34;
+      rig.rightBrow.position.y = 0.34;
+      rig.mouth.scale.set(1.0, 1.6, 0.6); // Big surprised "O" mouth
 
-      rig.leftHip.rotation.x = -jump * 1.2;
-      rig.leftKnee.rotation.x = jump * 2.2;
-      rig.rightHip.rotation.x = -jump * 1.2;
-      rig.rightKnee.rotation.x = jump * 2.2;
+      rig.leftShoulder.rotation.set(-2.45 + Math.sin(t * 9) * 0.3, 0, 0.65);
+      rig.leftElbow.rotation.set(-0.5 + Math.cos(t * 9) * 0.3, 0, 0);
+      rig.rightShoulder.rotation.set(-2.45 + Math.cos(t * 9) * 0.3, 0, -0.65);
+      rig.rightElbow.rotation.set(-0.5 + Math.sin(t * 9) * 0.3, 0, 0);
+
+      rig.leftHip.rotation.x = -jump * 1.4;
+      rig.leftKnee.rotation.x = jump * 2.5;
+      rig.rightHip.rotation.x = -jump * 1.4;
+      rig.rightKnee.rotation.x = jump * 2.5;
       break;
     }
 
     case 'point': {
-      // Pointing upward/sideways toward fact text
-      rig.torso.rotation.y = -0.2;
-      rig.head.rotation.y = 0.18;
-      rig.head.rotation.x = -0.15 + Math.sin(t * 3) * 0.05;
+      // Leaning forward and pointing emphatically toward fact text
+      const pulse = Math.sin(t * 5.5) * 0.16;
+      rig.hips.position.y = 0.95 + Math.abs(Math.sin(t * 3.5)) * 0.03;
+      rig.torso.rotation.y = -0.3;
+      rig.torso.rotation.x = 0.1;
+      rig.head.rotation.y = 0.25;
+      rig.head.rotation.x = -0.15 + Math.sin(t * 4) * 0.08;
+      rig.mouth.scale.set(1.2, 0.45 + Math.abs(Math.sin(t * 10)) * 0.6, 0.45);
 
-      rig.rightShoulder.rotation.set(-2.15 + Math.sin(t * 4) * 0.1, 0, -0.45);
-      rig.rightElbow.rotation.set(-0.25, 0, 0);
+      rig.rightShoulder.rotation.set(-2.25 + pulse, 0, -0.5);
+      rig.rightElbow.rotation.set(-0.2 + pulse * 0.5, 0, 0);
 
-      rig.leftShoulder.rotation.set(-0.25, 0, 0.35);
-      rig.leftElbow.rotation.set(-0.9, 0, 0);
+      // Left hand on hip
+      rig.leftShoulder.rotation.set(-0.2, 0, 0.65);
+      rig.leftElbow.rotation.set(-1.3, 0, -0.4);
       break;
     }
 
     case 'wave': {
-      // Friendly wave for intro / outro
-      rig.hips.position.y = 0.95 + Math.sin(t * 3) * 0.025;
-      rig.head.rotation.z = Math.sin(t * 3) * 0.08;
-      rig.rightShoulder.rotation.set(-2.4, 0, -0.4 + Math.sin(t * 8) * 0.28);
-      rig.rightElbow.rotation.set(-0.55 + Math.sin(t * 8) * 0.25, 0, 0);
-      rig.leftShoulder.rotation.set(0, 0, 0.2);
+      // Cheerful bounce & big friendly wave
+      const bounce = Math.abs(Math.sin(t * 4.5)) * 0.06;
+      rig.hips.position.y = 0.94 + bounce;
+      rig.torso.rotation.z = Math.sin(t * 4.5) * 0.08;
+      rig.head.rotation.z = Math.sin(t * 4.5) * 0.14;
+      rig.mouth.scale.set(1.4, 0.85, 0.45);
+
+      rig.rightShoulder.rotation.set(-2.5, 0, -0.45 + Math.sin(t * 9) * 0.4);
+      rig.rightElbow.rotation.set(-0.55 + Math.sin(t * 9) * 0.35, 0, 0);
+      rig.leftShoulder.rotation.set(0.1, 0, 0.3 + Math.sin(t * 4.5) * 0.1);
       break;
     }
 
     case 'walk': {
-      // Smooth walk cycle in place
-      const phase = t * 5.5;
+      // Energetic cartoon walk cycle
+      const phase = t * 6.0;
       const swing = Math.sin(phase);
       const lift = Math.abs(Math.cos(phase));
-      rig.hips.position.y = 0.93 + lift * 0.04;
-      rig.torso.rotation.y = -swing * 0.12;
-      rig.head.rotation.y = swing * 0.08;
+      rig.hips.position.y = 0.92 + lift * 0.07;
+      rig.torso.rotation.y = -swing * 0.22;
+      rig.torso.rotation.x = 0.08;
+      rig.head.rotation.y = swing * 0.14;
 
-      rig.leftHip.rotation.x = swing * 0.55;
-      rig.leftKnee.rotation.x = Math.max(0, -swing) * 0.75;
-      rig.rightHip.rotation.x = -swing * 0.55;
-      rig.rightKnee.rotation.x = Math.max(0, swing) * 0.75;
+      rig.leftHip.rotation.x = swing * 0.72;
+      rig.leftKnee.rotation.x = Math.max(0, -swing) * 0.95;
+      rig.rightHip.rotation.x = -swing * 0.72;
+      rig.rightKnee.rotation.x = Math.max(0, swing) * 0.95;
 
-      rig.leftShoulder.rotation.x = -swing * 0.45;
-      rig.leftElbow.rotation.x = -0.45;
-      rig.rightShoulder.rotation.x = swing * 0.45;
-      rig.rightElbow.rotation.x = -0.45;
+      rig.leftShoulder.rotation.x = -swing * 0.65;
+      rig.leftElbow.rotation.x = -0.6;
+      rig.rightShoulder.rotation.x = swing * 0.65;
+      rig.rightElbow.rotation.x = -0.6;
       break;
     }
 
     case 'idle':
     default: {
-      // Gentle breathing & nod
-      rig.hips.position.y = 0.95 + Math.sin(t * 2.2) * 0.015;
-      rig.head.rotation.x = Math.sin(t * 2.2) * 0.04;
-      rig.leftShoulder.rotation.set(0, 0, 0.14 + Math.sin(t * 2.2) * 0.03);
-      rig.rightShoulder.rotation.set(0, 0, -0.14 - Math.sin(t * 2.2) * 0.03);
+      // Lively relaxed idle: breathing, weight shift & looking around
+      const shift = Math.sin(t * 2.0);
+      rig.hips.position.y = 0.95 + Math.abs(shift) * 0.03;
+      rig.hips.position.x = shift * 0.04;
+      rig.torso.rotation.z = -shift * 0.06;
+      rig.head.rotation.y = Math.sin(t * 1.4) * 0.2;
+      rig.head.rotation.x = Math.sin(t * 2.5) * 0.07;
+      rig.leftShoulder.rotation.set(0, 0, 0.18 + Math.sin(t * 2.5) * 0.08);
+      rig.rightShoulder.rotation.set(0, 0, -0.18 - Math.sin(t * 2.5) * 0.08);
       break;
     }
   }
@@ -383,17 +516,16 @@ function createFactBadgeTexture(text: string): THREE.CanvasTexture {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Pill background
   const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
-  grad.addColorStop(0, 'rgba(139, 92, 246, 0.92)');
-  grad.addColorStop(1, 'rgba(6, 182, 212, 0.92)');
+  grad.addColorStop(0, 'rgba(139, 92, 246, 0.95)');
+  grad.addColorStop(1, 'rgba(6, 182, 212, 0.95)');
   ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.roundRect(16, 20, canvas.width - 32, canvas.height - 40, 32);
   ctx.fill();
 
   ctx.lineWidth = 5;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
   ctx.stroke();
 
   ctx.fillStyle = '#ffffff';
@@ -450,24 +582,24 @@ export class Scene3DRenderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 50);
     this.camera.position.set(0, 1.35, 3.6);
 
     // 3-Point Studio Lighting
-    this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 0.85);
+    this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 0.9);
     this.scene.add(this.hemiLight);
 
-    this.keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    this.keyLight = new THREE.DirectionalLight(0xffffff, 1.85);
     this.keyLight.position.set(2.5, 4.5, 3.5);
     this.keyLight.castShadow = true;
     this.keyLight.shadow.mapSize.width = 1024;
     this.keyLight.shadow.mapSize.height = 1024;
     this.scene.add(this.keyLight);
 
-    this.rimLight = new THREE.DirectionalLight(0x38bdf8, 1.6);
+    this.rimLight = new THREE.DirectionalLight(0x38bdf8, 1.5);
     this.rimLight.position.set(-2.5, 3.0, -3.0);
     this.scene.add(this.rimLight);
 
@@ -475,8 +607,8 @@ export class Scene3DRenderer {
     const floorGeo = new THREE.CircleGeometry(10, 48);
     const floorMat = new THREE.MeshStandardMaterial({
       color: 0x111827,
-      roughness: 0.75,
-      metalness: 0.1,
+      roughness: 0.85,
+      metalness: 0.05,
     });
     this.floorMesh = new THREE.Mesh(floorGeo, floorMat);
     this.floorMesh.rotation.x = -Math.PI / 2;
@@ -493,19 +625,19 @@ export class Scene3DRenderer {
         color: 0x38bdf8,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.8,
       })
     );
     this.podiumRing.rotation.x = -Math.PI / 2;
     this.podiumRing.position.y = 0.004;
     this.scene.add(this.podiumRing);
 
-    // Procedural Stickman
+    // Procedural 3D Stickman
     this.rig = buildStickmanRig('#f8fafc');
     this.scene.add(this.rig.root);
 
     // Floating 3D Fact Badge
-    const badgeGeo = new THREE.PlaneGeometry(1.7, 0.42);
+    const badgeGeo = new THREE.PlaneGeometry(1.75, 0.44);
     const badgeMat = new THREE.MeshBasicMaterial({
       transparent: true,
       side: THREE.DoubleSide,
@@ -561,7 +693,6 @@ export class Scene3DRenderer {
     const gltf = await this.gltfLoader.loadAsync(url);
     const model = gltf.scene;
 
-    // Auto-normalize size to ~1.8m height and center on floor
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z, 0.001);
@@ -596,7 +727,6 @@ export class Scene3DRenderer {
     const progress = Math.max(0, Math.min(1, timeSec / safeDur));
     const animTime = timeSec * (config.animationSpeed || 1);
 
-    // Character mode (Stickman vs uploaded GLB)
     if (config.mode === 'glb' && config.glbUrl && this.glbGroup) {
       this.rig.root.visible = false;
       this.glbGroup.visible = true;
@@ -613,11 +743,13 @@ export class Scene3DRenderer {
     } else {
       if (this.glbGroup) this.glbGroup.visible = false;
       this.rig.root.visible = true;
-      this.rig.bodyMaterial.color.set(config.characterColor || '#f8fafc');
+      const col = config.characterColor || '#f8fafc';
+      this.rig.bodyMaterial.color.set(col);
+      const isDark = col.toLowerCase() === '#1e293b' || col.toLowerCase() === '#000000';
+      this.rig.outlineMaterial.color.setHex(isDark ? 0x38bdf8 : 0x0f172a);
       applyStickmanPose(this.rig, config.pose, animTime);
     }
 
-    // Floating 3D Fact Badge
     const badgeText = (config.factBadgeText || '').trim();
     if (badgeText) {
       if (badgeText !== this.currentBadgeText) {
@@ -634,7 +766,6 @@ export class Scene3DRenderer {
       this.badgeMesh.visible = false;
     }
 
-    // Camera animation preset
     const lookTarget = new THREE.Vector3(0, 1.25, 0);
     switch (config.cameraPreset) {
       case 'orbit': {
