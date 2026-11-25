@@ -1,5 +1,32 @@
-import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic, ExportResolution, SharpenLevel } from '../types/editor';
-import { getActiveTransitionInfo, drawCanvasTransition } from './transition';
+import {
+  ALL_FORMATS,
+  AudioBufferSource,
+  BufferTarget,
+  CanvasSource,
+  Input,
+  Mp4OutputFormat,
+  Output,
+  UrlSource,
+  VideoSampleSink,
+  getFirstEncodableAudioCodec,
+  getFirstEncodableVideoCodec,
+  type VideoSample,
+} from 'mediabunny';
+import type {
+  AspectRatio,
+  BackgroundMusic,
+  ExportResolution,
+  SharpenLevel,
+  Subtitle,
+  VideoClip,
+  Voiceover,
+  Watermark,
+} from '../types/editor';
+import {
+  drawCanvasTransition,
+  drawSingleFrameToCanvas,
+  getActiveTransitionInfo,
+} from './transition';
 
 export interface ExportProgress {
   progress: number; // 0 to 100
@@ -12,72 +39,640 @@ export interface ExportOptions {
   sharpenLevel?: SharpenLevel; // 'subtle' | 'high'
 }
 
-export async function exportVideo(
+interface ClipRange {
+  clip: VideoClip;
+  start: number;
+  end: number;
+}
+
+/**
+ * Helper to auto-wrap text so sentences NEVER get cut off on vertical (9:16) or narrow screens.
+ */
+function wrapCanvasText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxAllowedWidth: number
+): string[] {
+  const paragraphs = text.split('\n');
+  const wrappedLines: string[] = [];
+
+  for (const para of paragraphs) {
+    const cleanPara = para.trim();
+    if (!cleanPara) continue;
+
+    const words = cleanPara.split(/\s+/);
+    let currentLine = words[0] || '';
+
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const testLine = `${currentLine} ${word}`;
+      const metrics = context.measureText(testLine);
+
+      if (metrics.width <= maxAllowedWidth) {
+        currentLine = testLine;
+      } else {
+        wrappedLines.push(currentLine);
+        currentLine = word;
+      }
+    }
+
+    if (currentLine) {
+      wrappedLines.push(currentLine);
+    }
+  }
+
+  return wrappedLines.length > 0 ? wrappedLines : [text];
+}
+
+/**
+ * Shared overlay renderer (Watermark + Subtitles) used by both Mediabunny and MediaRecorder pipelines.
+ */
+function createOverlayRenderers(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  aspectRatio: AspectRatio,
+  watermark: Watermark,
+  watermarkImg: HTMLImageElement | null,
+  subtitles: Subtitle[]
+) {
+  const refPreviewHeight = aspectRatio === '9:16' ? 460 : aspectRatio === '1:1' ? 440 : 450;
+  const scale = height / refPreviewHeight;
+
+  const drawWatermark = () => {
+    if (!watermark.enabled) return;
+    ctx.save();
+    ctx.globalAlpha = watermark.opacity;
+
+    const padding = Math.round(24 * scale);
+    let x = padding;
+    let y = padding;
+
+    if (watermark.type === 'text' && watermark.text) {
+      const fontSize = Math.round(24 * watermark.scale * scale);
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.fillStyle = watermark.color || '#ffffff';
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = Math.round(4 * scale);
+
+      const metrics = ctx.measureText(watermark.text);
+      const textWidth = metrics.width;
+      const textHeight = fontSize;
+
+      if (watermark.position === 'top-left') {
+        x = padding;
+        y = padding + textHeight;
+      } else if (watermark.position === 'top-right') {
+        x = width - textWidth - padding;
+        y = padding + textHeight;
+      } else if (watermark.position === 'bottom-left') {
+        x = padding;
+        y = height - padding;
+      } else if (watermark.position === 'bottom-right') {
+        x = width - textWidth - padding;
+        y = height - padding;
+      } else if (watermark.position === 'center') {
+        x = (width - textWidth) / 2;
+        y = height / 2;
+      }
+
+      ctx.fillText(watermark.text, x, y);
+    } else if (watermark.type === 'image' && watermarkImg) {
+      const imgW = 120 * watermark.scale * scale;
+      const imgH = (watermarkImg.naturalHeight / watermarkImg.naturalWidth) * imgW;
+
+      if (watermark.position === 'top-left') {
+        x = padding;
+        y = padding;
+      } else if (watermark.position === 'top-right') {
+        x = width - imgW - padding;
+        y = padding;
+      } else if (watermark.position === 'bottom-left') {
+        x = padding;
+        y = height - imgH - padding;
+      } else if (watermark.position === 'bottom-right') {
+        x = width - imgW - padding;
+        y = height - imgH - padding;
+      } else if (watermark.position === 'center') {
+        x = (width - imgW) / 2;
+        y = (height - imgH) / 2;
+      }
+
+      ctx.drawImage(watermarkImg, x, y, imgW, imgH);
+    }
+
+    ctx.restore();
+  };
+
+  const drawSubtitles = (currentTime: number) => {
+    const activeSubs = subtitles.filter(
+      (s) => currentTime >= s.startTime && currentTime <= s.endTime && s.text.trim().length > 0
+    );
+
+    for (const sub of activeSubs) {
+      ctx.save();
+      const baseFontSize = Math.max(14, sub.fontSize || 24);
+      let fontSize = Math.round(baseFontSize * scale);
+
+      if (width < height) {
+        fontSize = Math.min(fontSize, Math.round(width * 0.072));
+      }
+
+      let fontFamilyName = 'sans-serif';
+      if (sub.fontFamily === 'impact') fontFamilyName = 'Impact, "Arial Black", sans-serif';
+      else if (sub.fontFamily === 'serif') fontFamilyName = 'Georgia, "Times New Roman", serif';
+      else if (sub.fontFamily === 'mono') fontFamilyName = 'ui-monospace, Consolas, monospace';
+      else if (sub.fontFamily === 'cursive') fontFamilyName = '"Comic Sans MS", cursive';
+
+      ctx.font = `bold ${fontSize}px ${fontFamilyName}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const rawText = sub.isUppercase ? sub.text.toUpperCase() : sub.text;
+      const maxLineWidth = Math.round(width * 0.84);
+      let lines = wrapCanvasText(ctx, rawText, maxLineWidth);
+
+      if (lines.length > 3 && width < height) {
+        fontSize = Math.round(fontSize * 0.88);
+        ctx.font = `bold ${fontSize}px ${fontFamilyName}`;
+        lines = wrapCanvasText(ctx, rawText, maxLineWidth);
+      }
+
+      const lineHeight = fontSize * 1.3;
+      const totalTextHeight = lines.length * lineHeight;
+
+      const marginY = Math.round(20 * scale);
+      const rawTargetY = ((sub.positionY ?? 80) / 100) * height;
+      const targetY = Math.min(
+        height - totalTextHeight / 2 - marginY,
+        Math.max(totalTextHeight / 2 + marginY, rawTargetY)
+      );
+
+      lines.forEach((line, index) => {
+        const lineY = targetY - totalTextHeight / 2 + index * lineHeight + lineHeight / 2;
+        const metrics = ctx.measureText(line);
+        const bgPaddingX = Math.round(18 * scale);
+        const bgPaddingY = Math.round(8 * scale);
+        const bgRadius = Math.round(10 * scale);
+
+        if (sub.bgColor && sub.bgColor !== 'transparent') {
+          ctx.fillStyle = sub.bgColor;
+          const bgWidth = Math.min(width - 24, metrics.width + bgPaddingX * 2);
+          const bgHeight = fontSize + bgPaddingY * 2;
+          ctx.beginPath();
+          ctx.roundRect(
+            width / 2 - bgWidth / 2,
+            lineY - bgHeight / 2,
+            bgWidth,
+            bgHeight,
+            bgRadius
+          );
+          ctx.fill();
+        }
+
+        if (sub.glowColor) {
+          ctx.shadowColor = sub.glowColor;
+          ctx.shadowBlur = Math.round(14 * scale);
+        } else {
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+          ctx.shadowBlur = Math.round(4 * scale);
+          ctx.shadowOffsetY = Math.round(2 * scale);
+        }
+
+        const rawStroke = (sub.strokeWidth ?? 1.5) * scale;
+        const effectiveStroke = Math.min(rawStroke, Math.max(1.0 * scale, fontSize * 0.08));
+        if (effectiveStroke > 0) {
+          ctx.lineWidth = effectiveStroke * 2;
+          ctx.strokeStyle = sub.strokeColor || 'rgba(0, 0, 0, 0.9)';
+          ctx.strokeText(line, width / 2, lineY);
+        }
+
+        ctx.fillStyle = sub.color || '#ffffff';
+        ctx.fillText(line, width / 2, lineY);
+      });
+
+      ctx.restore();
+    }
+  };
+
+  return { drawWatermark, drawSubtitles };
+}
+
+/**
+ * Sequential video frame reader backed by Mediabunny VideoSampleSink.
+ * Decodes frames in-order without re-seeking, keeping memory low by closing consumed samples.
+ */
+class ClipFrameReader {
+  private input: Input;
+  private sink: VideoSampleSink;
+  private iterator: AsyncGenerator<VideoSample, void, unknown> | null = null;
+  private currentSample: VideoSample | null = null;
+  private nextSample: VideoSample | null = null;
+  private done = false;
+  private trimStart: number;
+  private trimEnd: number;
+
+  constructor(url: string, trimStart: number, trimEnd: number) {
+    this.input = new Input({
+      formats: ALL_FORMATS,
+      source: new UrlSource(url),
+    });
+    this.trimStart = trimStart;
+    this.trimEnd = trimEnd;
+    this.sink = null as unknown as VideoSampleSink;
+  }
+
+  async init(): Promise<void> {
+    const videoTrack = await this.input.getPrimaryVideoTrack();
+    if (!videoTrack) {
+      throw new Error('Track video tidak ditemukan pada klip');
+    }
+    this.sink = new VideoSampleSink(videoTrack);
+  }
+
+  async getFrameAt(clipTime: number): Promise<VideoSample | null> {
+    if (!this.iterator && !this.done) {
+      const start = Math.max(0, this.trimStart - 0.05);
+      const end = this.trimEnd + 0.5;
+      this.iterator = this.sink.samples(start, end);
+      const first = await this.iterator.next();
+      if (first.done) {
+        this.done = true;
+      } else {
+        this.currentSample = first.value;
+        const second = await this.iterator.next();
+        if (second.done) {
+          this.done = true;
+        } else {
+          this.nextSample = second.value;
+        }
+      }
+    }
+
+    while (!this.done && this.nextSample && this.nextSample.timestamp <= clipTime) {
+      this.currentSample?.close();
+      this.currentSample = this.nextSample;
+      this.nextSample = null;
+      if (this.iterator) {
+        const res = await this.iterator.next();
+        if (res.done) {
+          this.done = true;
+        } else {
+          this.nextSample = res.value;
+        }
+      } else {
+        this.done = true;
+      }
+    }
+
+    return this.currentSample || this.nextSample;
+  }
+
+  async dispose(): Promise<void> {
+    this.currentSample?.close();
+    this.currentSample = null;
+    this.nextSample?.close();
+    this.nextSample = null;
+    if (this.iterator) {
+      try {
+        await this.iterator.return();
+      } catch {
+        // ignore
+      }
+      this.iterator = null;
+    }
+    if (!this.input.disposed) {
+      this.input.dispose();
+    }
+  }
+}
+
+/**
+ * Mixes all clip audio, voiceovers, and background music faster-than-realtime using OfflineAudioContext.
+ */
+async function mixTimelineAudioBuffer(
+  clipRanges: ClipRange[],
+  voiceovers: Voiceover[],
+  bgm: BackgroundMusic | null | undefined,
+  totalDuration: number
+): Promise<AudioBuffer> {
+  const sampleRate = 48000;
+  const length = Math.max(1, Math.ceil(totalDuration * sampleRate));
+  const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
+  const decodedCache = new Map<string, AudioBuffer | null>();
+
+  const decodeUrl = async (url: string): Promise<AudioBuffer | null> => {
+    if (decodedCache.has(url)) {
+      return decodedCache.get(url) ?? null;
+    }
+    try {
+      const resp = await fetch(url);
+      const buf = await resp.arrayBuffer();
+      const decoded = await offlineCtx.decodeAudioData(buf);
+      decodedCache.set(url, decoded);
+      return decoded;
+    } catch {
+      decodedCache.set(url, null);
+      return null;
+    }
+  };
+
+  for (const range of clipRanges) {
+    const vol = range.clip.volume ?? 1;
+    if (vol <= 0) continue;
+    const decoded = await decodeUrl(range.clip.url);
+    if (!decoded) continue;
+
+    const dur = Math.max(0, range.end - range.start);
+    const src = offlineCtx.createBufferSource();
+    src.buffer = decoded;
+    const gain = offlineCtx.createGain();
+    gain.gain.value = vol;
+    src.connect(gain);
+    gain.connect(offlineCtx.destination);
+    src.start(range.start, range.clip.trimStart, dur);
+  }
+
+  for (const vo of voiceovers) {
+    const vol = vo.volume ?? 1;
+    if (vol <= 0) continue;
+    const decoded = await decodeUrl(vo.url);
+    if (!decoded) continue;
+
+    const src = offlineCtx.createBufferSource();
+    src.buffer = decoded;
+    const gain = offlineCtx.createGain();
+    gain.gain.value = vol;
+    src.connect(gain);
+    gain.connect(offlineCtx.destination);
+    src.start(vo.startTime, vo.trimStart || 0, vo.duration);
+  }
+
+  if (bgm && bgm.url && (bgm.volume ?? 0.2) > 0) {
+    const decoded = await decodeUrl(bgm.url);
+    if (decoded) {
+      const bgmVol = bgm.volume ?? 0.2;
+      const shouldLoop = bgm.loop ?? true;
+      const segDur = decoded.duration;
+      if (segDur > 0) {
+        if (shouldLoop) {
+          let t = 0;
+          while (t < totalDuration) {
+            const playDur = Math.min(segDur, totalDuration - t);
+            const src = offlineCtx.createBufferSource();
+            src.buffer = decoded;
+            const gain = offlineCtx.createGain();
+            gain.gain.value = bgmVol;
+            src.connect(gain);
+            gain.connect(offlineCtx.destination);
+            src.start(t, 0, playDur);
+            t += segDur;
+          }
+        } else {
+          const playDur = Math.min(segDur, totalDuration);
+          const src = offlineCtx.createBufferSource();
+          src.buffer = decoded;
+          const gain = offlineCtx.createGain();
+          gain.gain.value = bgmVol;
+          src.connect(gain);
+          gain.connect(offlineCtx.destination);
+          src.start(0, 0, playDur);
+        }
+      }
+    }
+  }
+
+  return offlineCtx.startRendering();
+}
+
+/**
+ * High-speed faster-than-realtime MP4 export powered by Mediabunny + WebCodecs.
+ */
+async function exportWithMediabunny(
   clips: VideoClip[],
+  clipRanges: ClipRange[],
+  totalDuration: number,
+  width: number,
+  height: number,
+  videoBitsPerSecond: number,
+  sharpen: boolean,
+  sharpenLevel: SharpenLevel,
   subtitles: Subtitle[],
   watermark: Watermark,
+  watermarkImg: HTMLImageElement | null,
   voiceovers: Voiceover[],
   aspectRatio: AspectRatio,
-  onProgress: (p: ExportProgress) => void,
-  bgm?: BackgroundMusic | null,
-  options?: ExportOptions
+  bgm: BackgroundMusic | null | undefined,
+  onProgress: (p: ExportProgress) => void
 ): Promise<Blob> {
-  if (clips.length === 0) {
-    throw new Error('Tidak ada video clip untuk diekspor');
-  }
-
-  // Calculate total timeline duration
-  const clipDurations = clips.map((c) => Math.max(0, c.trimEnd - c.trimStart));
-  const totalDuration = clipDurations.reduce((a, b) => a + b, 0);
-
-  if (totalDuration <= 0) {
-    throw new Error('Durasi video tidak valid');
-  }
-
-  const resolution = options?.resolution || '1080p';
-  const sharpen = options?.sharpen ?? true;
-  const sharpenLevel = options?.sharpenLevel || 'high';
-
-  // Determine export dimensions according to resolution and aspect ratio
-  let width = 1920;
-  let height = 1080;
-
-  if (resolution === '1080p') {
-    if (aspectRatio === '9:16') {
-      width = 1080;
-      height = 1920;
-    } else if (aspectRatio === '1:1') {
-      width = 1080;
-      height = 1080;
-    } else {
-      width = 1920;
-      height = 1080;
-    }
-  } else {
-    // 720p HD
-    if (aspectRatio === '9:16') {
-      width = 720;
-      height = 1280;
-    } else if (aspectRatio === '1:1') {
-      width = 720;
-      height = 720;
-    } else {
-      width = 1280;
-      height = 720;
-    }
-  }
+  const fps = 30;
+  const frameDuration = 1 / fps;
+  const totalFrames = Math.max(1, Math.ceil(totalDuration * fps));
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
-
-  // High quality image smoothing interpolation (Bicubic scaling)
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // Mount hidden container in document.body to enable full GPU hardware acceleration in Chromium
-  // (Unattached video and canvas elements are severely throttled by browsers, causing stutter)
+  const { drawWatermark, drawSubtitles } = createOverlayRenderers(
+    ctx,
+    width,
+    height,
+    aspectRatio,
+    watermark,
+    watermarkImg,
+    subtitles
+  );
+
+  onProgress({ progress: 8, status: 'Menyiapkan encoder MP4 (Mediabunny WebCodecs)...' });
+
+  const target = new BufferTarget();
+  const output = new Output({
+    format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
+    target,
+  });
+
+  const videoCodec = await getFirstEncodableVideoCodec(
+    output.format.getSupportedVideoCodecs(),
+    { width, height, bitrate: videoBitsPerSecond, frameRate: fps }
+  );
+  if (!videoCodec) {
+    throw new Error('Browser tidak mendukung hardware video encoding WebCodecs');
+  }
+
+  const audioCodec = await getFirstEncodableAudioCodec(
+    output.format.getSupportedAudioCodecs(),
+    { sampleRate: 48000, numberOfChannels: 2, bitrate: 128_000 }
+  );
+
+  const videoSource = new CanvasSource(canvas, {
+    codec: videoCodec,
+    bitrate: videoBitsPerSecond,
+  });
+  output.addVideoTrack(videoSource, { frameRate: fps });
+
+  let audioSource: AudioBufferSource | null = null;
+  if (audioCodec) {
+    audioSource = new AudioBufferSource({
+      codec: audioCodec,
+      bitrate: 128_000,
+    });
+    output.addAudioTrack(audioSource);
+  }
+
+  const readers = clips.map(
+    (c) => new ClipFrameReader(c.url, c.trimStart, c.trimEnd)
+  );
+
+  try {
+    onProgress({ progress: 14, status: 'Membuka stream video & mencampur audio...' });
+    await Promise.all(readers.map((r) => r.init()));
+
+    await output.start();
+
+    if (audioSource) {
+      const mixedAudio = await mixTimelineAudioBuffer(
+        clipRanges,
+        voiceovers,
+        bgm,
+        totalDuration
+      );
+      await audioSource.add(mixedAudio);
+      audioSource.close();
+    }
+
+    onProgress({ progress: 22, status: 'Merender MP4 berkecepatan tinggi...' });
+
+    for (let frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
+      const t = frameIdx * frameDuration;
+
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+
+      const activeTrans = getActiveTransitionInfo(clips, t);
+
+      if (activeTrans) {
+        const idxA = activeTrans.cutIndex;
+        const idxB = activeTrans.cutIndex + 1;
+        const rangeA = clipRanges[idxA];
+        const rangeB = clipRanges[idxB];
+
+        const durA = Math.max(0, rangeA.clip.trimEnd - rangeA.clip.trimStart);
+        const timeA =
+          rangeA.clip.trimStart + Math.min(durA, Math.max(0, t - rangeA.start));
+        const timeB =
+          rangeB.clip.trimStart + Math.max(0, t - rangeB.start);
+
+        const [sampleA, sampleB] = await Promise.all([
+          readers[idxA].getFrameAt(timeA),
+          readers[idxB].getFrameAt(timeB),
+        ]);
+
+        if (sampleA && sampleB) {
+          drawCanvasTransition(
+            ctx,
+            sampleA,
+            sampleB,
+            activeTrans.type,
+            activeTrans.progress,
+            width,
+            height,
+            sharpen,
+            sharpenLevel
+          );
+        } else if (sampleA || sampleB) {
+          drawSingleFrameToCanvas(ctx, (sampleA || sampleB)!, width, height);
+        }
+      } else {
+        const activeIdx = clipRanges.findIndex((r) => t >= r.start && t < r.end);
+        const safeIdx = activeIdx !== -1 ? activeIdx : clipRanges.length - 1;
+        const range = clipRanges[safeIdx];
+        const clipTime = range.clip.trimStart + Math.max(0, t - range.start);
+        const sample = await readers[safeIdx].getFrameAt(clipTime);
+
+        if (sample) {
+          if (sharpen) {
+            ctx.filter =
+              sharpenLevel === 'high'
+                ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
+                : 'contrast(1.09) saturate(1.04) brightness(1.01)';
+          } else {
+            ctx.filter = 'none';
+          }
+          drawSingleFrameToCanvas(ctx, sample, width, height);
+          ctx.filter = 'none';
+        }
+      }
+
+      drawWatermark();
+      drawSubtitles(t);
+
+      await videoSource.add(t, frameDuration);
+
+      if (frameIdx % 5 === 0 || frameIdx === totalFrames - 1) {
+        const pct = Math.min(98, Math.round((frameIdx / totalFrames) * 76) + 22);
+        onProgress({
+          progress: pct,
+          status: `Merender MP4 cepat (${t.toFixed(1)}s / ${totalDuration.toFixed(1)}s)...`,
+        });
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    }
+
+    onProgress({ progress: 99, status: 'Menyelesaikan kontainer MP4...' });
+    videoSource.close();
+    await output.finalize();
+
+    if (!target.buffer) {
+      throw new Error('Buffer output MP4 kosong');
+    }
+
+    onProgress({ progress: 100, status: 'Selesai! Video MP4 siap diunduh.' });
+    return new Blob([target.buffer], { type: 'video/mp4' });
+  } finally {
+    await Promise.all(readers.map((r) => r.dispose()));
+  }
+}
+
+/**
+ * Fallback real-time exporter via MediaRecorder for browsers without WebCodecs support.
+ */
+async function exportWithMediaRecorder(
+  clips: VideoClip[],
+  clipRanges: ClipRange[],
+  totalDuration: number,
+  width: number,
+  height: number,
+  videoBitsPerSecond: number,
+  sharpen: boolean,
+  sharpenLevel: SharpenLevel,
+  subtitles: Subtitle[],
+  watermark: Watermark,
+  watermarkImg: HTMLImageElement | null,
+  voiceovers: Voiceover[],
+  aspectRatio: AspectRatio,
+  bgm: BackgroundMusic | null | undefined,
+  onProgress: (p: ExportProgress) => void
+): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const { drawWatermark, drawSubtitles } = createOverlayRenderers(
+    ctx,
+    width,
+    height,
+    aspectRatio,
+    watermark,
+    watermarkImg,
+    subtitles
+  );
+
   const exportMount = document.createElement('div');
   exportMount.id = 'openedit-export-gpu-mount';
   exportMount.style.cssText =
@@ -87,34 +682,20 @@ export async function exportVideo(
 
   onProgress({ progress: 5, status: 'Menyiapkan audio engine...' });
 
-  // Setup Web Audio Context for audio mixing
-  const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const AudioCtxClass =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const audioCtx = new AudioCtxClass();
   const dest = audioCtx.createMediaStreamDestination();
 
-  // Ensure AudioContext is active and running (prevents media element stall)
   if (audioCtx.state === 'suspended') {
     try {
       await audioCtx.resume();
-    } catch (e) {
-      console.warn('Could not resume AudioContext:', e);
+    } catch {
+      // ignore
     }
   }
 
-  // Pre-load watermark image if needed
-  let watermarkImg: HTMLImageElement | null = null;
-  if (watermark.enabled && watermark.type === 'image' && watermark.imageUrl) {
-    watermarkImg = new Image();
-    watermarkImg.crossOrigin = 'anonymous';
-    watermarkImg.src = watermark.imageUrl;
-    await new Promise((resolve) => {
-      if (!watermarkImg) return resolve(null);
-      watermarkImg.onload = resolve;
-      watermarkImg.onerror = resolve;
-    });
-  }
-
-  // Pre-load and buffer video elements with hardware acceleration
   onProgress({ progress: 12, status: 'Memuat dan menyinkronkan video...' });
   const videoElements: HTMLVideoElement[] = [];
   for (let i = 0; i < clips.length; i++) {
@@ -127,7 +708,6 @@ export async function exportVideo(
     v.volume = clips[i].volume ?? 1;
     exportMount.appendChild(v);
 
-    // Wait until video data is buffered and seeked to trimStart
     await new Promise<void>((resolve) => {
       v.currentTime = clips[i].trimStart;
       if (v.readyState >= 2) {
@@ -144,21 +724,19 @@ export async function exportVideo(
       setTimeout(resolve, 2500);
     });
 
-    // Connect to Web Audio
     try {
       const source = audioCtx.createMediaElementSource(v);
       const gain = audioCtx.createGain();
       gain.gain.value = clips[i].volume ?? 1;
       source.connect(gain);
       gain.connect(dest);
-    } catch (e) {
-      console.warn('Audio element source error:', e);
+    } catch {
+      // ignore
     }
 
     videoElements.push(v);
   }
 
-  // Pre-load voiceover elements
   const voiceoverElements: { el: HTMLAudioElement; vo: Voiceover }[] = [];
   for (const vo of voiceovers) {
     const a = document.createElement('audio');
@@ -173,13 +751,12 @@ export async function exportVideo(
       gain.gain.value = vo.volume ?? 1;
       source.connect(gain);
       gain.connect(dest);
-    } catch (e) {
-      console.warn('Voiceover audio source error:', e);
+    } catch {
+      // ignore
     }
     voiceoverElements.push({ el: a, vo });
   }
 
-  // Pre-load background music (BGM)
   let bgmAudio: HTMLAudioElement | null = null;
   if (bgm && bgm.url) {
     bgmAudio = document.createElement('audio');
@@ -194,12 +771,11 @@ export async function exportVideo(
       gain.gain.value = bgm.volume ?? 0.2;
       source.connect(gain);
       gain.connect(dest);
-    } catch (e) {
-      console.warn('BGM audio source error:', e);
+    } catch {
+      // ignore
     }
   }
 
-  // Combine Canvas Stream with Audio Stream
   const canvasStream = canvas.captureStream(30);
   const audioTracks = dest.stream.getAudioTracks();
   const combinedStream = new MediaStream([
@@ -207,43 +783,26 @@ export async function exportVideo(
     ...audioTracks,
   ]);
 
-  // Setup MediaRecorder with MP4 or WebM support
   let chosenMime = 'video/mp4;codecs=avc1';
-  let isNativeMp4 = false;
-
-  const mp4Candidates = [
+  const candidates = [
     'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
     'video/mp4;codecs=avc1,opus',
     'video/mp4;codecs=avc1',
     'video/mp4;codecs=h264,aac',
     'video/mp4;codecs=h264',
     'video/mp4',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=h264,opus',
+    'video/webm',
   ];
 
-  for (const m of mp4Candidates) {
+  for (const m of candidates) {
     if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) {
       chosenMime = m;
-      isNativeMp4 = true;
       break;
     }
   }
-
-  if (!isNativeMp4) {
-    const webmCandidates = [
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm;codecs=h264,opus',
-      'video/webm',
-    ];
-    for (const m of webmCandidates) {
-      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) {
-        chosenMime = m;
-        break;
-      }
-    }
-  }
-
-  const videoBitsPerSecond = resolution === '1080p' ? 9_000_000 : 4_500_000;
 
   const mediaRecorder = new MediaRecorder(combinedStream, {
     mimeType: chosenMime,
@@ -276,8 +835,8 @@ export async function exportVideo(
       if (audioCtx.state !== 'closed') {
         audioCtx.close().catch(() => {});
       }
-    } catch (e) {
-      console.warn('Cleanup error:', e);
+    } catch {
+      // ignore
     }
   };
 
@@ -293,245 +852,16 @@ export async function exportVideo(
     mediaRecorder.onstop = () => {
       if (animId) cancelAnimationFrame(animId);
       cleanupAll();
-      const outputType = isNativeMp4 ? 'video/mp4' : 'video/mp4';
-      const outputBlob = new Blob(recordedChunks, { type: outputType });
-      resolve(outputBlob);
+      resolve(new Blob(recordedChunks, { type: 'video/mp4' }));
     };
 
-    // Calculate clip timeline start and end times
-    let runningTime = 0;
-    const clipRanges = clips.map((c) => {
-      const start = runningTime;
-      const effectiveDur = Math.max(0, c.trimEnd - c.trimStart);
-      runningTime += effectiveDur;
-      return { clip: c, start, end: runningTime };
-    });
-
-    // Start recorder with 1000ms chunk timeslice for optimal container integrity
     mediaRecorder.start(1000);
-
     const exportStartTime = performance.now();
     let currentClipIndex = -1;
     let isFinished = false;
 
-    // Helper to draw watermark
-    const drawWatermark = () => {
-      if (!watermark.enabled) return;
-      ctx.save();
-      ctx.globalAlpha = watermark.opacity;
-
-      // Scaling relative to preview player height (~450px reference)
-      const refPreviewHeight = aspectRatio === '9:16' ? 460 : aspectRatio === '1:1' ? 440 : 450;
-      const scale = height / refPreviewHeight;
-
-      const padding = Math.round(24 * scale);
-      let x = padding;
-      let y = padding;
-
-      if (watermark.type === 'text' && watermark.text) {
-        const fontSize = Math.round(24 * watermark.scale * scale);
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.fillStyle = watermark.color || '#ffffff';
-        ctx.shadowColor = 'rgba(0,0,0,0.7)';
-        ctx.shadowBlur = Math.round(4 * scale);
-
-        const metrics = ctx.measureText(watermark.text);
-        const textWidth = metrics.width;
-        const textHeight = fontSize;
-
-        if (watermark.position === 'top-left') {
-          x = padding;
-          y = padding + textHeight;
-        } else if (watermark.position === 'top-right') {
-          x = width - textWidth - padding;
-          y = padding + textHeight;
-        } else if (watermark.position === 'bottom-left') {
-          x = padding;
-          y = height - padding;
-        } else if (watermark.position === 'bottom-right') {
-          x = width - textWidth - padding;
-          y = height - padding;
-        } else if (watermark.position === 'center') {
-          x = (width - textWidth) / 2;
-          y = height / 2;
-        }
-
-        ctx.fillText(watermark.text, x, y);
-      } else if (watermark.type === 'image' && watermarkImg) {
-        const imgW = 120 * watermark.scale * scale;
-        const imgH = (watermarkImg.naturalHeight / watermarkImg.naturalWidth) * imgW;
-
-        if (watermark.position === 'top-left') {
-          x = padding;
-          y = padding;
-        } else if (watermark.position === 'top-right') {
-          x = width - imgW - padding;
-          y = padding;
-        } else if (watermark.position === 'bottom-left') {
-          x = padding;
-          y = height - imgH - padding;
-        } else if (watermark.position === 'bottom-right') {
-          x = width - imgW - padding;
-          y = height - imgH - padding;
-        } else if (watermark.position === 'center') {
-          x = (width - imgW) / 2;
-          y = (height - imgH) / 2;
-        }
-
-        ctx.drawImage(watermarkImg, x, y, imgW, imgH);
-      }
-
-      ctx.restore();
-    };
-
-    // Helper to auto-wrap text so sentences NEVER get cut off on vertical (9:16) or narrow screens
-    const wrapCanvasText = (
-      context: CanvasRenderingContext2D,
-      text: string,
-      maxAllowedWidth: number
-    ): string[] => {
-      const paragraphs = text.split('\n');
-      const wrappedLines: string[] = [];
-
-      for (const para of paragraphs) {
-        const cleanPara = para.trim();
-        if (!cleanPara) continue;
-
-        const words = cleanPara.split(/\s+/);
-        let currentLine = words[0] || '';
-
-        for (let i = 1; i < words.length; i++) {
-          const word = words[i];
-          const testLine = `${currentLine} ${word}`;
-          const metrics = context.measureText(testLine);
-
-          if (metrics.width <= maxAllowedWidth) {
-            currentLine = testLine;
-          } else {
-            wrappedLines.push(currentLine);
-            currentLine = word;
-          }
-        }
-
-        if (currentLine) {
-          wrappedLines.push(currentLine);
-        }
-      }
-
-      return wrappedLines.length > 0 ? wrappedLines : [text];
-    };
-
-    // Helper to draw subtitles (PROPORTIONALLY SCALED & AUTO-WRAPPED TO PREVENT CUTOFF)
-    const drawSubtitles = (currentTime: number) => {
-      const activeSubs = subtitles.filter(
-        (s) => currentTime >= s.startTime && currentTime <= s.endTime && s.text.trim().length > 0
-      );
-
-      // Height reference of preview player is ~450px.
-      // Scaling font size by (height / 450) ensures the subtitle occupies the EXACT SAME
-      // percentage of video height in export as it does on the live screen preview!
-      const refPreviewHeight = aspectRatio === '9:16' ? 460 : aspectRatio === '1:1' ? 440 : 450;
-      const scale = height / refPreviewHeight;
-
-      for (const sub of activeSubs) {
-        ctx.save();
-        const baseFontSize = Math.max(14, sub.fontSize || 24);
-        let fontSize = Math.round(baseFontSize * scale);
-
-        // On portrait / vertical screen (9:16, width < height), ensure font size
-        // fits comfortably within the narrow screen width (max 7.2% of width)
-        if (width < height) {
-          fontSize = Math.min(fontSize, Math.round(width * 0.072));
-        }
-
-        let fontFamilyName = 'sans-serif';
-        if (sub.fontFamily === 'impact') fontFamilyName = 'Impact, "Arial Black", sans-serif';
-        else if (sub.fontFamily === 'serif') fontFamilyName = 'Georgia, "Times New Roman", serif';
-        else if (sub.fontFamily === 'mono') fontFamilyName = 'ui-monospace, Consolas, monospace';
-        else if (sub.fontFamily === 'cursive') fontFamilyName = '"Comic Sans MS", cursive';
-
-        ctx.font = `bold ${fontSize}px ${fontFamilyName}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        const rawText = sub.isUppercase ? sub.text.toUpperCase() : sub.text;
-
-        // Auto-wrap lines within 84% of canvas width so text NEVER overflows outside screen
-        const maxLineWidth = Math.round(width * 0.84);
-        let lines = wrapCanvasText(ctx, rawText, maxLineWidth);
-
-        // If wrapping produced more than 3 lines on vertical screen, slightly scale down font size
-        if (lines.length > 3 && width < height) {
-          fontSize = Math.round(fontSize * 0.88);
-          ctx.font = `bold ${fontSize}px ${fontFamilyName}`;
-          lines = wrapCanvasText(ctx, rawText, maxLineWidth);
-        }
-
-        const lineHeight = fontSize * 1.30;
-        const totalTextHeight = lines.length * lineHeight;
-
-        // Clamp targetY so subtitle never gets cut off at top or bottom edge
-        const marginY = Math.round(20 * scale);
-        const rawTargetY = ((sub.positionY ?? 80) / 100) * height;
-        const targetY = Math.min(
-          height - totalTextHeight / 2 - marginY,
-          Math.max(totalTextHeight / 2 + marginY, rawTargetY)
-        );
-
-        lines.forEach((line, index) => {
-          const lineY = targetY - totalTextHeight / 2 + index * lineHeight + lineHeight / 2;
-          const metrics = ctx.measureText(line);
-          const bgPaddingX = Math.round(18 * scale);
-          const bgPaddingY = Math.round(8 * scale);
-          const bgRadius = Math.round(10 * scale);
-
-          // Draw background pill
-          if (sub.bgColor && sub.bgColor !== 'transparent') {
-            ctx.fillStyle = sub.bgColor;
-            const bgWidth = Math.min(width - 24, metrics.width + bgPaddingX * 2);
-            const bgHeight = fontSize + bgPaddingY * 2;
-            ctx.beginPath();
-            ctx.roundRect(
-              width / 2 - bgWidth / 2,
-              lineY - bgHeight / 2,
-              bgWidth,
-              bgHeight,
-              bgRadius
-            );
-            ctx.fill();
-          }
-
-          // Text Glow & Shadow
-          if (sub.glowColor) {
-            ctx.shadowColor = sub.glowColor;
-            ctx.shadowBlur = Math.round(14 * scale);
-          } else {
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-            ctx.shadowBlur = Math.round(4 * scale);
-            ctx.shadowOffsetY = Math.round(2 * scale);
-          }
-
-          // Draw text stroke & fill (Fill on top so solid white fill ALWAYS dominates!)
-          const rawStroke = (sub.strokeWidth ?? 1.5) * scale;
-          const effectiveStroke = Math.min(rawStroke, Math.max(1.0 * scale, fontSize * 0.08));
-          if (effectiveStroke > 0) {
-            ctx.lineWidth = effectiveStroke * 2;
-            ctx.strokeStyle = sub.strokeColor || 'rgba(0, 0, 0, 0.9)';
-            ctx.strokeText(line, width / 2, lineY);
-          }
-
-          ctx.fillStyle = sub.color || '#ffffff';
-          ctx.fillText(line, width / 2, lineY);
-        });
-
-        ctx.restore();
-      }
-    };
-
-    // Hardware-synchronized render loop via requestAnimationFrame (avoids setTimeout timer jitter)
     const renderLoop = () => {
       if (isFinished) return;
-
       const elapsed = (performance.now() - exportStartTime) / 1000;
 
       if (elapsed >= totalDuration) {
@@ -546,26 +876,19 @@ export async function exportVideo(
         return;
       }
 
-      const progressPercent = Math.min(99, Math.round((elapsed / totalDuration) * 90) + 10);
+      const progressPercent = Math.min(99, Math.round((elapsed / totalDuration) * 88) + 12);
       onProgress({
         progress: progressPercent,
         status: `Merender frame (${elapsed.toFixed(1)}s / ${totalDuration.toFixed(1)}s)...`,
       });
 
-      // Check for active transition between adjacent clips
       const activeTrans = getActiveTransitionInfo(clips, elapsed);
+      const activeIdx = clipRanges.findIndex((r) => elapsed >= r.start && elapsed < r.end);
 
-      // Find active clip (when outside of transition)
-      const activeIdx = clipRanges.findIndex(
-        (r) => elapsed >= r.start && elapsed < r.end
-      );
-
-      // Black background
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
 
       if (activeTrans) {
-        // RENDER SMOOTH SEAMLESS TRANSITION
         const idxA = activeTrans.cutIndex;
         const idxB = activeTrans.cutIndex + 1;
         const vElA = videoElements[idxA];
@@ -600,7 +923,6 @@ export async function exportVideo(
           sharpen,
           sharpenLevel
         );
-
         currentClipIndex = idxB;
       } else if (activeIdx !== -1) {
         const range = clipRanges[activeIdx];
@@ -615,55 +937,27 @@ export async function exportVideo(
           vEl.currentTime = range.clip.trimStart;
           vEl.play().catch(() => {});
         } else {
-          // Drift Lock: Keep HTMLVideoElement locked within 100ms of master timeline clock
           if (vEl.paused && elapsed < range.end) {
             vEl.play().catch(() => {});
           }
           const drift = vEl.currentTime - expectedClipTime;
-          if (Math.abs(drift) > 0.10) {
+          if (Math.abs(drift) > 0.1) {
             vEl.currentTime = expectedClipTime;
           }
         }
 
-        // Draw video frame to canvas maintaining aspect ratio
-        if (vEl.readyState >= 2) {
-          const vWidth = vEl.videoWidth || 1280;
-          const vHeight = vEl.videoHeight || 720;
-          const hRatio = width / vWidth;
-          const vRatio = height / vHeight;
-          const ratio = Math.min(hRatio, vRatio);
-
-          const centerShiftX = (width - vWidth * ratio) / 2;
-          const centerShiftY = (height - vHeight * ratio) / 2;
-
-          // Apply video sharpening filter to upscale low-res footage crisply
-          if (sharpen) {
-            ctx.filter =
-              sharpenLevel === 'high'
-                ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
-                : 'contrast(1.09) saturate(1.04) brightness(1.01)';
-          } else {
-            ctx.filter = 'none';
-          }
-
-          ctx.drawImage(
-            vEl,
-            0,
-            0,
-            vWidth,
-            vHeight,
-            centerShiftX,
-            centerShiftY,
-            vWidth * ratio,
-            vHeight * ratio
-          );
-
-          // Always reset filter before drawing watermark & subtitles
+        if (sharpen) {
+          ctx.filter =
+            sharpenLevel === 'high'
+              ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
+              : 'contrast(1.09) saturate(1.04) brightness(1.01)';
+        } else {
           ctx.filter = 'none';
         }
+        drawSingleFrameToCanvas(ctx, vEl, width, height);
+        ctx.filter = 'none';
       }
 
-      // Check voiceovers with tight synchronization
       voiceoverElements.forEach(({ el, vo }) => {
         const voStart = vo.startTime;
         const voEnd = vo.startTime + vo.duration;
@@ -675,35 +969,26 @@ export async function exportVideo(
           } else if (Math.abs(el.currentTime - expectedAudioTime) > 0.15) {
             el.currentTime = expectedAudioTime;
           }
-        } else {
-          if (!el.paused) {
-            el.pause();
-          }
+        } else if (!el.paused) {
+          el.pause();
         }
       });
 
-      // Sync background music (BGM)
-      if (bgmAudio && bgm) {
-        if (elapsed < totalDuration) {
-          const expectedBgmTime = bgm.loop && bgm.duration > 0
-            ? elapsed % bgm.duration
-            : elapsed;
-          if (expectedBgmTime < (bgm.duration || Infinity)) {
-            if (bgmAudio.paused) {
-              bgmAudio.currentTime = expectedBgmTime;
-              bgmAudio.play().catch(() => {});
-            } else if (Math.abs(bgmAudio.currentTime - expectedBgmTime) > 0.2) {
-              bgmAudio.currentTime = expectedBgmTime;
-            }
+      if (bgmAudio && bgm && elapsed < totalDuration) {
+        const expectedBgmTime =
+          bgm.loop && bgm.duration > 0 ? elapsed % bgm.duration : elapsed;
+        if (expectedBgmTime < (bgm.duration || Infinity)) {
+          if (bgmAudio.paused) {
+            bgmAudio.currentTime = expectedBgmTime;
+            bgmAudio.play().catch(() => {});
+          } else if (Math.abs(bgmAudio.currentTime - expectedBgmTime) > 0.25) {
+            bgmAudio.currentTime = expectedBgmTime;
           }
-        } else {
-          if (!bgmAudio.paused) {
-            bgmAudio.pause();
-          }
+        } else if (!bgmAudio.paused) {
+          bgmAudio.pause();
         }
       }
 
-      // Draw overlays
       drawWatermark();
       drawSubtitles(elapsed);
 
@@ -712,4 +997,132 @@ export async function exportVideo(
 
     animId = requestAnimationFrame(renderLoop);
   });
+}
+
+/**
+ * Main video export entry point.
+ * Uses Mediabunny + WebCodecs for faster-than-realtime native MP4 rendering,
+ * with automatic MediaRecorder fallback for older browsers.
+ */
+export async function exportVideo(
+  clips: VideoClip[],
+  subtitles: Subtitle[],
+  watermark: Watermark,
+  voiceovers: Voiceover[],
+  aspectRatio: AspectRatio,
+  onProgress: (p: ExportProgress) => void,
+  bgm?: BackgroundMusic | null,
+  options?: ExportOptions
+): Promise<Blob> {
+  if (clips.length === 0) {
+    throw new Error('Tidak ada video clip untuk diekspor');
+  }
+
+  let runningTime = 0;
+  const clipRanges: ClipRange[] = clips.map((c) => {
+    const start = runningTime;
+    const effectiveDur = Math.max(0, c.trimEnd - c.trimStart);
+    runningTime += effectiveDur;
+    return { clip: c, start, end: runningTime };
+  });
+  const totalDuration = runningTime;
+
+  if (totalDuration <= 0) {
+    throw new Error('Durasi video tidak valid');
+  }
+
+  const resolution = options?.resolution || '1080p';
+  const sharpen = options?.sharpen ?? true;
+  const sharpenLevel = options?.sharpenLevel || 'high';
+
+  let width = 1920;
+  let height = 1080;
+
+  if (resolution === '1080p') {
+    if (aspectRatio === '9:16') {
+      width = 1080;
+      height = 1920;
+    } else if (aspectRatio === '1:1') {
+      width = 1080;
+      height = 1080;
+    } else {
+      width = 1920;
+      height = 1080;
+    }
+  } else if (aspectRatio === '9:16') {
+    width = 720;
+    height = 1280;
+  } else if (aspectRatio === '1:1') {
+    width = 720;
+    height = 720;
+  } else {
+    width = 1280;
+    height = 720;
+  }
+
+  const videoBitsPerSecond = resolution === '1080p' ? 9_000_000 : 4_500_000;
+
+  let watermarkImg: HTMLImageElement | null = null;
+  if (watermark.enabled && watermark.type === 'image' && watermark.imageUrl) {
+    watermarkImg = new Image();
+    watermarkImg.crossOrigin = 'anonymous';
+    watermarkImg.src = watermark.imageUrl;
+    await new Promise((resolve) => {
+      if (!watermarkImg) return resolve(null);
+      watermarkImg.onload = resolve;
+      watermarkImg.onerror = resolve;
+    });
+  }
+
+  const supportsWebCodecs =
+    typeof VideoEncoder !== 'undefined' && typeof AudioEncoder !== 'undefined';
+
+  if (supportsWebCodecs) {
+    try {
+      return await exportWithMediabunny(
+        clips,
+        clipRanges,
+        totalDuration,
+        width,
+        height,
+        videoBitsPerSecond,
+        sharpen,
+        sharpenLevel,
+        subtitles,
+        watermark,
+        watermarkImg,
+        voiceovers,
+        aspectRatio,
+        bgm,
+        onProgress
+      );
+    } catch (err) {
+      console.warn(
+        '[OpenEdit] Mediabunny WebCodecs export fallback to MediaRecorder:',
+        err
+      );
+      onProgress({
+        progress: 5,
+        status: 'Beralih ke mode kompatibilitas browser...',
+      });
+    }
+  }
+
+  return exportWithMediaRecorder(
+    clips,
+    clipRanges,
+    totalDuration,
+    width,
+    height,
+    videoBitsPerSecond,
+    sharpen,
+    sharpenLevel,
+    subtitles,
+    watermark,
+    watermarkImg,
+    voiceovers,
+    aspectRatio,
+    bgm,
+    onProgress
+  );
 }

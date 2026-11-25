@@ -1,4 +1,7 @@
+import type { VideoSample } from 'mediabunny';
 import type { VideoClip, TransitionType, SharpenLevel } from '../types/editor';
+
+export type DrawableVideoFrame = HTMLVideoElement | VideoSample;
 
 export interface ActiveTransitionInfo {
   cutIndex: number; // Index of clipA in clips array
@@ -203,11 +206,11 @@ export function getCssTransitionStyles(
 }
 
 /**
- * Draws a single video element scaled proportionally to fill canvas container.
+ * Draws a single video element or Mediabunny VideoSample scaled proportionally to fill canvas container.
  */
-function drawSingleFrame(
+export function drawSingleFrameToCanvas(
   ctx: CanvasRenderingContext2D,
-  videoEl: HTMLVideoElement,
+  frame: DrawableVideoFrame,
   width: number,
   height: number,
   offsetX = 0,
@@ -216,10 +219,12 @@ function drawSingleFrame(
   opacity = 1.0
 ) {
   if (opacity <= 0.005) return;
-  if (videoEl.readyState < 2) return;
 
-  const vWidth = videoEl.videoWidth || 1280;
-  const vHeight = videoEl.videoHeight || 720;
+  const isVideoSample = 'displayWidth' in frame;
+  if (!isVideoSample && frame.readyState < 2) return;
+
+  const vWidth = isVideoSample ? frame.displayWidth || 1280 : frame.videoWidth || 1280;
+  const vHeight = isVideoSample ? frame.displayHeight || 720 : frame.videoHeight || 720;
   const hRatio = width / vWidth;
   const vRatio = height / vHeight;
   const fitRatio = Math.min(hRatio, vRatio) * scale;
@@ -231,17 +236,23 @@ function drawSingleFrame(
 
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
-  ctx.drawImage(videoEl, 0, 0, vWidth, vHeight, destX, destY, destW, destH);
+  if (isVideoSample) {
+    frame.draw(ctx, destX, destY, destW, destH);
+  } else {
+    ctx.drawImage(frame, 0, 0, vWidth, vHeight, destX, destY, destW, destH);
+  }
   ctx.restore();
 }
+
+const drawSingleFrame = drawSingleFrameToCanvas;
 
 /**
  * Renders two video frames onto the Canvas during an active transition for export.
  */
 export function drawCanvasTransition(
   ctx: CanvasRenderingContext2D,
-  vElA: HTMLVideoElement,
-  vElB: HTMLVideoElement,
+  vElA: DrawableVideoFrame,
+  vElB: DrawableVideoFrame,
   type: TransitionType,
   progress: number,
   width: number,
