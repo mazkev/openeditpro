@@ -26,7 +26,9 @@ import {
   drawCanvasTransition,
   drawSingleFrameToCanvas,
   getActiveTransitionInfo,
+  type DrawableVideoFrame,
 } from './transition';
+import { Scene3DRenderer } from './scene3d';
 
 export interface ExportProgress {
   progress: number; // 0 to 100
@@ -378,6 +380,7 @@ async function mixTimelineAudioBuffer(
   };
 
   for (const range of clipRanges) {
+    if (range.clip.clipType === '3d' || !range.clip.url) continue;
     const vol = range.clip.volume ?? 1;
     if (vol <= 0) continue;
     const decoded = await decodeUrl(range.clip.url);
@@ -522,13 +525,36 @@ async function exportWithMediabunny(
     output.addAudioTrack(audioSource);
   }
 
-  const readers = clips.map(
-    (c) => new ClipFrameReader(c.url, c.trimStart, c.trimEnd)
+  const readers = clips.map((c) =>
+    c.clipType === '3d' || !c.url ? null : new ClipFrameReader(c.url, c.trimStart, c.trimEnd)
   );
+  const has3DClips = clips.some((c) => c.clipType === '3d' && c.scene3d);
+  const scene3dA = has3DClips ? new Scene3DRenderer(width, height) : null;
+  const scene3dB = has3DClips ? new Scene3DRenderer(width, height) : null;
+
+  const getDrawableFrame = async (
+    clipIdx: number,
+    clipTime: number,
+    slot: 'A' | 'B'
+  ): Promise<DrawableVideoFrame | null> => {
+    const clip = clips[clipIdx];
+    if (clip.clipType === '3d' && clip.scene3d) {
+      const r = slot === 'A' ? scene3dA : scene3dB;
+      if (!r) return null;
+      if (clip.scene3d.mode === 'glb' && clip.scene3d.glbUrl) {
+        await r.ensureGlbLoaded(clip.scene3d.glbUrl);
+      }
+      const dur = Math.max(0.1, clip.trimEnd - clip.trimStart);
+      r.renderAt(Math.max(0, clipTime - clip.trimStart), dur, clip.scene3d);
+      return r.getCanvas();
+    }
+    const reader = readers[clipIdx];
+    return reader ? reader.getFrameAt(clipTime) : null;
+  };
 
   try {
     onProgress({ progress: 14, status: 'Membuka stream video & mencampur audio...' });
-    await Promise.all(readers.map((r) => r.init()));
+    await Promise.all(readers.map((r) => (r ? r.init() : Promise.resolve())));
 
     await output.start();
 
@@ -566,8 +592,8 @@ async function exportWithMediabunny(
           rangeB.clip.trimStart + Math.max(0, t - rangeB.start);
 
         const [sampleA, sampleB] = await Promise.all([
-          readers[idxA].getFrameAt(timeA),
-          readers[idxB].getFrameAt(timeB),
+          getDrawableFrame(idxA, timeA, 'A'),
+          getDrawableFrame(idxB, timeB, 'B'),
         ]);
 
         if (sampleA && sampleB) {
@@ -590,10 +616,11 @@ async function exportWithMediabunny(
         const safeIdx = activeIdx !== -1 ? activeIdx : clipRanges.length - 1;
         const range = clipRanges[safeIdx];
         const clipTime = range.clip.trimStart + Math.max(0, t - range.start);
-        const sample = await readers[safeIdx].getFrameAt(clipTime);
+        const sample = await getDrawableFrame(safeIdx, clipTime, 'A');
 
         if (sample) {
-          if (sharpen) {
+          const is3D = clips[safeIdx].clipType === '3d';
+          if (sharpen && !is3D) {
             ctx.filter =
               sharpenLevel === 'high'
                 ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
@@ -632,7 +659,9 @@ async function exportWithMediabunny(
     onProgress({ progress: 100, status: 'Selesai! Video MP4 siap diunduh.' });
     return new Blob([target.buffer], { type: 'video/mp4' });
   } finally {
-    await Promise.all(readers.map((r) => r.dispose()));
+    scene3dA?.dispose();
+    scene3dB?.dispose();
+    await Promise.all(readers.map((r) => (r ? r.dispose() : Promise.resolve())));
   }
 }
 
@@ -697,8 +726,21 @@ async function exportWithMediaRecorder(
   }
 
   onProgress({ progress: 12, status: 'Memuat dan menyinkronkan video...' });
-  const videoElements: HTMLVideoElement[] = [];
+  const videoElements: (HTMLVideoElement | null)[] = [];
+  const has3DClips = clips.some((c) => c.clipType === '3d' && c.scene3d);
+  const scene3dA = has3DClips ? new Scene3DRenderer(width, height) : null;
+  const scene3dB = has3DClips ? new Scene3DRenderer(width, height) : null;
+
   for (let i = 0; i < clips.length; i++) {
+    if (clips[i].clipType === '3d' || !clips[i].url) {
+      if (clips[i].scene3d?.mode === 'glb' && clips[i].scene3d?.glbUrl) {
+        await scene3dA?.ensureGlbLoaded(clips[i].scene3d!.glbUrl!);
+        await scene3dB?.ensureGlbLoaded(clips[i].scene3d!.glbUrl!);
+      }
+      videoElements.push(null);
+      continue;
+    }
+
     const v = document.createElement('video');
     v.crossOrigin = 'anonymous';
     v.playsInline = true;
@@ -816,7 +858,10 @@ async function exportWithMediaRecorder(
 
   const cleanupAll = () => {
     try {
+      scene3dA?.dispose();
+      scene3dB?.dispose();
       videoElements.forEach((v) => {
+        if (!v) return;
         v.pause();
         v.src = '';
         v.load();
@@ -867,7 +912,7 @@ async function exportWithMediaRecorder(
       if (elapsed >= totalDuration) {
         isFinished = true;
         onProgress({ progress: 100, status: 'Menyelesaikan file ekspor...' });
-        videoElements.forEach((v) => v.pause());
+        videoElements.forEach((v) => v?.pause());
         voiceoverElements.forEach(({ el }) => el.pause());
         if (bgmAudio) bgmAudio.pause();
         if (mediaRecorder.state !== 'inactive') {
@@ -888,11 +933,33 @@ async function exportWithMediaRecorder(
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
 
+      const getMrDrawable = (
+        clipIdx: number,
+        expectedTime: number,
+        slot: 'A' | 'B'
+      ): DrawableVideoFrame | null => {
+        const clip = clips[clipIdx];
+        if (clip.clipType === '3d' && clip.scene3d) {
+          const r = slot === 'A' ? scene3dA : scene3dB;
+          if (!r) return null;
+          const dur = Math.max(0.1, clip.trimEnd - clip.trimStart);
+          r.renderAt(Math.max(0, expectedTime - clip.trimStart), dur, clip.scene3d);
+          return r.getCanvas();
+        }
+        const vEl = videoElements[clipIdx];
+        if (!vEl) return null;
+        if (vEl.paused && elapsed < clipRanges[clipIdx].end) {
+          vEl.play().catch(() => {});
+        }
+        if (Math.abs(vEl.currentTime - expectedTime) > 0.12) {
+          vEl.currentTime = expectedTime;
+        }
+        return vEl;
+      };
+
       if (activeTrans) {
         const idxA = activeTrans.cutIndex;
         const idxB = activeTrans.cutIndex + 1;
-        const vElA = videoElements[idxA];
-        const vElB = videoElements[idxB];
         const rangeA = clipRanges[idxA];
         const rangeB = clipRanges[idxB];
 
@@ -902,60 +969,55 @@ async function exportWithMediaRecorder(
         const expectedTimeB =
           rangeB.clip.trimStart + Math.max(0, elapsed - rangeB.start);
 
-        if (vElA.paused) vElA.play().catch(() => {});
-        if (vElB.paused) vElB.play().catch(() => {});
+        const frameA = getMrDrawable(idxA, expectedTimeA, 'A');
+        const frameB = getMrDrawable(idxB, expectedTimeB, 'B');
 
-        if (Math.abs(vElA.currentTime - expectedTimeA) > 0.12) {
-          vElA.currentTime = expectedTimeA;
+        if (frameA && frameB) {
+          drawCanvasTransition(
+            ctx,
+            frameA,
+            frameB,
+            activeTrans.type,
+            activeTrans.progress,
+            width,
+            height,
+            sharpen,
+            sharpenLevel
+          );
+        } else if (frameA || frameB) {
+          drawSingleFrameToCanvas(ctx, (frameA || frameB)!, width, height);
         }
-        if (Math.abs(vElB.currentTime - expectedTimeB) > 0.12) {
-          vElB.currentTime = expectedTimeB;
-        }
-
-        drawCanvasTransition(
-          ctx,
-          vElA,
-          vElB,
-          activeTrans.type,
-          activeTrans.progress,
-          width,
-          height,
-          sharpen,
-          sharpenLevel
-        );
         currentClipIndex = idxB;
       } else if (activeIdx !== -1) {
         const range = clipRanges[activeIdx];
-        const vEl = videoElements[activeIdx];
         const expectedClipTime = range.clip.trimStart + (elapsed - range.start);
 
         if (activeIdx !== currentClipIndex) {
           if (currentClipIndex >= 0) {
-            videoElements[currentClipIndex].pause();
+            videoElements[currentClipIndex]?.pause();
           }
           currentClipIndex = activeIdx;
-          vEl.currentTime = range.clip.trimStart;
-          vEl.play().catch(() => {});
-        } else {
-          if (vEl.paused && elapsed < range.end) {
+          const vEl = videoElements[activeIdx];
+          if (vEl) {
+            vEl.currentTime = range.clip.trimStart;
             vEl.play().catch(() => {});
-          }
-          const drift = vEl.currentTime - expectedClipTime;
-          if (Math.abs(drift) > 0.1) {
-            vEl.currentTime = expectedClipTime;
           }
         }
 
-        if (sharpen) {
-          ctx.filter =
-            sharpenLevel === 'high'
-              ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
-              : 'contrast(1.09) saturate(1.04) brightness(1.01)';
-        } else {
+        const frame = getMrDrawable(activeIdx, expectedClipTime, 'A');
+        if (frame) {
+          const is3D = clips[activeIdx].clipType === '3d';
+          if (sharpen && !is3D) {
+            ctx.filter =
+              sharpenLevel === 'high'
+                ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
+                : 'contrast(1.09) saturate(1.04) brightness(1.01)';
+          } else {
+            ctx.filter = 'none';
+          }
+          drawSingleFrameToCanvas(ctx, frame, width, height);
           ctx.filter = 'none';
         }
-        drawSingleFrameToCanvas(ctx, vEl, width, height);
-        ctx.filter = 'none';
       }
 
       voiceoverElements.forEach(({ el, vo }) => {

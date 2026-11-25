@@ -112,10 +112,117 @@ export const TRANSITION_PRESETS: TransitionPreset[] = [
   },
 ];
 
+export type StickmanPose =
+  | 'explain'
+  | 'think'
+  | 'shock'
+  | 'point'
+  | 'wave'
+  | 'walk'
+  | 'idle';
+
+export type CameraPreset3D = 'presenter' | 'orbit' | 'zoom-in' | 'low-angle' | 'pan';
+
+export type StageTheme3D = 'dark-studio' | 'light-studio' | 'neon-cyber' | 'warm-sunset';
+
+export interface Scene3DConfig {
+  mode: 'stickman' | 'glb';
+  pose: StickmanPose;
+  characterColor: string;
+  stageTheme: StageTheme3D;
+  cameraPreset: CameraPreset3D;
+  animationSpeed: number;
+  factBadgeText?: string;
+  glbUrl?: string;
+  glbAnimationIndex?: number;
+}
+
+export const STICKMAN_POSES: {
+  id: StickmanPose;
+  name: string;
+  icon: string;
+  description: string;
+}[] = [
+  {
+    id: 'explain',
+    name: 'Menjelaskan',
+    icon: '🗣️',
+    description: 'Gerakan tangan aktif ala presenter fakta unik',
+  },
+  {
+    id: 'think',
+    name: 'Berpikir',
+    icon: '🤔',
+    description: 'Tangan di dagu, cocok untuk kalimat tanya "Kok bisa?"',
+  },
+  {
+    id: 'shock',
+    name: 'Kaget / Mindblown',
+    icon: '🤯',
+    description: 'Melompat kaget saat fakta mencengangkan terungkap',
+  },
+  {
+    id: 'point',
+    name: 'Menunjuk',
+    icon: '👉',
+    description: 'Menunjuk ke atas/samping ke arah teks fakta',
+  },
+  {
+    id: 'wave',
+    name: 'Sapaan / Outro',
+    icon: '👋',
+    description: 'Melambaikan tangan ramah untuk pembuka/penutup',
+  },
+  {
+    id: 'walk',
+    name: 'Berjalan',
+    icon: '🚶',
+    description: 'Berjalan santai di tempat dengan ayunan alami',
+  },
+  {
+    id: 'idle',
+    name: 'Santai (Idle)',
+    icon: '🧍',
+    description: 'Berdiri tenang sambil bernapas & mengangguk ringan',
+  },
+];
+
+export const CAMERA_PRESETS_3D: {
+  id: CameraPreset3D;
+  name: string;
+  icon: string;
+}[] = [
+  { id: 'presenter', name: 'Fokus Presenter', icon: '🎥' },
+  { id: 'orbit', name: 'Orbit Melingkar', icon: '🔄' },
+  { id: 'zoom-in', name: 'Zoom Dramatis', icon: '🔍' },
+  { id: 'low-angle', name: 'Hero Low-Angle', icon: '📐' },
+  { id: 'pan', name: 'Geser Sinematik', icon: '↔️' },
+];
+
+export const STAGE_THEMES_3D: {
+  id: StageTheme3D;
+  name: string;
+  bgPreview: string;
+}[] = [
+  { id: 'dark-studio', name: 'Studio Gelap', bgPreview: '#0f172a' },
+  { id: 'neon-cyber', name: 'Neon Fakta', bgPreview: '#1e1b4b' },
+  { id: 'light-studio', name: 'Studio Putih', bgPreview: '#e2e8f0' },
+  { id: 'warm-sunset', name: 'Hangat Senja', bgPreview: '#451a03' },
+];
+
+export const CHARACTER_COLORS_3D: { name: string; hex: string }[] = [
+  { name: 'Putih Klasik', hex: '#f8fafc' },
+  { name: 'Biru Cyan', hex: '#38bdf8' },
+  { name: 'Kuning Fakta', hex: '#facc15' },
+  { name: 'Merah Energi', hex: '#fb7185' },
+  { name: 'Hijau Mint', hex: '#34d399' },
+  { name: 'Hitam Elegan', hex: '#1e293b' },
+];
+
 export interface VideoClip {
   id: string;
   name: string;
-  url: string; // Object URL or source URL
+  url: string; // Object URL or source URL (empty string for procedural 3D clips)
   duration: number; // Original duration in seconds
   trimStart: number; // Trim start offset in seconds
   trimEnd: number; // Trim end offset in seconds (effective duration = trimEnd - trimStart)
@@ -123,6 +230,8 @@ export interface VideoClip {
   volume: number; // 0 to 1
   speed: number; // 1.0 default
   transition?: VideoTransition; // Transition applied into the next clip on timeline
+  clipType?: 'video' | '3d';
+  scene3d?: Scene3DConfig;
 }
 
 export interface Subtitle {

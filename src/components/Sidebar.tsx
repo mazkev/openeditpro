@@ -24,9 +24,29 @@ import {
   Check,
   Disc,
   VolumeX,
+  Box,
 } from 'lucide-react';
-import type { VideoClip, Subtitle, Watermark, Voiceover, WatermarkPosition, BackgroundMusic, TransitionType } from '../types/editor';
-import { TRANSITION_PRESETS } from '../types/editor';
+import type {
+  VideoClip,
+  Subtitle,
+  Watermark,
+  Voiceover,
+  WatermarkPosition,
+  BackgroundMusic,
+  TransitionType,
+  StickmanPose,
+  CameraPreset3D,
+  StageTheme3D,
+  Scene3DConfig,
+} from '../types/editor';
+import {
+  TRANSITION_PRESETS,
+  STICKMAN_POSES,
+  CAMERA_PRESETS_3D,
+  STAGE_THEMES_3D,
+  CHARACTER_COLORS_3D,
+} from '../types/editor';
+import { create3DClipThumbnail } from '../utils/scene3d';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
 import {
@@ -160,6 +180,7 @@ interface SidebarProps {
 
 export type TabType =
   | 'media'
+  | 'studio3d'
   | 'edit'
   | 'transition'
   | 'subtitle'
@@ -205,6 +226,19 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [transitionCategory, setTransitionCategory] = useState<
     'all' | 'basic' | 'motion' | 'zoom' | 'wipe'
   >('all');
+
+  // 3D Stickman Studio State
+  const [pose3d, setPose3d] = useState<StickmanPose>('explain');
+  const [color3d, setColor3d] = useState('#f8fafc');
+  const [theme3d, setTheme3d] = useState<StageTheme3D>('dark-studio');
+  const [camera3d, setCamera3d] = useState<CameraPreset3D>('presenter');
+  const [duration3d, setDuration3d] = useState(5);
+  const [speed3d, setSpeed3d] = useState(1.0);
+  const [factBadge3d, setFactBadge3d] = useState('TAHUKAH KAMU?');
+  const [mode3d, setMode3d] = useState<'stickman' | 'glb'>('stickman');
+  const [glbUrl3d, setGlbUrl3d] = useState('');
+  const [glbName3d, setGlbName3d] = useState('');
+  const glbInputRef = useRef<HTMLInputElement>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
@@ -625,6 +659,22 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('studio3d')}
+          className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all relative ${
+            activeTab === 'studio3d'
+              ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/60 shadow-sm'
+              : 'text-gray-400 hover:text-cyan-300 hover:bg-[#1a1c24]'
+          }`}
+          title="Studio 3D Stickman Fakta Unik & Model .glb"
+        >
+          <Box className="w-5 h-5 mb-0.5 text-cyan-400" />
+          <span className="text-[10px] font-bold">3D</span>
+          {clips.some((c) => c.clipType === '3d') && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400" />
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveTab('edit')}
           className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all ${
             activeTab === 'edit'
@@ -794,6 +844,464 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     </div>
                   );
                 })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB: 3D STUDIO (STICKMAN FAKTA UNIK & GLB) */}
+        {activeTab === 'studio3d' && (
+          <div className="flex flex-col h-full overflow-y-auto pr-1 space-y-3.5">
+            <div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-gray-100 flex items-center space-x-1.5">
+                  <Box className="w-4 h-4 text-cyan-400" />
+                  <span>Studio 3D Stickman</span>
+                </h2>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-semibold">
+                  Fakta Unik
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Buat video animasi 3D Stickman untuk konten fakta unik, edukasi, atau Shorts/TikTok.
+              </p>
+            </div>
+
+            {/* 1-CLICK TEMPLATE PAKET FAKTA UNIK */}
+            <div className="bg-gradient-to-br from-cyan-950/60 via-[#151c2c] to-purple-950/50 p-3 rounded-xl border border-cyan-500/40 shadow-md space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-200 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Template Fakta Unik (3 Adegan)</span>
+                </span>
+                <span className="text-[10px] text-cyan-300/80 font-mono">11 detik</span>
+              </div>
+              <p className="text-[10px] text-gray-300 leading-relaxed">
+                Langsung membuat 3 adegan Stickman 3D lengkap dengan transisi & contoh subtitle (Berpikir → Menjelaskan → Mindblown).
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = Date.now();
+                  const scene1: Scene3DConfig = {
+                    mode: 'stickman',
+                    pose: 'think',
+                    characterColor: color3d,
+                    stageTheme: theme3d,
+                    cameraPreset: 'zoom-in',
+                    animationSpeed: 1.0,
+                    factBadgeText: 'TAHUKAH KAMU?',
+                  };
+                  const scene2: Scene3DConfig = {
+                    mode: 'stickman',
+                    pose: 'explain',
+                    characterColor: color3d,
+                    stageTheme: theme3d,
+                    cameraPreset: 'presenter',
+                    animationSpeed: 1.0,
+                    factBadgeText: 'FAKTA UNIK #1',
+                  };
+                  const scene3: Scene3DConfig = {
+                    mode: 'stickman',
+                    pose: 'shock',
+                    characterColor: color3d,
+                    stageTheme: 'neon-cyber',
+                    cameraPreset: 'low-angle',
+                    animationSpeed: 1.1,
+                    factBadgeText: 'MIND BLOWN!',
+                  };
+
+                  const new3DClips: VideoClip[] = [
+                    {
+                      id: `3d-fact-1-${now}`,
+                      name: '3D Stickman - Pembuka (Berpikir)',
+                      url: '',
+                      duration: 3.2,
+                      trimStart: 0,
+                      trimEnd: 3.2,
+                      thumbnailUrl: create3DClipThumbnail(scene1),
+                      volume: 0,
+                      speed: 1,
+                      clipType: '3d',
+                      scene3d: scene1,
+                      transition: { type: 'fade', duration: 0.4 },
+                    },
+                    {
+                      id: `3d-fact-2-${now}`,
+                      name: '3D Stickman - Isi Fakta (Jelaskan)',
+                      url: '',
+                      duration: 4.8,
+                      trimStart: 0,
+                      trimEnd: 4.8,
+                      thumbnailUrl: create3DClipThumbnail(scene2),
+                      volume: 0,
+                      speed: 1,
+                      clipType: '3d',
+                      scene3d: scene2,
+                      transition: { type: 'zoom-in', duration: 0.4 },
+                    },
+                    {
+                      id: `3d-fact-3-${now}`,
+                      name: '3D Stickman - Plot Twist (Kaget)',
+                      url: '',
+                      duration: 3.0,
+                      trimStart: 0,
+                      trimEnd: 3.0,
+                      thumbnailUrl: create3DClipThumbnail(scene3),
+                      volume: 0,
+                      speed: 1,
+                      clipType: '3d',
+                      scene3d: scene3,
+                    },
+                  ];
+
+                  setClips((prev) => [...prev, ...new3DClips]);
+                  setSelectedClipId(new3DClips[0].id);
+
+                  if (subtitles.length === 0) {
+                    setSubtitles([
+                      {
+                        id: `sub-3d-1-${now}`,
+                        text: 'Tahukah kamu kenapa gurita punya tiga jantung?',
+                        startTime: 0.2,
+                        endTime: 3.0,
+                        fontSize: 24,
+                        color: '#ffffff',
+                        bgColor: 'rgba(15, 23, 42, 0.85)',
+                        strokeColor: '#000000',
+                        strokeWidth: 2,
+                        fontFamily: 'impact',
+                        isUppercase: true,
+                        positionY: 82,
+                      },
+                      {
+                        id: `sub-3d-2-${now}`,
+                        text: 'Dua jantung memompa darah ke insang, dan satu ke seluruh tubuh!',
+                        startTime: 3.3,
+                        endTime: 7.8,
+                        fontSize: 24,
+                        color: '#38bdf8',
+                        bgColor: 'rgba(15, 23, 42, 0.85)',
+                        strokeColor: '#000000',
+                        strokeWidth: 2,
+                        fontFamily: 'impact',
+                        isUppercase: true,
+                        positionY: 82,
+                      },
+                      {
+                        id: `sub-3d-3-${now}`,
+                        text: 'Dan uniknya, jantung utamanya berhenti berdetak saat berenang!',
+                        startTime: 8.1,
+                        endTime: 10.8,
+                        fontSize: 24,
+                        color: '#facc15',
+                        bgColor: 'rgba(15, 23, 42, 0.85)',
+                        strokeColor: '#000000',
+                        strokeWidth: 2,
+                        fontFamily: 'impact',
+                        isUppercase: true,
+                        positionY: 82,
+                      },
+                    ]);
+                  }
+
+                  if (setCurrentTime) setCurrentTime(0);
+                  if (onPlayPreview) onPlayPreview();
+                }}
+                className="w-full py-2 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-xs rounded-lg transition-all shadow flex items-center justify-center space-x-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Muat Template 3D Fakta Unik</span>
+              </button>
+            </div>
+
+            {/* MODE SWITCH: STICKMAN VS UPLOAD .GLB */}
+            <div className="flex bg-[#101116] p-1 rounded-xl border border-[#232530]">
+              <button
+                type="button"
+                onClick={() => setMode3d('stickman')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  mode3d === 'stickman'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                🕺 Stickman 3D
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode3d('glb')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  mode3d === 'glb'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                📦 Upload .GLB/.GLTF
+              </button>
+            </div>
+
+            {mode3d === 'stickman' ? (
+              <div className="space-y-3">
+                {/* POSE / EKSPRESI */}
+                <div className="space-y-1.5">
+                  <span className="text-xs font-bold text-gray-200 block">
+                    1. Pilih Pose / Gerakan Stickman:
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {STICKMAN_POSES.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPose3d(p.id)}
+                        className={`p-2 rounded-xl border text-left transition-all ${
+                          pose3d === p.id
+                            ? 'bg-cyan-950/70 border-cyan-400 text-white ring-1 ring-cyan-400/50'
+                            : 'bg-[#171820] border-[#252834] text-gray-300 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-base">{p.icon}</span>
+                          <span className="text-xs font-bold truncate">{p.name}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-1">
+                          {p.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* WARNA STICKMAN */}
+                <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
+                  <span className="text-xs font-semibold text-gray-200 block">
+                    2. Warna Karakter Stickman:
+                  </span>
+                  <div className="flex items-center space-x-2">
+                    {CHARACTER_COLORS_3D.map((c) => (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => setColor3d(c.hex)}
+                        title={c.name}
+                        className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                          color3d === c.hex
+                            ? 'border-cyan-400 scale-115 ring-2 ring-cyan-400/40'
+                            : 'border-gray-600 hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-2">
+                <span className="text-xs font-bold text-gray-200 block">
+                  Upload Model 3D (.glb / .gltf):
+                </span>
+                <input
+                  ref={glbInputRef}
+                  type="file"
+                  accept=".glb,.gltf"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setGlbUrl3d(URL.createObjectURL(f));
+                    setGlbName3d(f.name);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => glbInputRef.current?.click()}
+                  className="w-full py-2.5 px-3 rounded-lg border border-dashed border-cyan-500/50 bg-cyan-950/20 hover:bg-cyan-950/40 text-xs text-cyan-300 font-semibold flex items-center justify-center space-x-1.5"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>{glbName3d ? `Terpilih: ${glbName3d}` : 'Pilih File .GLB / .GLTF'}</span>
+                </button>
+              </div>
+            )}
+
+            {/* PAPAN JUDUL 3D */}
+            <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
+              <span className="text-xs font-semibold text-gray-200 block">
+                3. Papan Judul 3D (Opsional):
+              </span>
+              <input
+                type="text"
+                value={factBadge3d}
+                onChange={(e) => setFactBadge3d(e.target.value)}
+                placeholder="Contoh: TAHUKAH KAMU? (kosongkan jika tidak perlu)"
+                className="w-full bg-[#101116] border border-[#2b2d3d] rounded-lg px-2.5 py-1.5 text-xs text-gray-200 outline-none focus:border-cyan-400"
+              />
+            </div>
+
+            {/* TEMA PANGGUNG & KAMERA */}
+            <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-2.5">
+              <div>
+                <span className="text-xs font-semibold text-gray-200 block mb-1.5">
+                  4. Latar Panggung 3D:
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {STAGE_THEMES_3D.map((th) => (
+                    <button
+                      key={th.id}
+                      type="button"
+                      onClick={() => setTheme3d(th.id)}
+                      className={`flex items-center space-x-2 p-1.5 rounded-lg border text-[11px] font-medium transition-all ${
+                        theme3d === th.id
+                          ? 'border-cyan-400 bg-cyan-950/50 text-white'
+                          : 'border-[#232532] bg-[#12131a] text-gray-300 hover:border-gray-600'
+                      }`}
+                    >
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border border-white/20 flex-shrink-0"
+                        style={{ backgroundColor: th.bgPreview }}
+                      />
+                      <span className="truncate">{th.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs font-semibold text-gray-200 block mb-1.5">
+                  5. Gerakan Kamera 3D:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {CAMERA_PRESETS_3D.map((cam) => (
+                    <button
+                      key={cam.id}
+                      type="button"
+                      onClick={() => setCamera3d(cam.id)}
+                      className={`px-2 py-1 rounded-lg border text-[11px] font-semibold transition-all ${
+                        camera3d === cam.id
+                          ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200'
+                          : 'border-[#232532] bg-[#12131a] text-gray-400 hover:text-gray-200'
+                      }`}
+                    >
+                      {cam.icon} {cam.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* DURASI & KECEPATAN */}
+            <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-300 font-semibold">Durasi Adegan 3D:</span>
+                <span className="text-cyan-300 font-mono font-bold">{duration3d} detik</span>
+              </div>
+              <input
+                type="range"
+                min="2"
+                max="15"
+                step="0.5"
+                value={duration3d}
+                onChange={(e) => setDuration3d(parseFloat(e.target.value))}
+                className="w-full accent-cyan-400"
+              />
+              <div className="flex justify-between text-xs pt-1">
+                <span className="text-gray-300 font-semibold">Kecepatan Gerak:</span>
+                <span className="text-cyan-300 font-mono font-bold">{speed3d.toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="2.0"
+                step="0.1"
+                value={speed3d}
+                onChange={(e) => setSpeed3d(parseFloat(e.target.value))}
+                className="w-full accent-cyan-400"
+              />
+            </div>
+
+            {/* TOMBOL TAMBAH / UPDATE KE TIMELINE */}
+            <div className="space-y-2 pb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (mode3d === 'glb' && !glbUrl3d) {
+                    alert('Silakan pilih file .glb / .gltf terlebih dahulu.');
+                    return;
+                  }
+                  const sceneConfig: Scene3DConfig = {
+                    mode: mode3d,
+                    pose: pose3d,
+                    characterColor: color3d,
+                    stageTheme: theme3d,
+                    cameraPreset: camera3d,
+                    animationSpeed: speed3d,
+                    factBadgeText: factBadge3d.trim() || undefined,
+                    glbUrl: mode3d === 'glb' ? glbUrl3d : undefined,
+                  };
+                  const poseLabel =
+                    STICKMAN_POSES.find((p) => p.id === pose3d)?.name || 'Stickman';
+                  const newClip: VideoClip = {
+                    id: `3d-clip-${Date.now()}`,
+                    name:
+                      mode3d === 'glb'
+                        ? `3D: ${glbName3d || 'Model'}`
+                        : `3D Stickman (${poseLabel})`,
+                    url: '',
+                    duration: duration3d,
+                    trimStart: 0,
+                    trimEnd: duration3d,
+                    thumbnailUrl: create3DClipThumbnail(sceneConfig),
+                    volume: 0,
+                    speed: 1,
+                    clipType: '3d',
+                    scene3d: sceneConfig,
+                  };
+                  setClips((prev) => [...prev, newClip]);
+                  setSelectedClipId(newClip.id);
+                }}
+                className="w-full py-2.5 px-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs rounded-xl transition-all shadow flex items-center justify-center space-x-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Tambahkan Adegan 3D ke Timeline</span>
+              </button>
+
+              {selectedClip?.clipType === '3d' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sceneConfig: Scene3DConfig = {
+                      mode: mode3d,
+                      pose: pose3d,
+                      characterColor: color3d,
+                      stageTheme: theme3d,
+                      cameraPreset: camera3d,
+                      animationSpeed: speed3d,
+                      factBadgeText: factBadge3d.trim() || undefined,
+                      glbUrl:
+                        mode3d === 'glb'
+                          ? glbUrl3d || selectedClip.scene3d?.glbUrl
+                          : undefined,
+                    };
+                    setClips((prev) =>
+                      prev.map((c) =>
+                        c.id === selectedClip.id
+                          ? {
+                              ...c,
+                              duration: duration3d,
+                              trimStart: 0,
+                              trimEnd: duration3d,
+                              thumbnailUrl: create3DClipThumbnail(sceneConfig),
+                              scene3d: sceneConfig,
+                            }
+                          : c
+                      )
+                    );
+                  }}
+                  className="w-full py-2 px-3 bg-[#20222e] hover:bg-[#282b3a] text-cyan-300 border border-cyan-500/40 font-bold text-xs rounded-xl transition-all flex items-center justify-center space-x-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Perbarui Klip 3D yang Dipilih</span>
+                </button>
               )}
             </div>
           </div>

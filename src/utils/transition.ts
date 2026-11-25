@@ -1,7 +1,7 @@
 import type { VideoSample } from 'mediabunny';
 import type { VideoClip, TransitionType, SharpenLevel } from '../types/editor';
 
-export type DrawableVideoFrame = HTMLVideoElement | VideoSample;
+export type DrawableVideoFrame = HTMLVideoElement | VideoSample | HTMLCanvasElement;
 
 export interface ActiveTransitionInfo {
   cutIndex: number; // Index of clipA in clips array
@@ -221,10 +221,19 @@ export function drawSingleFrameToCanvas(
   if (opacity <= 0.005) return;
 
   const isVideoSample = 'displayWidth' in frame;
-  if (!isVideoSample && frame.readyState < 2) return;
+  const isCanvas = typeof HTMLCanvasElement !== 'undefined' && frame instanceof HTMLCanvasElement;
+  if (!isVideoSample && !isCanvas && (frame as HTMLVideoElement).readyState < 2) return;
 
-  const vWidth = isVideoSample ? frame.displayWidth || 1280 : frame.videoWidth || 1280;
-  const vHeight = isVideoSample ? frame.displayHeight || 720 : frame.videoHeight || 720;
+  const vWidth = isVideoSample
+    ? frame.displayWidth || 1280
+    : isCanvas
+      ? frame.width || 1280
+      : (frame as HTMLVideoElement).videoWidth || 1280;
+  const vHeight = isVideoSample
+    ? frame.displayHeight || 720
+    : isCanvas
+      ? frame.height || 720
+      : (frame as HTMLVideoElement).videoHeight || 720;
   const hRatio = width / vWidth;
   const vRatio = height / vHeight;
   const fitRatio = Math.min(hRatio, vRatio) * scale;

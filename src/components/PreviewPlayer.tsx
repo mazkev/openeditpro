@@ -14,6 +14,7 @@ import {
 import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from '../types/editor';
 import { formatTime } from '../utils/time';
 import { getActiveTransitionInfo, getCssTransitionStyles } from '../utils/transition';
+import { Scene3DRenderer } from '../utils/scene3d';
 
 interface PreviewPlayerProps {
   clips: VideoClip[];
@@ -45,6 +46,10 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefA = useRef<HTMLVideoElement>(null);
   const videoRefB = useRef<HTMLVideoElement>(null);
+  const canvas3dARef = useRef<HTMLCanvasElement>(null);
+  const canvas3dBRef = useRef<HTMLCanvasElement>(null);
+  const renderer3dARef = useRef<Scene3DRenderer | null>(null);
+  const renderer3dBRef = useRef<Scene3DRenderer | null>(null);
   const flashOverlayRef = useRef<HTMLDivElement>(null);
   const voiceoverAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -92,15 +97,61 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
   }
 
   const activeClip = activeClipIndex !== -1 ? clips[activeClipIndex] : null;
+  const slotAIs3D = activeTransition
+    ? activeTransition.clipA.clipType === '3d' && Boolean(activeTransition.clipA.scene3d)
+    : activeClip?.clipType === '3d' && Boolean(activeClip?.scene3d);
+  const slotBIs3D = activeTransition
+    ? activeTransition.clipB.clipType === '3d' && Boolean(activeTransition.clipB.scene3d)
+    : false;
 
-  // Sync video elements with clips, transitions, and currentTime
+  // Cleanup 3D renderers on unmount
+  useEffect(() => {
+    return () => {
+      renderer3dARef.current?.dispose();
+      renderer3dARef.current = null;
+      renderer3dBRef.current?.dispose();
+      renderer3dBRef.current = null;
+    };
+  }, []);
+
+  // Sync video elements & 3D Stickman canvases with clips, transitions, and currentTime
   useEffect(() => {
     const videoA = videoRefA.current;
     const videoB = videoRefB.current;
-    if (!videoA) return;
+    const previewW = aspectRatio === '9:16' ? 540 : aspectRatio === '1:1' ? 600 : 800;
+    const previewH = aspectRatio === '9:16' ? 960 : aspectRatio === '1:1' ? 600 : 450;
+
+    const render3DSlot = (
+      rendererRef: React.MutableRefObject<Scene3DRenderer | null>,
+      canvasRef: React.RefObject<HTMLCanvasElement | null>,
+      clip: VideoClip,
+      timeInClip: number
+    ) => {
+      if (!clip.scene3d || !canvasRef.current) return;
+      if (!rendererRef.current) {
+        rendererRef.current = new Scene3DRenderer(previewW, previewH);
+      } else {
+        rendererRef.current.resize(previewW, previewH);
+      }
+      const r = rendererRef.current;
+      const dur = Math.max(0.1, clip.trimEnd - clip.trimStart);
+      if (clip.scene3d.mode === 'glb' && clip.scene3d.glbUrl) {
+        r.ensureGlbLoaded(clip.scene3d.glbUrl).catch(() => {});
+      }
+      r.renderAt(timeInClip, dur, clip.scene3d);
+
+      const targetCanvas = canvasRef.current;
+      if (targetCanvas.width !== previewW || targetCanvas.height !== previewH) {
+        targetCanvas.width = previewW;
+        targetCanvas.height = previewH;
+      }
+      const ctx = targetCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(r.getCanvas(), 0, 0, previewW, previewH);
+      }
+    };
 
     if (activeTransition) {
-      // In transition between clipA and clipB
       const clipA = activeTransition.clipA;
       const clipB = activeTransition.clipB;
 
@@ -109,22 +160,32 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       const timeInClipA = clipA.trimStart + Math.min(durA, Math.max(0, currentTime - (cutTime - durA)));
       const timeInClipB = clipB.trimStart + Math.max(0, currentTime - cutTime);
 
-      // Video A
-      if (videoA.src !== clipA.url) {
-        videoA.src = clipA.url;
-        videoA.currentTime = timeInClipA;
-      } else {
-        const driftA = Math.abs(videoA.currentTime - timeInClipA);
-        if (!isPlaying || driftA > 0.25) {
+      // Slot A
+      if (clipA.clipType === '3d' && clipA.scene3d) {
+        if (videoA && !videoA.paused) videoA.pause();
+        render3DSlot(renderer3dARef, canvas3dARef, clipA, timeInClipA - clipA.trimStart);
+      } else if (videoA) {
+        if (videoA.src !== clipA.url) {
+          videoA.src = clipA.url;
           videoA.currentTime = timeInClipA;
+        } else {
+          const driftA = Math.abs(videoA.currentTime - timeInClipA);
+          if (!isPlaying || driftA > 0.25) {
+            videoA.currentTime = timeInClipA;
+          }
         }
+        videoA.volume = isMuted
+          ? 0
+          : (clipA.volume ?? 1) * masterVolume * Math.max(0, 1 - activeTransition.progress);
+        if (isPlaying && videoA.paused) videoA.play().catch(() => {});
+        else if (!isPlaying && !videoA.paused) videoA.pause();
       }
-      videoA.volume = isMuted
-        ? 0
-        : (clipA.volume ?? 1) * masterVolume * Math.max(0, 1 - activeTransition.progress);
 
-      // Video B
-      if (videoB) {
+      // Slot B
+      if (clipB.clipType === '3d' && clipB.scene3d) {
+        if (videoB && !videoB.paused) videoB.pause();
+        render3DSlot(renderer3dBRef, canvas3dBRef, clipB, timeInClipB - clipB.trimStart);
+      } else if (videoB) {
         if (videoB.src !== clipB.url) {
           videoB.src = clipB.url;
           videoB.currentTime = timeInClipB;
@@ -137,47 +198,41 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         videoB.volume = isMuted
           ? 0
           : (clipB.volume ?? 1) * masterVolume * Math.min(1, activeTransition.progress);
-      }
-
-      if (isPlaying) {
-        if (videoA.paused) videoA.play().catch(() => {});
-        if (videoB && videoB.paused) videoB.play().catch(() => {});
-      } else {
-        if (!videoA.paused) videoA.pause();
-        if (videoB && !videoB.paused) videoB.pause();
+        if (isPlaying && videoB.paused) videoB.play().catch(() => {});
+        else if (!isPlaying && !videoB.paused) videoB.pause();
       }
     } else {
-      // Standard playback outside of transition
       if (videoB && !videoB.paused) {
         videoB.pause();
       }
-
       if (!activeClip) return;
-      const targetClipTime = activeClip.trimStart + activeClipOffset;
 
-      if (videoA.src !== activeClip.url) {
-        videoA.src = activeClip.url;
-        videoA.currentTime = targetClipTime;
-      } else {
-        const drift = Math.abs(videoA.currentTime - targetClipTime);
-        if (!isPlaying || drift > 0.25) {
+      if (activeClip.clipType === '3d' && activeClip.scene3d) {
+        if (videoA && !videoA.paused) videoA.pause();
+        render3DSlot(renderer3dARef, canvas3dARef, activeClip, activeClipOffset);
+      } else if (videoA) {
+        const targetClipTime = activeClip.trimStart + activeClipOffset;
+
+        if (videoA.src !== activeClip.url) {
+          videoA.src = activeClip.url;
           videoA.currentTime = targetClipTime;
+        } else {
+          const drift = Math.abs(videoA.currentTime - targetClipTime);
+          if (!isPlaying || drift > 0.25) {
+            videoA.currentTime = targetClipTime;
+          }
         }
-      }
 
-      videoA.volume = isMuted ? 0 : (activeClip.volume ?? 1) * masterVolume;
+        videoA.volume = isMuted ? 0 : (activeClip.volume ?? 1) * masterVolume;
 
-      if (isPlaying) {
-        if (videoA.paused) {
-          videoA.play().catch(() => {});
-        }
-      } else {
-        if (!videoA.paused) {
+        if (isPlaying) {
+          if (videoA.paused) videoA.play().catch(() => {});
+        } else if (!videoA.paused) {
           videoA.pause();
         }
       }
     }
-  }, [activeTransition, activeClip, activeClipOffset, currentTime, isPlaying, masterVolume, isMuted]);
+  }, [activeTransition, activeClip, activeClipOffset, currentTime, isPlaying, masterVolume, isMuted, aspectRatio]);
 
   // Sync voiceovers
   useEffect(() => {
@@ -370,6 +425,15 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                       ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
                       : 'none',
                     ...transitionStyles.styleA,
+                    display: slotAIs3D ? 'none' : 'block',
+                  }}
+                />
+                <canvas
+                  ref={canvas3dARef}
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                  style={{
+                    ...transitionStyles.styleA,
+                    display: slotAIs3D ? 'block' : 'none',
                   }}
                 />
                 <video
@@ -381,6 +445,15 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                       ? 'contrast(1.16) saturate(1.08) brightness(1.02)'
                       : 'none',
                     ...transitionStyles.styleB,
+                    display: activeTransition && !slotBIs3D ? 'block' : 'none',
+                  }}
+                />
+                <canvas
+                  ref={canvas3dBRef}
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                  style={{
+                    ...transitionStyles.styleB,
+                    display: activeTransition && slotBIs3D ? 'block' : 'none',
                   }}
                 />
                 {/* White Flash Overlay for Flash / Dip-to-White transition */}
