@@ -916,106 +916,158 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               </p>
             </div>
 
-            {/* 1-CLICK TEMPLATE PAKET FAKTA UNIK */}
+            {/* 1-CLICK TEMPLATE PAKET 6 ADEGAN CERITA & FAKTA UNIK */}
             <div className="bg-gradient-to-br from-cyan-950/60 via-[#151c2c] to-purple-950/50 p-3 rounded-xl border border-cyan-500/40 shadow-md space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-cyan-200 flex items-center space-x-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Template Fakta Unik (3 Adegan 2D)</span>
+                  <span>Template Cerita Nusantara (6 Adegan)</span>
                 </span>
-                <span className="text-[10px] text-cyan-300/80 font-mono">11 detik</span>
+                <span className="text-[10px] text-cyan-300/80 font-mono">22 detik</span>
               </div>
               <p className="text-[10px] text-gray-300 leading-relaxed">
-                Langsung membuat 3 adegan kartun 2D Stickman Blangkon lengkap dengan transisi & contoh subtitle (Berpikir → Menjelaskan → Kaget).
+                Langsung membuat 6 adegan lengkap (Sapaan → Berpikir → Penjelasan → Sejarah → Plot Twist → Penutup) lengkap dengan latar, properti, efek & subtitle.
               </p>
               <button
                 type="button"
                 onClick={() => {
                   const now = Date.now();
-                  const scene1: Scene3DConfig = {
-                    mode: 'stickman',
-                    characterStyle: characterStyle3d,
-                    sarungPattern: sarungPattern3d,
-                    pose: 'think',
-                    storyProp: 'thought-question',
-                    characterColor: color3d,
-                    stageTheme: theme3d || 'paper-sketch',
-                    cameraPreset: 'presenter',
-                    animationSpeed: 1.0,
-                    factBadgeText: 'KOK BISA?!',
-                    cartoonAnimType: 'articulated',
-                  };
-                  const scene2: Scene3DConfig = {
-                    mode: 'stickman',
-                    characterStyle: characterStyle3d,
-                    sarungPattern: sarungPattern3d,
-                    pose: 'explain',
-                    storyProp: 'octopus-hearts',
-                    characterColor: color3d,
-                    stageTheme: theme3d || 'paper-sketch',
-                    cameraPreset: 'zoom-in',
-                    animationSpeed: 1.0,
-                    factBadgeText: '3 JANTUNG GURITA',
-                    cartoonAnimType: 'articulated',
-                  };
-                  const scene3: Scene3DConfig = {
-                    mode: 'stickman',
-                    characterStyle: characterStyle3d,
-                    sarungPattern: sarungPattern3d,
-                    pose: 'shock',
-                    storyProp: 'comic-shock',
-                    characterColor: color3d,
-                    stageTheme: theme3d || 'paper-sketch',
-                    cameraPreset: 'presenter',
-                    animationSpeed: 1.1,
-                    factBadgeText: 'MIND BLOWN!',
-                    cartoonAnimType: 'articulated',
-                  };
-
-                  const charLabel = characterStyle3d === 'blangkon' ? 'Stickman Blangkon' : 'Stickman';
-                  const new3DClips: VideoClip[] = [
+                  const scenes: {
+                    cfg: Scene3DConfig;
+                    label: string;
+                    dur: number;
+                    transition?: { type: TransitionType; duration: number };
+                  }[] = [
                     {
-                      id: `3d-fact-1-${now}`,
-                      name: `2D ${charLabel} - Pembuka (Berpikir)`,
-                      url: '',
-                      duration: 3.2,
-                      trimStart: 0,
-                      trimEnd: 3.2,
-                      thumbnailUrl: create3DClipThumbnail(scene1),
-                      volume: 0,
-                      speed: 1,
-                      clipType: '3d',
-                      scene3d: scene1,
+                      label: '1. Pembuka (Menyapa)',
+                      dur: 3.5,
                       transition: { type: 'fade', duration: 0.4 },
+                      cfg: {
+                        mode: 'stickman',
+                        characterStyle: characterStyle3d,
+                        sarungPattern: sarungPattern3d,
+                        pose: 'wave',
+                        storyProp: 'coffee-cup',
+                        characterColor: color3d,
+                        stageTheme: 'cozy-room',
+                        cameraPreset: 'presenter',
+                        animationSpeed: 1.0,
+                        factBadgeText: 'HALO SOBAT!',
+                        cartoonAnimType: 'articulated',
+                        ambientEffect: 'music-notes',
+                      },
                     },
                     {
-                      id: `3d-fact-2-${now}`,
-                      name: `2D ${charLabel} - Isi Fakta (Jelaskan)`,
-                      url: '',
-                      duration: 4.8,
-                      trimStart: 0,
-                      trimEnd: 4.8,
-                      thumbnailUrl: create3DClipThumbnail(scene2),
-                      volume: 0,
-                      speed: 1,
-                      clipType: '3d',
-                      scene3d: scene2,
+                      label: '2. Pertanyaan (Berpikir)',
+                      dur: 3.5,
+                      transition: { type: 'slide-left', duration: 0.4 },
+                      cfg: {
+                        mode: 'stickman',
+                        characterStyle: characterStyle3d,
+                        sarungPattern: sarungPattern3d,
+                        pose: 'think',
+                        storyProp: 'thought-question',
+                        characterColor: color3d,
+                        stageTheme: 'paper-sketch',
+                        cameraPreset: 'zoom-in',
+                        animationSpeed: 1.0,
+                        factBadgeText: 'KOK BISA?!',
+                        cartoonAnimType: 'articulated',
+                        ambientEffect: 'auto',
+                      },
+                    },
+                    {
+                      label: '3. Fakta Dunia (Jelaskan)',
+                      dur: 4.0,
                       transition: { type: 'zoom-in', duration: 0.4 },
+                      cfg: {
+                        mode: 'stickman',
+                        characterStyle: characterStyle3d,
+                        sarungPattern: sarungPattern3d,
+                        pose: 'explain',
+                        storyProp: 'earth-globe',
+                        characterColor: color3d,
+                        stageTheme: 'chalkboard',
+                        cameraPreset: 'presenter',
+                        animationSpeed: 1.0,
+                        factBadgeText: 'REMPAH NUSANTARA',
+                        cartoonAnimType: 'articulated',
+                        ambientEffect: 'sparkles',
+                      },
                     },
                     {
-                      id: `3d-fact-3-${now}`,
-                      name: `2D ${charLabel} - Plot Twist (Kaget)`,
-                      url: '',
-                      duration: 3.0,
-                      trimStart: 0,
-                      trimEnd: 3.0,
-                      thumbnailUrl: create3DClipThumbnail(scene3),
-                      volume: 0,
-                      speed: 1,
-                      clipType: '3d',
-                      scene3d: scene3,
+                      label: '4. Catatan Sejarah (Menunjuk)',
+                      dur: 3.8,
+                      transition: { type: 'fade-white', duration: 0.35 },
+                      cfg: {
+                        mode: 'stickman',
+                        characterStyle: characterStyle3d,
+                        sarungPattern: sarungPattern3d,
+                        pose: 'point',
+                        storyProp: 'ancient-book',
+                        characterColor: color3d,
+                        stageTheme: 'countryside',
+                        cameraPreset: 'pan',
+                        animationSpeed: 1.0,
+                        factBadgeText: 'CATATAN SEJARAH',
+                        cartoonAnimType: 'articulated',
+                        ambientEffect: 'auto',
+                      },
+                    },
+                    {
+                      label: '5. Plot Twist (Kaget)',
+                      dur: 3.4,
+                      transition: { type: 'zoom-out', duration: 0.4 },
+                      cfg: {
+                        mode: 'stickman',
+                        characterStyle: characterStyle3d,
+                        sarungPattern: sarungPattern3d,
+                        pose: 'shock',
+                        storyProp: 'comic-shock',
+                        characterColor: color3d,
+                        stageTheme: 'cosmic',
+                        cameraPreset: 'low-angle',
+                        animationSpeed: 1.1,
+                        factBadgeText: 'MIND BLOWN!',
+                        cartoonAnimType: 'articulated',
+                        ambientEffect: 'auto',
+                      },
+                    },
+                    {
+                      label: '6. Penutup (Perayaan)',
+                      dur: 3.8,
+                      cfg: {
+                        mode: 'stickman',
+                        characterStyle: characterStyle3d,
+                        sarungPattern: sarungPattern3d,
+                        pose: 'walk',
+                        storyProp: 'trophy-star',
+                        characterColor: color3d,
+                        stageTheme: 'countryside',
+                        cameraPreset: 'presenter',
+                        animationSpeed: 1.0,
+                        factBadgeText: 'BANGGA INDONESIA!',
+                        cartoonAnimType: 'articulated',
+                        ambientEffect: 'confetti',
+                      },
                     },
                   ];
+
+                  const charLabel = characterStyle3d === 'blangkon' ? 'Stickman Blangkon' : 'Stickman';
+                  const new3DClips: VideoClip[] = scenes.map((sc, idx) => ({
+                    id: `3d-fact-${idx + 1}-${now}`,
+                    name: `${charLabel} - ${sc.label}`,
+                    url: '',
+                    duration: sc.dur,
+                    trimStart: 0,
+                    trimEnd: sc.dur,
+                    thumbnailUrl: create3DClipThumbnail(sc.cfg),
+                    volume: 0,
+                    speed: 1,
+                    clipType: '3d',
+                    scene3d: sc.cfg,
+                    transition: sc.transition,
+                  }));
 
                   setClips((prev) => [...prev, ...new3DClips]);
                   setSelectedClipId(new3DClips[0].id);
@@ -1024,9 +1076,9 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     setSubtitles([
                       {
                         id: `sub-3d-1-${now}`,
-                        text: 'Tahukah kamu kenapa gurita punya tiga jantung?',
+                        text: 'Halo sobat! Tahu nggak kenapa Nusantara dulu diperebutkan dunia?',
                         startTime: 0.2,
-                        endTime: 3.0,
+                        endTime: 3.3,
                         fontSize: 24,
                         color: '#ffffff',
                         bgColor: 'rgba(15, 23, 42, 0.85)',
@@ -1038,9 +1090,9 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       },
                       {
                         id: `sub-3d-2-${now}`,
-                        text: 'Dua jantung memompa darah ke insang, dan satu ke seluruh tubuh!',
-                        startTime: 3.3,
-                        endTime: 7.8,
+                        text: 'Ternyata bukan cuma karena emas, tapi karena sesuatu di dapur kita!',
+                        startTime: 3.6,
+                        endTime: 6.8,
                         fontSize: 24,
                         color: '#38bdf8',
                         bgColor: 'rgba(15, 23, 42, 0.85)',
@@ -1052,11 +1104,53 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       },
                       {
                         id: `sub-3d-3-${now}`,
-                        text: 'Dan uniknya, jantung utamanya berhenti berdetak saat berenang!',
-                        startTime: 8.1,
+                        text: 'Di abad ke-15, pala dan cengkeh Maluku lebih mahal daripada emas di Eropa!',
+                        startTime: 7.1,
                         endTime: 10.8,
                         fontSize: 24,
+                        color: '#fde047',
+                        bgColor: 'rgba(15, 23, 42, 0.85)',
+                        strokeColor: '#000000',
+                        strokeWidth: 2,
+                        fontFamily: 'impact',
+                        isUppercase: true,
+                        positionY: 82,
+                      },
+                      {
+                        id: `sub-3d-4-${now}`,
+                        text: 'Bahkan satu pulau kecil di Banda pernah ditukar dengan pulau di New York!',
+                        startTime: 11.1,
+                        endTime: 14.6,
+                        fontSize: 24,
+                        color: '#4ade80',
+                        bgColor: 'rgba(15, 23, 42, 0.85)',
+                        strokeColor: '#000000',
+                        strokeWidth: 2,
+                        fontFamily: 'impact',
+                        isUppercase: true,
+                        positionY: 82,
+                      },
+                      {
+                        id: `sub-3d-5-${now}`,
+                        text: 'Serius! Pulau Run di Maluku ditukar Belanda dengan Manhattan tahun 1667!',
+                        startTime: 14.9,
+                        endTime: 18.0,
+                        fontSize: 24,
                         color: '#facc15',
+                        bgColor: 'rgba(15, 23, 42, 0.85)',
+                        strokeColor: '#000000',
+                        strokeWidth: 2,
+                        fontFamily: 'impact',
+                        isUppercase: true,
+                        positionY: 82,
+                      },
+                      {
+                        id: `sub-3d-6-${now}`,
+                        text: 'Sejarah Nusantara memang luar biasa! Yuk ikuti terus fakta seru lainnya!',
+                        startTime: 18.3,
+                        endTime: 21.8,
+                        fontSize: 24,
+                        color: '#ffffff',
                         bgColor: 'rgba(15, 23, 42, 0.85)',
                         strokeColor: '#000000',
                         strokeWidth: 2,
@@ -1073,7 +1167,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                 className="w-full py-2 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-xs rounded-lg transition-all shadow flex items-center justify-center space-x-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Muat Template Kartun Fakta Unik</span>
+                <span>Muat Template 6 Adegan Nusantara</span>
               </button>
             </div>
 
