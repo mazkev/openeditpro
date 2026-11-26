@@ -275,6 +275,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [createSubtitleFromTTS, setCreateSubtitleFromTTS] = useState(true);
   const [isPreviewingSpeech, setIsPreviewingSpeech] = useState(false);
   const [ttsPlacementMode, setTtsPlacementMode] = useState<'start' | 'playhead'>('start');
+  const [autoSyncVideoToNarration, setAutoSyncVideoToNarration] = useState(true);
 
   // Fetch native system OS speech synthesis voices
   useEffect(() => {
@@ -681,6 +682,9 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         : (voiceObj.defaultSpeed ?? 1.0) * ttsSpeed;
 
       const generatedVoiceovers: Voiceover[] = [];
+      const updatedSubTimings = new Map<string, { start: number; end: number; dur: number }>();
+      let cursor = 0.1;
+
       for (let i = 0; i < targets.length; i++) {
         const sub = targets[i];
         setTtsStatus(`Merekam narasi ${i + 1}/${targets.length}...`);
@@ -689,12 +693,28 @@ const SidebarComponent: React.FC<SidebarProps> = ({
           speed: effectiveSpeed,
           edgeVoice,
         });
+
+        const startT =
+          !singleSub && autoSyncVideoToNarration
+            ? parseFloat(cursor.toFixed(1))
+            : parseFloat(Math.max(0, sub.startTime).toFixed(1));
+        const segDur = Math.max(1.0, duration);
+
+        if (!singleSub && autoSyncVideoToNarration) {
+          updatedSubTimings.set(sub.id, {
+            start: startT,
+            end: parseFloat((startT + segDur).toFixed(1)),
+            dur: parseFloat((segDur + 0.35).toFixed(1)),
+          });
+          cursor = startT + segDur + 0.35;
+        }
+
         generatedVoiceovers.push({
           id: `vo-sub-${sub.id}-${Date.now()}`,
           name: `Narasi [${voiceLabel}]: ${sub.text.slice(0, 22)}${sub.text.length > 22 ? '...' : ''}`,
           url,
           duration,
-          startTime: parseFloat(Math.max(0, sub.startTime).toFixed(1)),
+          startTime: startT,
           volume: 1,
         });
       }
@@ -707,8 +727,53 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         return [...filtered, ...generatedVoiceovers];
       });
 
+      if (!singleSub && autoSyncVideoToNarration && updatedSubTimings.size > 0) {
+        // Sync subtitles to exact voiceover timing
+        setSubtitles((prev) =>
+          prev.map((s) => {
+            const tInfo = updatedSubTimings.get(s.id);
+            return tInfo ? { ...s, startTime: tInfo.start, endTime: tInfo.end } : s;
+          })
+        );
+
+        // Sync clip durations so the video matches the full narration length!
+        const totalNarrationDur = parseFloat(cursor.toFixed(1));
+        setClips((prev) => {
+          if (prev.length === targets.length) {
+            return prev.map((c, idx) => {
+              const tInfo = updatedSubTimings.get(targets[idx].id);
+              if (!tInfo) return c;
+              if (c.clipType === '3d') {
+                const transPad = c.transition && c.transition.type !== 'none' ? c.transition.duration : 0;
+                const newDur = parseFloat((tInfo.dur + transPad).toFixed(1));
+                return { ...c, duration: newDur, trimStart: 0, trimEnd: newDur };
+              }
+              return c;
+            });
+          }
+          // Otherwise extend the last 3D clip if total video is shorter than narration
+          const currentTotal = prev.reduce(
+            (sum, c) => sum + Math.max(0, c.trimEnd - c.trimStart) - (c.transition && c.transition.type !== 'none' ? c.transition.duration : 0),
+            0
+          );
+          if (currentTotal < totalNarrationDur) {
+            const diff = totalNarrationDur - currentTotal + 0.5;
+            const last3dIdx = [...prev].reverse().findIndex((c) => c.clipType === '3d');
+            if (last3dIdx !== -1) {
+              const targetIdx = prev.length - 1 - last3dIdx;
+              return prev.map((c, idx) => {
+                if (idx !== targetIdx) return c;
+                const newDur = parseFloat((c.duration + diff).toFixed(1));
+                return { ...c, duration: newDur, trimEnd: parseFloat((c.trimEnd + diff).toFixed(1)) };
+              });
+            }
+          }
+          return prev;
+        });
+      }
+
       setTtsStatus('');
-      if (setCurrentTime) setCurrentTime(targets[0].startTime);
+      if (setCurrentTime) setCurrentTime(!singleSub && autoSyncVideoToNarration ? 0 : targets[0].startTime);
     } catch (err: unknown) {
       console.error('Narrate subtitles error:', err);
       alert('Gagal menarasikan subtitle: ' + (err instanceof Error ? err.message : 'Terjadi kesalahan'));
@@ -1925,6 +1990,113 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   </p>
                 </div>
 
+                {/* Edit Durasi Adegan Kartun 2D/3D (Dapat diperpanjang bebas!) */}
+                {selectedClip.clipType === '3d' && (
+                  <div className="bg-gradient-to-br from-cyan-950/50 to-[#171820] p-3 rounded-xl border border-cyan-500/40 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-cyan-300 block">
+                        ⏱️ Durasi Adegan Kartun
+                      </span>
+                      <span className="text-xs font-mono text-cyan-200 font-bold">
+                        {(selectedClip.trimEnd - selectedClip.trimStart).toFixed(1)} dtk
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={30}
+                      step={0.5}
+                      value={selectedClip.duration}
+                      onChange={(e) => {
+                        const val = Math.max(1, parseFloat(e.target.value) || 1);
+                        setClips((prev) =>
+                          prev.map((c) =>
+                            c.id === selectedClip.id
+                              ? { ...c, duration: val, trimStart: 0, trimEnd: val }
+                              : c
+                          )
+                        );
+                      }}
+                      className="w-full accent-cyan-400"
+                    />
+                    <div className="flex items-center space-x-1.5">
+                      {[1, 2, 5].map((addSec) => (
+                        <button
+                          key={addSec}
+                          type="button"
+                          onClick={() => {
+                            const val = parseFloat((selectedClip.duration + addSec).toFixed(1));
+                            setClips((prev) =>
+                              prev.map((c) =>
+                                c.id === selectedClip.id
+                                  ? { ...c, duration: val, trimStart: 0, trimEnd: val }
+                                  : c
+                              )
+                            );
+                          }}
+                          className="px-2 py-1 bg-[#101115] hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded text-[11px] font-bold transition-colors"
+                        >
+                          +{addSec}s
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetDur = selectedClip.duration;
+                          setClips((prev) =>
+                            prev.map((c) =>
+                              c.clipType === '3d'
+                                ? { ...c, duration: targetDur, trimStart: 0, trimEnd: targetDur }
+                                : c
+                            )
+                          );
+                        }}
+                        className="flex-1 py-1 px-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-500/40 rounded text-[10px] font-bold transition-colors"
+                        title="Samakan durasi semua adegan kartun dengan klip ini"
+                      >
+                        Samakan Semua
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sesuaikan Durasi Video agar Cukup untuk Semua Narasi */}
+                {voiceovers.length > 0 && (
+                  <div className="bg-[#171820] p-3 rounded-xl border border-indigo-500/40 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-indigo-300 font-bold">Total Narasi vs Video:</span>
+                      <span className="font-mono text-gray-300">
+                        {formatTime(Math.max(...voiceovers.map((v) => v.startTime + v.duration)))} /{' '}
+                        {formatTime(totalDuration)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const maxVoEnd = Math.max(
+                          ...voiceovers.map((v) => v.startTime + v.duration),
+                          0
+                        );
+                        if (maxVoEnd <= totalDuration) return;
+                        const diff = maxVoEnd - totalDuration + 0.5;
+                        setClips((prev) => {
+                          const last3dIdx = [...prev].reverse().findIndex((c) => c.clipType === '3d');
+                          if (last3dIdx === -1) return prev;
+                          const targetIdx = prev.length - 1 - last3dIdx;
+                          return prev.map((c, idx) => {
+                            if (idx !== targetIdx) return c;
+                            const newDur = parseFloat((c.duration + diff).toFixed(1));
+                            return { ...c, duration: newDur, trimEnd: parseFloat((c.trimEnd + diff).toFixed(1)) };
+                          });
+                        });
+                      }}
+                      className="w-full py-1.5 px-2.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 rounded-lg text-[11px] font-bold transition-colors"
+                    >
+                      ⏱️ Perpanjang Video Agar Pas Dengan Narasi
+                    </button>
+                  </div>
+                )}
+
                 {/* Trim Start & End Sliders */}
                 <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] space-y-3">
                   <span className="text-xs font-semibold text-gray-300 block">
@@ -2563,6 +2735,15 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     <span>{isGeneratingTTS ? 'Proses...' : 'Narasikan Semua'}</span>
                   </button>
                 </div>
+                <label className="flex items-center space-x-2 text-[10px] text-indigo-200 cursor-pointer pt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={autoSyncVideoToNarration}
+                    onChange={(e) => setAutoSyncVideoToNarration(e.target.checked)}
+                    className="rounded border-indigo-500/40 bg-[#101115] accent-indigo-500"
+                  />
+                  <span>Sesuaikan durasi video & subtitle otomatis agar pas dengan narasi</span>
+                </label>
                 {ttsStatus && (
                   <p className="text-[10px] text-indigo-300 font-medium animate-pulse">
                     {ttsStatus}
