@@ -1,17 +1,28 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { Scene3DConfig, StageTheme3D, StickmanPose } from '../types/editor';
+import type {
+  SarungPattern,
+  Scene3DConfig,
+  StageTheme3D,
+  StickmanPose,
+} from '../types/editor';
 
 interface StickmanRig {
   root: THREE.Group;
   hips: THREE.Group;
   torso: THREE.Group;
   head: THREE.Group;
-  leftEye: THREE.Mesh;
-  rightEye: THREE.Mesh;
+  leftEye: THREE.Group;
+  rightEye: THREE.Group;
   leftBrow: THREE.Mesh;
   rightBrow: THREE.Mesh;
   mouth: THREE.Mesh;
+  blangkonGroup: THREE.Group;
+  sarungGroup: THREE.Group;
+  sarungMesh: THREE.Mesh;
+  sarungKnot: THREE.Mesh;
+  sarungMaterial: THREE.MeshStandardMaterial;
+  sarungKnotMaterial: THREE.MeshStandardMaterial;
   leftShoulder: THREE.Group;
   leftElbow: THREE.Group;
   rightShoulder: THREE.Group;
@@ -21,6 +32,7 @@ interface StickmanRig {
   rightHip: THREE.Group;
   rightKnee: THREE.Group;
   bodyMaterial: THREE.MeshStandardMaterial;
+  stickMaterial: THREE.MeshStandardMaterial;
   outlineMaterial: THREE.MeshBasicMaterial;
 }
 
@@ -45,11 +57,11 @@ const THEME_PALETTES: Record<
     key: 0xf8fafc,
   },
   'light-studio': {
-    bg: 0xe2e8f0,
-    fog: 0xe2e8f0,
+    bg: 0xf8fafc,
+    fog: 0xf8fafc,
     floor: 0xf1f5f9,
-    grid: 0xcbd5e1,
-    rim: 0x60a5fa,
+    grid: 0xd1d5db,
+    rim: 0x64748b,
     key: 0xffffff,
   },
   'warm-sunset': {
@@ -63,7 +75,142 @@ const THEME_PALETTES: Record<
 };
 
 /**
- * Helper to create a crisp stickman limb with optional cel-shaded outline so it never looks like a wax candle.
+ * Procedural Batik Texture generator for the authentic Javanese Blangkon
+ * Creates traditional Parang / Lereng diagonal motif with warm chocolate & gold tones.
+ */
+let cachedBatikTexture: THREE.CanvasTexture | null = null;
+function getBatikBlangkonTexture(): THREE.CanvasTexture {
+  if (cachedBatikTexture) return cachedBatikTexture;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  // Warm deep batik base
+  ctx.fillStyle = '#451a03';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Diagonal Parang Rusak / Lereng batik bands (45-degree angle)
+  ctx.save();
+  ctx.translate(256, 256);
+  ctx.rotate(-Math.PI / 4);
+  ctx.translate(-256, -256);
+
+  const bandWidth = 44;
+  for (let x = -200; x < 800; x += bandWidth) {
+    const isAlt = Math.floor(x / bandWidth) % 2 === 0;
+    ctx.fillStyle = isAlt ? '#78350f' : '#b45309';
+    ctx.fillRect(x, -200, bandWidth, 1000);
+
+    // Parang curved tongue / flames
+    ctx.fillStyle = isAlt ? '#291003' : '#fed7aa';
+    for (let y = -200; y < 1000; y += 32) {
+      ctx.beginPath();
+      ctx.arc(x + bandWidth * 0.35, y, 9, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Gold highlight dot (ceplok / truntum)
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(x + bandWidth * 0.7, y + 16, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = isAlt ? '#291003' : '#fed7aa';
+    }
+
+    ctx.strokeStyle = '#1e0c02';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, -200);
+    ctx.lineTo(x, 1000);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 3);
+  cachedBatikTexture = tex;
+  return tex;
+}
+
+/**
+ * Procedural Checkered Sarong Texture generator (matching traditional Indonesian sarung Wadimor/Gajah Duduk)
+ */
+const cachedSarungTextures = new Map<SarungPattern, THREE.CanvasTexture>();
+function getSarungTexture(pattern: SarungPattern): THREE.CanvasTexture {
+  const cached = cachedSarungTextures.get(pattern);
+  if (cached) return cached;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  if (pattern === 'plain-black') {
+    ctx.fillStyle = '#18181b';
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 14;
+    ctx.strokeRect(7, 7, 498, 498);
+  } else if (pattern === 'batik-brown') {
+    return getBatikBlangkonTexture();
+  } else {
+    // Plaid Sarung (Red/Maroon as in photo, or Emerald Green)
+    const isRed = pattern === 'plaid-red';
+    const baseColor = isRed ? '#6b111a' : '#064e3b';
+    const accentColor = isRed ? '#991b1b' : '#047857';
+
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(0, 0, 512, 512);
+
+    const step = 64;
+
+    // Vertical stripes
+    for (let x = 0; x < 512; x += step) {
+      ctx.fillStyle = '#09090b';
+      ctx.fillRect(x + 8, 0, 22, 512);
+
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(x + 32, 0, 18, 512);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(x + 52, 0, 4, 512);
+      ctx.fillRect(x + 4, 0, 2, 512);
+    }
+
+    // Horizontal stripes with blend overlay
+    ctx.save();
+    ctx.globalAlpha = 0.72;
+    for (let y = 0; y < 512; y += step) {
+      ctx.fillStyle = '#09090b';
+      ctx.fillRect(0, y + 8, 512, 22);
+
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(0, y + 32, 512, 18);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, y + 52, 512, 4);
+      ctx.fillRect(0, y + 4, 512, 2);
+    }
+    ctx.restore();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+  cachedSarungTextures.set(pattern, tex);
+  return tex;
+}
+
+/**
+ * Helper to create a crisp stickman limb with cel-shaded outline
  */
 function createStickLimb(
   radius: number,
@@ -81,8 +228,8 @@ function createStickLimb(
   group.add(mesh);
 
   const outlineGeo = new THREE.CylinderGeometry(
-    radius + 0.008,
-    radius * 0.92 + 0.008,
+    radius + 0.007,
+    radius * 0.92 + 0.007,
     length + 0.01,
     14
   );
@@ -102,7 +249,7 @@ function createJointSphere(
   const m = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 14), material);
   m.castShadow = true;
   g.add(m);
-  const o = new THREE.Mesh(new THREE.SphereGeometry(radius + 0.008, 14, 14), outlineMaterial);
+  const o = new THREE.Mesh(new THREE.SphereGeometry(radius + 0.007, 14, 14), outlineMaterial);
   g.add(o);
   return g;
 }
@@ -110,7 +257,7 @@ function createJointSphere(
 function buildStickmanRig(colorHex: string): StickmanRig {
   const root = new THREE.Group();
 
-  // Matte toon-like finish (high roughness, 0 metalness) so it looks like clean 3D animation, not glossy wax
+  // White matte body finish for head and torso
   const bodyMaterial = new THREE.MeshStandardMaterial({
     color: new THREE.Color(colorHex),
     roughness: 0.88,
@@ -125,8 +272,19 @@ function buildStickmanRig(colorHex: string): StickmanRig {
     side: THREE.BackSide,
   });
 
+  // Solid dark matte finish for classic stickman limbs
+  const stickMaterial = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    roughness: 0.92,
+    metalness: 0.0,
+  });
+
   const featureMaterial = new THREE.MeshBasicMaterial({
-    color: isDarkBody ? 0x38bdf8 : 0x0f172a,
+    color: 0x0f172a,
+  });
+
+  const scleraMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
   });
 
   // Hips (pelvis center at y = 0.96)
@@ -135,7 +293,7 @@ function buildStickmanRig(colorHex: string): StickmanRig {
   root.add(hips);
   hips.add(createJointSphere(0.036, bodyMaterial, outlineMaterial));
 
-  // Torso (slim iconic stickman spine)
+  // Torso (clean white stickman spine)
   const torso = new THREE.Group();
   hips.add(torso);
 
@@ -179,7 +337,7 @@ function buildStickmanRig(colorHex: string): StickmanRig {
   pelvisBar.rotation.z = Math.PI / 2;
   hips.add(pelvisBar);
 
-  // Head (classic larger stickman head)
+  // Head (classic large round cartoon head)
   const head = new THREE.Group();
   head.position.y = 0.62;
   torso.add(head);
@@ -200,49 +358,201 @@ function buildStickmanRig(colorHex: string): StickmanRig {
   headOutline.position.y = 0.21;
   head.add(headOutline);
 
-  // Expressive Eyes
-  const eyeGeo = new THREE.SphereGeometry(0.032, 12, 12);
-  const leftEye = new THREE.Mesh(eyeGeo, featureMaterial);
-  leftEye.position.set(-0.08, 0.23, 0.215);
-  leftEye.scale.set(1, 1.35, 0.5);
+  // ==========================================
+  // BLANGKON JAWA (Batik Headwear + Mondholan Bun)
+  // ==========================================
+  const blangkonGroup = new THREE.Group();
+  head.add(blangkonGroup);
+
+  const batikTex = getBatikBlangkonTexture();
+  const blangkonMat = new THREE.MeshStandardMaterial({
+    map: batikTex,
+    roughness: 0.85,
+    metalness: 0.0,
+  });
+
+  // Cap dome over top of head
+  const capGeo = new THREE.SphereGeometry(
+    headRadius + 0.01,
+    24,
+    16,
+    0,
+    Math.PI * 2,
+    0,
+    Math.PI * 0.58
+  );
+  const capMesh = new THREE.Mesh(capGeo, blangkonMat);
+  capMesh.position.y = 0.21;
+  capMesh.rotation.x = 0.08;
+  capMesh.castShadow = true;
+  blangkonGroup.add(capMesh);
+
+  const capOutline = new THREE.Mesh(
+    new THREE.SphereGeometry(headRadius + 0.02, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.58),
+    outlineMaterial
+  );
+  capOutline.position.y = 0.21;
+  capOutline.rotation.x = 0.08;
+  blangkonGroup.add(capOutline);
+
+  // Wiron front fold crest (curved band right on brow)
+  const wironGeo = new THREE.TorusGeometry(headRadius + 0.008, 0.022, 10, 24, Math.PI * 0.72);
+  const wironMesh = new THREE.Mesh(wironGeo, blangkonMat);
+  wironMesh.rotation.x = Math.PI * 0.56;
+  wironMesh.rotation.z = Math.PI * 0.14;
+  wironMesh.position.set(0, 0.26, 0.075);
+  blangkonGroup.add(wironMesh);
+
+  // Mondholan (iconic rounded bun at the rear/back of head)
+  const mondholanRadius = 0.088;
+  const mondholanGeo = new THREE.SphereGeometry(mondholanRadius, 18, 18);
+  const mondholanMesh = new THREE.Mesh(mondholanGeo, blangkonMat);
+  mondholanMesh.position.set(0.045, 0.17, -0.215);
+  mondholanMesh.castShadow = true;
+  blangkonGroup.add(mondholanMesh);
+
+  const mondholanOutline = new THREE.Mesh(
+    new THREE.SphereGeometry(mondholanRadius + 0.01, 18, 18),
+    outlineMaterial
+  );
+  mondholanOutline.position.set(0.045, 0.17, -0.215);
+  blangkonGroup.add(mondholanOutline);
+
+  // ==========================================
+  // EXPRESSIVE CARTOON EYES (matching reference image)
+  // ==========================================
+  function createCartoonEye(): THREE.Group {
+    const eyeGroup = new THREE.Group();
+
+    // Outer thick black border
+    const borderMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.054, 16, 16),
+      featureMaterial
+    );
+    borderMesh.scale.set(1, 1.25, 0.35);
+    eyeGroup.add(borderMesh);
+
+    // Pure white sclera
+    const scleraMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.047, 16, 16),
+      scleraMaterial
+    );
+    scleraMesh.position.z = 0.008;
+    scleraMesh.scale.set(1, 1.25, 0.35);
+    eyeGroup.add(scleraMesh);
+
+    // Solid black circular pupil
+    const pupilMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.024, 14, 14),
+      featureMaterial
+    );
+    pupilMesh.position.set(0.005, 0.008, 0.022);
+    pupilMesh.scale.set(1, 1.15, 0.4);
+    eyeGroup.add(pupilMesh);
+
+    return eyeGroup;
+  }
+
+  const leftEye = createCartoonEye();
+  leftEye.position.set(-0.078, 0.22, 0.218);
   head.add(leftEye);
 
-  const rightEye = new THREE.Mesh(eyeGeo, featureMaterial);
-  rightEye.position.set(0.08, 0.23, 0.215);
-  rightEye.scale.set(1, 1.35, 0.5);
+  const rightEye = createCartoonEye();
+  rightEye.position.set(0.078, 0.22, 0.218);
   head.add(rightEye);
 
   // Expressive Eyebrows
-  const browGeo = new THREE.BoxGeometry(0.07, 0.018, 0.02);
+  const browGeo = new THREE.BoxGeometry(0.075, 0.018, 0.02);
   const leftBrow = new THREE.Mesh(browGeo, featureMaterial);
-  leftBrow.position.set(-0.08, 0.3, 0.215);
+  leftBrow.position.set(-0.078, 0.31, 0.218);
+  leftBrow.rotation.z = -0.12;
   head.add(leftBrow);
 
   const rightBrow = new THREE.Mesh(browGeo, featureMaterial);
-  rightBrow.position.set(0.08, 0.3, 0.215);
+  rightBrow.position.set(0.078, 0.31, 0.218);
+  rightBrow.rotation.z = 0.12;
   head.add(rightBrow);
 
-  // Animated Mouth
-  const mouthGeo = new THREE.SphereGeometry(0.035, 12, 12);
+  // Animated Happy Smile Mouth
+  const mouthGeo = new THREE.SphereGeometry(0.042, 14, 14);
   const mouth = new THREE.Mesh(mouthGeo, featureMaterial);
-  mouth.position.set(0, 0.13, 0.22);
-  mouth.scale.set(1.3, 0.35, 0.4);
+  mouth.position.set(0, 0.12, 0.222);
+  mouth.scale.set(1.4, 0.5, 0.4);
   head.add(mouth);
 
-  // Left Arm (slim stick limbs + round joints)
+  // ==========================================
+  // SARUNG (Indonesian Plaid / Batik Sarong)
+  // ==========================================
+  const sarungGroup = new THREE.Group();
+  hips.add(sarungGroup);
+
+  const defaultSarungTex = getSarungTexture('plaid-red');
+  const sarungMaterial = new THREE.MeshStandardMaterial({
+    map: defaultSarungTex,
+    roughness: 0.88,
+    metalness: 0.0,
+  });
+
+  const sarungKnotMaterial = new THREE.MeshStandardMaterial({
+    map: defaultSarungTex,
+    roughness: 0.88,
+    metalness: 0.0,
+  });
+
+  // Skirt cylinder (y reaches from hips down to below knees)
+  const sarungGeo = new THREE.CylinderGeometry(0.188, 0.226, 0.52, 24, 1, true);
+  const sarungMesh = new THREE.Mesh(sarungGeo, sarungMaterial);
+  sarungMesh.position.y = -0.26;
+  sarungMesh.castShadow = true;
+  sarungMesh.receiveShadow = true;
+  sarungGroup.add(sarungMesh);
+
+  const sarungOutline = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.198, 0.236, 0.525, 24, 1, true),
+    outlineMaterial
+  );
+  sarungOutline.position.y = -0.26;
+  sarungGroup.add(sarungOutline);
+
+  // Rolled waistband ring ("gulungan sarung di pinggang")
+  const waistRollGeo = new THREE.TorusGeometry(0.192, 0.024, 10, 24);
+  const waistRollMesh = new THREE.Mesh(waistRollGeo, sarungMaterial);
+  waistRollMesh.rotation.x = Math.PI / 2;
+  waistRollMesh.position.y = 0.01;
+  sarungGroup.add(waistRollMesh);
+
+  // Front knot & flap ("lipatan wiron sarung depan")
+  const knotGeo = new THREE.BoxGeometry(0.11, 0.42, 0.03);
+  const sarungKnot = new THREE.Mesh(knotGeo, sarungKnotMaterial);
+  sarungKnot.position.set(0.025, -0.23, 0.198);
+  sarungKnot.rotation.z = -0.05;
+  sarungKnot.castShadow = true;
+  sarungGroup.add(sarungKnot);
+
+  const knotOutline = new THREE.Mesh(
+    new THREE.BoxGeometry(0.124, 0.435, 0.038),
+    outlineMaterial
+  );
+  knotOutline.position.set(0.025, -0.23, 0.198);
+  knotOutline.rotation.z = -0.05;
+  sarungGroup.add(knotOutline);
+
+  // ==========================================
+  // ARMS & HANDS (Black Stickman Style)
+  // ==========================================
   const leftShoulder = new THREE.Group();
   leftShoulder.position.set(-0.17, 0.52, 0);
   torso.add(leftShoulder);
-  leftShoulder.add(createJointSphere(0.03, bodyMaterial, outlineMaterial));
-  leftShoulder.add(createStickLimb(0.023, 0.34, bodyMaterial, outlineMaterial));
+  leftShoulder.add(createJointSphere(0.03, stickMaterial, outlineMaterial));
+  leftShoulder.add(createStickLimb(0.023, 0.34, stickMaterial, outlineMaterial));
 
   const leftElbow = new THREE.Group();
   leftElbow.position.y = -0.34;
   leftShoulder.add(leftElbow);
-  leftElbow.add(createJointSphere(0.026, bodyMaterial, outlineMaterial));
-  leftElbow.add(createStickLimb(0.021, 0.33, bodyMaterial, outlineMaterial));
+  leftElbow.add(createJointSphere(0.026, stickMaterial, outlineMaterial));
+  leftElbow.add(createStickLimb(0.021, 0.33, stickMaterial, outlineMaterial));
 
-  const leftHand = createJointSphere(0.048, bodyMaterial, outlineMaterial);
+  const leftHand = createJointSphere(0.046, stickMaterial, outlineMaterial);
   leftHand.position.y = -0.34;
   leftElbow.add(leftHand);
 
@@ -250,31 +560,33 @@ function buildStickmanRig(colorHex: string): StickmanRig {
   const rightShoulder = new THREE.Group();
   rightShoulder.position.set(0.17, 0.52, 0);
   torso.add(rightShoulder);
-  rightShoulder.add(createJointSphere(0.03, bodyMaterial, outlineMaterial));
-  rightShoulder.add(createStickLimb(0.023, 0.34, bodyMaterial, outlineMaterial));
+  rightShoulder.add(createJointSphere(0.03, stickMaterial, outlineMaterial));
+  rightShoulder.add(createStickLimb(0.023, 0.34, stickMaterial, outlineMaterial));
 
   const rightElbow = new THREE.Group();
   rightElbow.position.y = -0.34;
   rightShoulder.add(rightElbow);
-  rightElbow.add(createJointSphere(0.026, bodyMaterial, outlineMaterial));
-  rightElbow.add(createStickLimb(0.021, 0.33, bodyMaterial, outlineMaterial));
+  rightElbow.add(createJointSphere(0.026, stickMaterial, outlineMaterial));
+  rightElbow.add(createStickLimb(0.021, 0.33, stickMaterial, outlineMaterial));
 
-  const rightHand = createJointSphere(0.048, bodyMaterial, outlineMaterial);
+  const rightHand = createJointSphere(0.046, stickMaterial, outlineMaterial);
   rightHand.position.y = -0.34;
   rightElbow.add(rightHand);
 
-  // Left Leg
+  // ==========================================
+  // LEGS & FEET
+  // ==========================================
   const leftHip = new THREE.Group();
   leftHip.position.set(-0.11, 0, 0);
   hips.add(leftHip);
-  leftHip.add(createJointSphere(0.03, bodyMaterial, outlineMaterial));
-  leftHip.add(createStickLimb(0.026, 0.46, bodyMaterial, outlineMaterial));
+  leftHip.add(createJointSphere(0.03, stickMaterial, outlineMaterial));
+  leftHip.add(createStickLimb(0.026, 0.46, stickMaterial, outlineMaterial));
 
   const leftKnee = new THREE.Group();
   leftKnee.position.y = -0.46;
   leftHip.add(leftKnee);
-  leftKnee.add(createJointSphere(0.028, bodyMaterial, outlineMaterial));
-  leftKnee.add(createStickLimb(0.024, 0.46, bodyMaterial, outlineMaterial));
+  leftKnee.add(createJointSphere(0.028, stickMaterial, outlineMaterial));
+  leftKnee.add(createStickLimb(0.024, 0.46, stickMaterial, outlineMaterial));
 
   const leftFoot = createJointSphere(0.048, bodyMaterial, outlineMaterial);
   leftFoot.scale.set(0.9, 0.65, 1.8);
@@ -285,14 +597,14 @@ function buildStickmanRig(colorHex: string): StickmanRig {
   const rightHip = new THREE.Group();
   rightHip.position.set(0.11, 0, 0);
   hips.add(rightHip);
-  rightHip.add(createJointSphere(0.03, bodyMaterial, outlineMaterial));
-  rightHip.add(createStickLimb(0.026, 0.46, bodyMaterial, outlineMaterial));
+  rightHip.add(createJointSphere(0.03, stickMaterial, outlineMaterial));
+  rightHip.add(createStickLimb(0.026, 0.46, stickMaterial, outlineMaterial));
 
   const rightKnee = new THREE.Group();
   rightKnee.position.y = -0.46;
   rightHip.add(rightKnee);
-  rightKnee.add(createJointSphere(0.028, bodyMaterial, outlineMaterial));
-  rightKnee.add(createStickLimb(0.024, 0.46, bodyMaterial, outlineMaterial));
+  rightKnee.add(createJointSphere(0.028, stickMaterial, outlineMaterial));
+  rightKnee.add(createStickLimb(0.024, 0.46, stickMaterial, outlineMaterial));
 
   const rightFoot = createJointSphere(0.048, bodyMaterial, outlineMaterial);
   rightFoot.scale.set(0.9, 0.65, 1.8);
@@ -309,6 +621,12 @@ function buildStickmanRig(colorHex: string): StickmanRig {
     leftBrow,
     rightBrow,
     mouth,
+    blangkonGroup,
+    sarungGroup,
+    sarungMesh,
+    sarungKnot,
+    sarungMaterial,
+    sarungKnotMaterial,
     leftShoulder,
     leftElbow,
     rightShoulder,
@@ -318,6 +636,7 @@ function buildStickmanRig(colorHex: string): StickmanRig {
     rightHip,
     rightKnee,
     bodyMaterial,
+    stickMaterial,
     outlineMaterial,
   };
 }
@@ -330,13 +649,15 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
   rig.hips.rotation.set(0, 0, 0);
   rig.torso.rotation.set(0, 0, 0);
   rig.head.rotation.set(0, 0, 0);
-  rig.leftEye.scale.set(1, 1.35, 0.5);
-  rig.rightEye.scale.set(1, 1.35, 0.5);
-  rig.leftBrow.position.set(-0.08, 0.3, 0.215);
-  rig.leftBrow.rotation.set(0, 0, 0);
-  rig.rightBrow.position.set(0.08, 0.3, 0.215);
-  rig.rightBrow.rotation.set(0, 0, 0);
-  rig.mouth.scale.set(1.3, 0.35, 0.4);
+  rig.leftEye.scale.set(1, 1, 1);
+  rig.rightEye.scale.set(1, 1, 1);
+  rig.leftBrow.position.set(-0.078, 0.31, 0.218);
+  rig.leftBrow.rotation.set(0, 0, -0.12);
+  rig.rightBrow.position.set(0.078, 0.31, 0.218);
+  rig.rightBrow.rotation.set(0, 0, 0.12);
+  rig.mouth.scale.set(1.4, 0.5, 0.4);
+  rig.sarungMesh.rotation.set(0, 0, 0);
+  rig.sarungKnot.rotation.set(0, 0, -0.05);
   rig.leftShoulder.rotation.set(0, 0, 0.14);
   rig.leftElbow.rotation.set(-0.25, 0, 0);
   rig.rightShoulder.rotation.set(0, 0, -0.14);
@@ -374,6 +695,7 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
       rig.leftKnee.rotation.x = bounce * 2.5;
       rig.rightHip.rotation.x = -bounce * 1.4;
       rig.rightKnee.rotation.x = bounce * 2.5;
+      rig.sarungKnot.rotation.z = -0.05 + Math.sin(t * 2.6) * 0.05;
       break;
     }
 
@@ -387,12 +709,12 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
       rig.head.rotation.x = -0.1 + Math.cos(t * 2.4) * 0.08;
 
       // Asymmetric curious eyebrows & squinting eye
-      rig.leftEye.scale.set(1.0, 0.7, 0.5);
-      rig.rightEye.scale.set(1.15, 1.45, 0.5);
-      rig.leftBrow.rotation.z = -0.22;
-      rig.rightBrow.position.y = 0.325;
-      rig.rightBrow.rotation.z = 0.15;
-      rig.mouth.scale.set(0.75, 0.3, 0.4);
+      rig.leftEye.scale.set(1.0, 0.75, 1.0);
+      rig.rightEye.scale.set(1.15, 1.25, 1.0);
+      rig.leftBrow.rotation.z = -0.26;
+      rig.rightBrow.position.y = 0.33;
+      rig.rightBrow.rotation.z = 0.18;
+      rig.mouth.scale.set(0.9, 0.35, 0.4);
 
       // Right hand tapping chin
       const chinTap = Math.sin(t * 5.5) * 0.14;
@@ -419,11 +741,11 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
       rig.head.rotation.x = -0.25;
       rig.head.rotation.z = Math.sin(t * 12) * 0.12;
 
-      rig.leftEye.scale.set(1.45, 1.9, 0.5);
-      rig.rightEye.scale.set(1.45, 1.9, 0.5);
-      rig.leftBrow.position.y = 0.34;
-      rig.rightBrow.position.y = 0.34;
-      rig.mouth.scale.set(1.0, 1.6, 0.6); // Big surprised "O" mouth
+      rig.leftEye.scale.set(1.4, 1.45, 1.0);
+      rig.rightEye.scale.set(1.4, 1.45, 1.0);
+      rig.leftBrow.position.y = 0.35;
+      rig.rightBrow.position.y = 0.35;
+      rig.mouth.scale.set(1.1, 1.7, 0.6); // Big surprised "O" mouth
 
       rig.leftShoulder.rotation.set(-2.45 + Math.sin(t * 9) * 0.3, 0, 0.65);
       rig.leftElbow.rotation.set(-0.5 + Math.cos(t * 9) * 0.3, 0, 0);
@@ -434,6 +756,7 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
       rig.leftKnee.rotation.x = jump * 2.5;
       rig.rightHip.rotation.x = -jump * 1.4;
       rig.rightKnee.rotation.x = jump * 2.5;
+      rig.sarungKnot.rotation.x = -jump * 0.6;
       break;
     }
 
@@ -445,7 +768,7 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
       rig.torso.rotation.x = 0.1;
       rig.head.rotation.y = 0.25;
       rig.head.rotation.x = -0.15 + Math.sin(t * 4) * 0.08;
-      rig.mouth.scale.set(1.2, 0.45 + Math.abs(Math.sin(t * 10)) * 0.6, 0.45);
+      rig.mouth.scale.set(1.3, 0.45 + Math.abs(Math.sin(t * 10)) * 0.6, 0.45);
 
       rig.rightShoulder.rotation.set(-2.25 + pulse, 0, -0.5);
       rig.rightElbow.rotation.set(-0.2 + pulse * 0.5, 0, 0);
@@ -457,16 +780,22 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
     }
 
     case 'wave': {
-      // Cheerful bounce & big friendly wave
-      const bounce = Math.abs(Math.sin(t * 4.5)) * 0.06;
+      // Cheerful bounce & big friendly wave matching the uploaded reference image!
+      const bounce = Math.abs(Math.sin(t * 4.5)) * 0.05;
       rig.hips.position.y = 0.94 + bounce;
-      rig.torso.rotation.z = Math.sin(t * 4.5) * 0.08;
-      rig.head.rotation.z = Math.sin(t * 4.5) * 0.14;
+      rig.torso.rotation.z = Math.sin(t * 4.5) * 0.06;
+      rig.head.rotation.z = Math.sin(t * 4.5) * 0.09;
       rig.mouth.scale.set(1.4, 0.85, 0.45);
 
-      rig.rightShoulder.rotation.set(-2.5, 0, -0.45 + Math.sin(t * 9) * 0.4);
-      rig.rightElbow.rotation.set(-0.55 + Math.sin(t * 9) * 0.35, 0, 0);
-      rig.leftShoulder.rotation.set(0.1, 0, 0.3 + Math.sin(t * 4.5) * 0.1);
+      // Right arm high up waving enthusiastically (as in photo)
+      rig.rightShoulder.rotation.set(-2.55, 0.1, -0.42 + Math.sin(t * 8.5) * 0.38);
+      rig.rightElbow.rotation.set(-0.45 + Math.sin(t * 8.5) * 0.3, 0, 0);
+
+      // Left hand resting on hip / waist behind sarung (as in photo)
+      rig.leftShoulder.rotation.set(-0.15, 0.2, 0.55);
+      rig.leftElbow.rotation.set(-1.45, 0, -0.4);
+
+      rig.sarungKnot.rotation.z = -0.05 + Math.sin(t * 4.5) * 0.04;
       break;
     }
 
@@ -489,6 +818,10 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
       rig.leftElbow.rotation.x = -0.6;
       rig.rightShoulder.rotation.x = swing * 0.65;
       rig.rightElbow.rotation.x = -0.6;
+
+      rig.sarungMesh.rotation.y = -swing * 0.18;
+      rig.sarungMesh.rotation.x = 0.05 + Math.abs(swing) * 0.06;
+      rig.sarungKnot.rotation.z = -0.05 + swing * 0.12;
       break;
     }
 
@@ -503,6 +836,7 @@ function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
       rig.head.rotation.x = Math.sin(t * 2.5) * 0.07;
       rig.leftShoulder.rotation.set(0, 0, 0.18 + Math.sin(t * 2.5) * 0.08);
       rig.rightShoulder.rotation.set(0, 0, -0.18 - Math.sin(t * 2.5) * 0.08);
+      rig.sarungKnot.rotation.z = -0.05 + Math.sin(t * 2.0) * 0.03;
       break;
     }
   }
@@ -747,6 +1081,22 @@ export class Scene3DRenderer {
       this.rig.bodyMaterial.color.set(col);
       const isDark = col.toLowerCase() === '#1e293b' || col.toLowerCase() === '#000000';
       this.rig.outlineMaterial.color.setHex(isDark ? 0x38bdf8 : 0x0f172a);
+
+      const isBlangkon = (config.characterStyle ?? 'blangkon') === 'blangkon';
+      this.rig.blangkonGroup.visible = isBlangkon;
+      this.rig.sarungGroup.visible = isBlangkon;
+
+      if (isBlangkon) {
+        const pattern = config.sarungPattern || 'plaid-red';
+        const sarungTex = getSarungTexture(pattern);
+        if (this.rig.sarungMaterial.map !== sarungTex) {
+          this.rig.sarungMaterial.map = sarungTex;
+          this.rig.sarungMaterial.needsUpdate = true;
+          this.rig.sarungKnotMaterial.map = sarungTex;
+          this.rig.sarungKnotMaterial.needsUpdate = true;
+        }
+      }
+
       applyStickmanPose(this.rig, config.pose, animTime);
     }
 

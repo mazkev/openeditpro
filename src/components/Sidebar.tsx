@@ -35,6 +35,8 @@ import type {
   BackgroundMusic,
   TransitionType,
   StickmanPose,
+  StickmanCharacterStyle,
+  SarungPattern,
   CameraPreset3D,
   StageTheme3D,
   Scene3DConfig,
@@ -42,6 +44,8 @@ import type {
 import {
   TRANSITION_PRESETS,
   STICKMAN_POSES,
+  STICKMAN_STYLES,
+  SARUNG_PATTERNS,
   CAMERA_PRESETS_3D,
   STAGE_THEMES_3D,
   CHARACTER_COLORS_3D,
@@ -228,6 +232,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   >('all');
 
   // 3D Stickman Studio State
+  const [characterStyle3d, setCharacterStyle3d] = useState<StickmanCharacterStyle>('blangkon');
+  const [sarungPattern3d, setSarungPattern3d] = useState<SarungPattern>('plaid-red');
   const [pose3d, setPose3d] = useState<StickmanPose>('explain');
   const [color3d, setColor3d] = useState('#f8fafc');
   const [theme3d, setTheme3d] = useState<StageTheme3D>('dark-studio');
@@ -239,6 +245,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [glbUrl3d, setGlbUrl3d] = useState('');
   const [glbName3d, setGlbName3d] = useState('');
   const glbInputRef = useRef<HTMLInputElement>(null);
+  const lastSynced3DClipIdRef = useRef<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
@@ -641,6 +648,31 @@ const SidebarComponent: React.FC<SidebarProps> = ({
 
   const selectedClip = clips.find((c) => c.id === selectedClipId);
 
+  // Sync 3D studio controls when user selects a 3D clip on the timeline
+  useEffect(() => {
+    if (
+      selectedClip?.clipType === '3d' &&
+      selectedClip.scene3d &&
+      selectedClip.id !== lastSynced3DClipIdRef.current
+    ) {
+      lastSynced3DClipIdRef.current = selectedClip.id;
+      const s = selectedClip.scene3d;
+      const dur = selectedClip.duration;
+      queueMicrotask(() => {
+        if (s.pose) setPose3d(s.pose);
+        if (s.characterColor) setColor3d(s.characterColor);
+        if (s.stageTheme) setTheme3d(s.stageTheme);
+        if (s.cameraPreset) setCamera3d(s.cameraPreset);
+        if (s.animationSpeed) setSpeed3d(s.animationSpeed);
+        if (s.factBadgeText !== undefined) setFactBadge3d(s.factBadgeText);
+        if (s.mode) setMode3d(s.mode);
+        if (s.characterStyle) setCharacterStyle3d(s.characterStyle);
+        if (s.sarungPattern) setSarungPattern3d(s.sarungPattern);
+        setDuration3d(dur);
+      });
+    }
+  }, [selectedClip?.id, selectedClip?.clipType, selectedClip?.duration, selectedClip?.scene3d]);
+
   return (
     <div className="flex h-full w-[380px] bg-[#14151a] border-r border-[#252733] select-none flex-shrink-0">
       {/* Icon Navigation Tabs */}
@@ -885,6 +917,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   const now = Date.now();
                   const scene1: Scene3DConfig = {
                     mode: 'stickman',
+                    characterStyle: characterStyle3d,
+                    sarungPattern: sarungPattern3d,
                     pose: 'think',
                     characterColor: color3d,
                     stageTheme: theme3d,
@@ -894,6 +928,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   };
                   const scene2: Scene3DConfig = {
                     mode: 'stickman',
+                    characterStyle: characterStyle3d,
+                    sarungPattern: sarungPattern3d,
                     pose: 'explain',
                     characterColor: color3d,
                     stageTheme: theme3d,
@@ -903,6 +939,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   };
                   const scene3: Scene3DConfig = {
                     mode: 'stickman',
+                    characterStyle: characterStyle3d,
+                    sarungPattern: sarungPattern3d,
                     pose: 'shock',
                     characterColor: color3d,
                     stageTheme: 'neon-cyber',
@@ -911,10 +949,11 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     factBadgeText: 'MIND BLOWN!',
                   };
 
+                  const charLabel = characterStyle3d === 'blangkon' ? 'Stickman Blangkon' : 'Stickman';
                   const new3DClips: VideoClip[] = [
                     {
                       id: `3d-fact-1-${now}`,
-                      name: '3D Stickman - Pembuka (Berpikir)',
+                      name: `3D ${charLabel} - Pembuka (Berpikir)`,
                       url: '',
                       duration: 3.2,
                       trimStart: 0,
@@ -928,7 +967,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     },
                     {
                       id: `3d-fact-2-${now}`,
-                      name: '3D Stickman - Isi Fakta (Jelaskan)',
+                      name: `3D ${charLabel} - Isi Fakta (Jelaskan)`,
                       url: '',
                       duration: 4.8,
                       trimStart: 0,
@@ -942,7 +981,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     },
                     {
                       id: `3d-fact-3-${now}`,
-                      name: '3D Stickman - Plot Twist (Kaget)',
+                      name: `3D ${charLabel} - Plot Twist (Kaget)`,
                       url: '',
                       duration: 3.0,
                       trimStart: 0,
@@ -1043,10 +1082,75 @@ const SidebarComponent: React.FC<SidebarProps> = ({
 
             {mode3d === 'stickman' ? (
               <div className="space-y-3">
+                {/* GAYA KARAKTER 3D */}
+                <div className="space-y-1.5">
+                  <span className="text-xs font-bold text-gray-200 block">
+                    1. Gaya Karakter Stickman:
+                  </span>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {STICKMAN_STYLES.map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => setCharacterStyle3d(st.id)}
+                        className={`p-2 rounded-xl border text-left transition-all ${
+                          characterStyle3d === st.id
+                            ? 'bg-cyan-950/70 border-cyan-400 text-white ring-1 ring-cyan-400/50'
+                            : 'bg-[#171820] border-[#252834] text-gray-300 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">{st.icon}</span>
+                            <span className="text-xs font-bold">{st.name}</span>
+                          </div>
+                          {st.id === 'blangkon' && (
+                            <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                              Khas Fakta Unik
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">
+                          {st.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* MOTIF SARUNG (HANYA JIKA GAYA BLANGKON AKTIF) */}
+                {characterStyle3d === 'blangkon' && (
+                  <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
+                    <span className="text-xs font-semibold text-gray-200 block">
+                      Motif Sarung Nusantara:
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {SARUNG_PATTERNS.map((sp) => (
+                        <button
+                          key={sp.id}
+                          type="button"
+                          onClick={() => setSarungPattern3d(sp.id)}
+                          className={`flex items-center space-x-2 p-1.5 rounded-lg border text-[11px] font-medium transition-all ${
+                            sarungPattern3d === sp.id
+                              ? 'border-cyan-400 bg-cyan-950/60 text-white ring-1 ring-cyan-400/40'
+                              : 'border-[#232532] bg-[#12131a] text-gray-300 hover:border-gray-600'
+                          }`}
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded border border-white/30 flex-shrink-0"
+                            style={{ backgroundColor: sp.colorPreview }}
+                          />
+                          <span className="truncate">{sp.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* POSE / EKSPRESI */}
                 <div className="space-y-1.5">
                   <span className="text-xs font-bold text-gray-200 block">
-                    1. Pilih Pose / Gerakan Stickman:
+                    2. Pilih Pose / Gerakan Stickman:
                   </span>
                   <div className="grid grid-cols-2 gap-1.5">
                     {STICKMAN_POSES.map((p) => (
@@ -1075,7 +1179,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                 {/* WARNA STICKMAN */}
                 <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
                   <span className="text-xs font-semibold text-gray-200 block">
-                    2. Warna Karakter Stickman:
+                    3. Warna Karakter Stickman:
                   </span>
                   <div className="flex items-center space-x-2">
                     {CHARACTER_COLORS_3D.map((c) => (
@@ -1230,6 +1334,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   }
                   const sceneConfig: Scene3DConfig = {
                     mode: mode3d,
+                    characterStyle: characterStyle3d,
+                    sarungPattern: sarungPattern3d,
                     pose: pose3d,
                     characterColor: color3d,
                     stageTheme: theme3d,
@@ -1240,12 +1346,13 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   };
                   const poseLabel =
                     STICKMAN_POSES.find((p) => p.id === pose3d)?.name || 'Stickman';
+                  const charLabel = characterStyle3d === 'blangkon' ? 'Stickman Blangkon' : 'Stickman';
                   const newClip: VideoClip = {
                     id: `3d-clip-${Date.now()}`,
                     name:
                       mode3d === 'glb'
                         ? `3D: ${glbName3d || 'Model'}`
-                        : `3D Stickman (${poseLabel})`,
+                        : `3D ${charLabel} (${poseLabel})`,
                     url: '',
                     duration: duration3d,
                     trimStart: 0,
@@ -1271,6 +1378,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   onClick={() => {
                     const sceneConfig: Scene3DConfig = {
                       mode: mode3d,
+                      characterStyle: characterStyle3d,
+                      sarungPattern: sarungPattern3d,
                       pose: pose3d,
                       characterColor: color3d,
                       stageTheme: theme3d,
@@ -1282,11 +1391,18 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                           ? glbUrl3d || selectedClip.scene3d?.glbUrl
                           : undefined,
                     };
+                    const poseLabel =
+                      STICKMAN_POSES.find((p) => p.id === pose3d)?.name || 'Stickman';
+                    const charLabel = characterStyle3d === 'blangkon' ? 'Stickman Blangkon' : 'Stickman';
                     setClips((prev) =>
                       prev.map((c) =>
                         c.id === selectedClip.id
                           ? {
                               ...c,
+                              name:
+                                mode3d === 'glb'
+                                  ? `3D: ${glbName3d || 'Model'}`
+                                  : `3D ${charLabel} (${poseLabel})`,
                               duration: duration3d,
                               trimStart: 0,
                               trimEnd: duration3d,

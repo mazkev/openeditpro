@@ -121,6 +121,10 @@ export type StickmanPose =
   | 'walk'
   | 'idle';
 
+export type StickmanCharacterStyle = 'blangkon' | 'classic';
+
+export type SarungPattern = 'plaid-red' | 'plaid-green' | 'batik-brown' | 'plain-black';
+
 export type CameraPreset3D = 'presenter' | 'orbit' | 'zoom-in' | 'low-angle' | 'pan';
 
 export type StageTheme3D = 'dark-studio' | 'light-studio' | 'neon-cyber' | 'warm-sunset';
@@ -135,7 +139,40 @@ export interface Scene3DConfig {
   factBadgeText?: string;
   glbUrl?: string;
   glbAnimationIndex?: number;
+  characterStyle?: StickmanCharacterStyle;
+  sarungPattern?: SarungPattern;
 }
+
+export const STICKMAN_STYLES: {
+  id: StickmanCharacterStyle;
+  name: string;
+  icon: string;
+  description: string;
+}[] = [
+  {
+    id: 'blangkon',
+    name: 'Si Stickman Blangkon (Nusantara)',
+    icon: '👳‍♂️',
+    description: 'Khas Fakta Unik Indonesia: Blangkon batik, sarung kotak-kotak & mata ekspresif',
+  },
+  {
+    id: 'classic',
+    name: 'Stickman Minimalis',
+    icon: '🕺',
+    description: 'Gaya stickman modern tanpa aksesoris blangkon & sarung',
+  },
+];
+
+export const SARUNG_PATTERNS: {
+  id: SarungPattern;
+  name: string;
+  colorPreview: string;
+}[] = [
+  { id: 'plaid-red', name: 'Kotak Marun (Khas Foto)', colorPreview: '#881337' },
+  { id: 'plaid-green', name: 'Kotak Hijau Zamrud', colorPreview: '#065f46' },
+  { id: 'batik-brown', name: 'Batik Parang Klasik', colorPreview: '#78350f' },
+  { id: 'plain-black', name: 'Hitam Polos Elegan', colorPreview: '#1e293b' },
+];
 
 export const STICKMAN_POSES: {
   id: StickmanPose;
