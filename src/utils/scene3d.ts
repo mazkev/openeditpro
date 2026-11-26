@@ -2426,7 +2426,8 @@ export function renderArticulatedStickman2D(
   height: number,
   pose: StickmanPose,
   t: number,
-  config: Scene3DConfig
+  config: Scene3DConfig,
+  audioMouthOpen?: number | null
 ): void {
   ctx.clearRect(0, 0, width, height);
 
@@ -2964,11 +2965,55 @@ export function renderArticulatedStickman2D(
   }
   ctx.restore();
 
-  // 10. MOUTH (Animated Lip-Sync, Talking, Smile & Gasp)
+  // 10. MOUTH (Audio-Driven Lip-Sync, Procedural Talking, Smile & Gasp)
   ctx.save();
   ctx.translate(0, 56);
 
-  if (pose === 'explain') {
+  const hasAudioSync = audioMouthOpen !== undefined && audioMouthOpen !== null;
+
+  if (pose === 'shock') {
+    // Huge open O gasp
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 20, 32, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#1e1b4b';
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 7;
+    ctx.stroke();
+  } else if (hasAudioSync) {
+    if (audioMouthOpen > 0.05) {
+      // REAL AUDIO-DRIVEN LIP-SYNC!
+      const mouthOpen = 5 + audioMouthOpen * 27;
+      const mouthW = 22 + audioMouthOpen * 8;
+
+      ctx.beginPath();
+      ctx.ellipse(0, 0, mouthW, mouthOpen, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#4c0519';
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 6.5;
+      ctx.stroke();
+
+      if (mouthOpen > 13) {
+        ctx.beginPath();
+        ctx.rect(-15, -mouthOpen + 2, 30, 8);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.ellipse(0, mouthOpen - 4, 15, 7, 0, 0, Math.PI);
+      ctx.fillStyle = '#fb7185';
+      ctx.fill();
+    } else {
+      // Silent pause between narration phrases: relaxed friendly smile
+      ctx.beginPath();
+      ctx.arc(0, -10, 24, 0.2, Math.PI - 0.2);
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 6.5;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+  } else if (pose === 'explain') {
     // DYNAMIC MULTI-HARMONIC TALKING MOUTH FLAP (NATURAL SPEECH SYLLABLES)
     const talkCycle = Math.abs(Math.sin(t * 11.5) * 0.65 + Math.sin(t * 17.3) * 0.35);
     const mouthOpen = 6 + talkCycle * 25;
@@ -2993,15 +3038,6 @@ export function renderArticulatedStickman2D(
     ctx.ellipse(0, mouthOpen - 4, 16, 8, 0, 0, Math.PI);
     ctx.fillStyle = '#fb7185';
     ctx.fill();
-  } else if (pose === 'shock') {
-    // Huge open O gasp
-    ctx.beginPath();
-    ctx.ellipse(0, 4, 20, 32, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#1e1b4b';
-    ctx.fill();
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 7;
-    ctx.stroke();
   } else if (pose === 'think') {
     // Small sideways pursed curious mouth
     ctx.beginPath();
@@ -3455,7 +3491,12 @@ export class Scene3DRenderer {
     }
   }
 
-  renderAt(timeSec: number, durationSec: number, config: Scene3DConfig): void {
+  renderAt(
+    timeSec: number,
+    durationSec: number,
+    config: Scene3DConfig,
+    options?: { mouthOpen?: number | null }
+  ): void {
     const safeDur = Math.max(0.1, durationSec);
     const progress = Math.max(0, Math.min(1, timeSec / safeDur));
     const animTime = timeSec * (config.animationSpeed || 1);
@@ -3630,7 +3671,8 @@ export class Scene3DRenderer {
             1024,
             config.pose,
             animTime,
-            config
+            config,
+            options?.mouthOpen
           );
           this.stickmanTex.needsUpdate = true;
         }

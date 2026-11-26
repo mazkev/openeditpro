@@ -15,6 +15,7 @@ import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, Background
 import { formatTime } from '../utils/time';
 import { getActiveTransitionInfo, getCssTransitionStyles } from '../utils/transition';
 import { Scene3DRenderer } from '../utils/scene3d';
+import { ensureVoiceoverEnvelope, getVoiceoverMouthOpenAt } from '../utils/audioEnvelope';
 
 interface PreviewPlayerProps {
   clips: VideoClip[];
@@ -138,7 +139,8 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       if (clip.scene3d.mode === 'glb' && clip.scene3d.glbUrl) {
         r.ensureGlbLoaded(clip.scene3d.glbUrl).catch(() => {});
       }
-      r.renderAt(timeInClip, dur, clip.scene3d);
+      const mouthOpen = getVoiceoverMouthOpenAt(voiceovers, currentTime);
+      r.renderAt(timeInClip, dur, clip.scene3d, { mouthOpen });
 
       const targetCanvas = canvasRef.current;
       if (targetCanvas.width !== previewW || targetCanvas.height !== previewH) {
@@ -232,11 +234,12 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         }
       }
     }
-  }, [activeTransition, activeClip, activeClipOffset, currentTime, isPlaying, masterVolume, isMuted, aspectRatio]);
+  }, [activeTransition, activeClip, activeClipOffset, currentTime, isPlaying, masterVolume, isMuted, aspectRatio, voiceovers]);
 
   // Sync voiceovers
   useEffect(() => {
     voiceovers.forEach((vo) => {
+      void ensureVoiceoverEnvelope(vo.url);
       let audio = voiceoverAudioRefs.current.get(vo.id);
       if (!audio) {
         audio = new Audio(vo.url);

@@ -29,6 +29,7 @@ import {
   type DrawableVideoFrame,
 } from './transition';
 import { Scene3DRenderer, ensureStickmanLoaded, ensureStoryImageLoaded } from './scene3d';
+import { ensureVoiceoverEnvelope, getVoiceoverMouthOpenAt } from './audioEnvelope';
 
 export interface ExportProgress {
   progress: number; // 0 to 100
@@ -537,6 +538,9 @@ async function exportWithMediabunny(
     if (storyUrls.length > 0) {
       await Promise.all(storyUrls.map((u) => ensureStoryImageLoaded(u)));
     }
+    if (voiceovers.length > 0) {
+      await Promise.all(voiceovers.map((v) => ensureVoiceoverEnvelope(v.url)));
+    }
   }
   const scene3dA = has3DClips ? new Scene3DRenderer(width, height) : null;
   const scene3dB = has3DClips ? new Scene3DRenderer(width, height) : null;
@@ -544,7 +548,8 @@ async function exportWithMediabunny(
   const getDrawableFrame = async (
     clipIdx: number,
     clipTime: number,
-    slot: 'A' | 'B'
+    slot: 'A' | 'B',
+    globalTime?: number
   ): Promise<DrawableVideoFrame | null> => {
     const clip = clips[clipIdx];
     if (clip.clipType === '3d' && clip.scene3d) {
@@ -554,7 +559,9 @@ async function exportWithMediabunny(
         await r.ensureGlbLoaded(clip.scene3d.glbUrl);
       }
       const dur = Math.max(0.1, clip.trimEnd - clip.trimStart);
-      r.renderAt(Math.max(0, clipTime - clip.trimStart), dur, clip.scene3d);
+      const mouthOpen =
+        globalTime !== undefined ? getVoiceoverMouthOpenAt(voiceovers, globalTime) : null;
+      r.renderAt(Math.max(0, clipTime - clip.trimStart), dur, clip.scene3d, { mouthOpen });
       return r.getCanvas();
     }
     const reader = readers[clipIdx];
@@ -601,8 +608,8 @@ async function exportWithMediabunny(
           rangeB.clip.trimStart + Math.max(0, t - rangeB.start);
 
         const [sampleA, sampleB] = await Promise.all([
-          getDrawableFrame(idxA, timeA, 'A'),
-          getDrawableFrame(idxB, timeB, 'B'),
+          getDrawableFrame(idxA, timeA, 'A', t),
+          getDrawableFrame(idxB, timeB, 'B', t),
         ]);
 
         if (sampleA && sampleB) {
@@ -625,7 +632,7 @@ async function exportWithMediabunny(
         const safeIdx = activeIdx !== -1 ? activeIdx : clipRanges.length - 1;
         const range = clipRanges[safeIdx];
         const clipTime = range.clip.trimStart + Math.max(0, t - range.start);
-        const sample = await getDrawableFrame(safeIdx, clipTime, 'A');
+        const sample = await getDrawableFrame(safeIdx, clipTime, 'A', t);
 
         if (sample) {
           const is3D = clips[safeIdx].clipType === '3d';
