@@ -261,6 +261,266 @@ function getSarungTexture(pattern: SarungPattern): THREE.CanvasTexture {
 }
 
 /**
+ * 2D Cartoon Stickman Image Loader & Flood-Fill Cutout Generator
+ * Extracts the authentic hand-drawn 2D stickman from the user reference photo
+ */
+let cachedStickmanCutoutTex: THREE.CanvasTexture | null = null;
+let cachedStickmanOriginalTex: THREE.CanvasTexture | null = null;
+let isStickmanLoading = false;
+const stickmanLoadCallbacks: (() => void)[] = [];
+
+function makeStickmanCutout(sourceCanvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(sourceCanvas, 0, 0);
+
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+
+  // Flood fill from outer borders to turn the off-white paper background transparent
+  const visited = new Uint8Array(w * h);
+  const queueX = new Int32Array(w * h);
+  const queueY = new Int32Array(w * h);
+  let qStart = 0;
+  let qEnd = 0;
+
+  const isBg = (idx: number) => {
+    const r = data[idx];
+    const g = data[idx + 1];
+    const b = data[idx + 2];
+    // Paper background is very light off-white (RGB > 218)
+    return r > 218 && g > 215 && b > 208;
+  };
+
+  // Seed top and bottom borders
+  for (let x = 0; x < w; x++) {
+    const topIdx = x * 4;
+    if (isBg(topIdx)) {
+      queueX[qEnd] = x;
+      queueY[qEnd] = 0;
+      qEnd++;
+      visited[x] = 1;
+    }
+    const botIdx = ((h - 1) * w + x) * 4;
+    if (isBg(botIdx)) {
+      queueX[qEnd] = x;
+      queueY[qEnd] = h - 1;
+      qEnd++;
+      visited[(h - 1) * w + x] = 1;
+    }
+  }
+
+  // Seed left and right borders
+  for (let y = 0; y < h; y++) {
+    const leftIdx = y * w * 4;
+    if (isBg(leftIdx) && !visited[y * w]) {
+      queueX[qEnd] = 0;
+      queueY[qEnd] = y;
+      qEnd++;
+      visited[y * w] = 1;
+    }
+    const rightIdx = (y * w + (w - 1)) * 4;
+    if (isBg(rightIdx) && !visited[y * w + (w - 1)]) {
+      queueX[qEnd] = w - 1;
+      queueY[qEnd] = y;
+      qEnd++;
+      visited[y * w + (w - 1)] = 1;
+    }
+  }
+
+  // BFS Flood-fill
+  while (qStart < qEnd) {
+    const qx = queueX[qStart];
+    const qy = queueY[qStart];
+    qStart++;
+
+    const pIdx = (qy * w + qx) * 4;
+    data[pIdx + 3] = 0; // Transparent!
+
+    // 4-neighborhood
+    const nx0 = qx + 1;
+    if (nx0 < w) {
+      const nPos = qy * w + nx0;
+      if (!visited[nPos]) {
+        visited[nPos] = 1;
+        if (isBg(nPos * 4)) {
+          queueX[qEnd] = nx0;
+          queueY[qEnd] = qy;
+          qEnd++;
+        }
+      }
+    }
+    const nx1 = qx - 1;
+    if (nx1 >= 0) {
+      const nPos = qy * w + nx1;
+      if (!visited[nPos]) {
+        visited[nPos] = 1;
+        if (isBg(nPos * 4)) {
+          queueX[qEnd] = nx1;
+          queueY[qEnd] = qy;
+          qEnd++;
+        }
+      }
+    }
+    const ny0 = qy + 1;
+    if (ny0 < h) {
+      const nPos = ny0 * w + qx;
+      if (!visited[nPos]) {
+        visited[nPos] = 1;
+        if (isBg(nPos * 4)) {
+          queueX[qEnd] = qx;
+          queueY[qEnd] = ny0;
+          qEnd++;
+        }
+      }
+    }
+    const ny1 = qy - 1;
+    if (ny1 >= 0) {
+      const nPos = ny1 * w + qx;
+      if (!visited[nPos]) {
+        visited[nPos] = 1;
+        if (isBg(nPos * 4)) {
+          queueX[qEnd] = qx;
+          queueY[qEnd] = ny1;
+          qEnd++;
+        }
+      }
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  return c;
+}
+
+function loadStickmanTextures(onReady?: () => void) {
+  if (cachedStickmanCutoutTex && cachedStickmanOriginalTex) {
+    if (onReady) onReady();
+    return;
+  }
+  if (onReady) stickmanLoadCallbacks.push(onReady);
+  if (isStickmanLoading) return;
+  isStickmanLoading = true;
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = '/stickman/stickman-blangkon.jpg';
+
+  img.onload = () => {
+    try {
+      const origCanvas = document.createElement('canvas');
+      origCanvas.width = img.naturalWidth || 1024;
+      origCanvas.height = img.naturalHeight || 571;
+      const origCtx = origCanvas.getContext('2d');
+      if (origCtx) {
+        origCtx.drawImage(img, 0, 0);
+
+        const origTex = new THREE.CanvasTexture(origCanvas);
+        origTex.colorSpace = THREE.SRGBColorSpace;
+        cachedStickmanOriginalTex = origTex;
+
+        const cutoutCanvas = makeStickmanCutout(origCanvas);
+        const cutoutTex = new THREE.CanvasTexture(cutoutCanvas);
+        cutoutTex.colorSpace = THREE.SRGBColorSpace;
+        cachedStickmanCutoutTex = cutoutTex;
+      }
+    } catch (err) {
+      console.warn('Stickman cutout fallback to original:', err);
+    } finally {
+      isStickmanLoading = false;
+      while (stickmanLoadCallbacks.length > 0) {
+        const cb = stickmanLoadCallbacks.shift();
+        if (cb) cb();
+      }
+    }
+  };
+
+  img.onerror = () => {
+    isStickmanLoading = false;
+  };
+}
+
+let cachedStickmanPlaceholderTex: THREE.CanvasTexture | null = null;
+function getStickmanPlaceholderTexture(): THREE.CanvasTexture {
+  if (cachedStickmanPlaceholderTex) return cachedStickmanPlaceholderTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 286;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, 512, 286);
+    ctx.strokeStyle = '#18181b';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    // Head
+    ctx.beginPath();
+    ctx.arc(256, 90, 48, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.stroke();
+    // Blangkon
+    ctx.beginPath();
+    ctx.arc(256, 75, 48, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.fillStyle = '#5c2c16';
+    ctx.fill();
+    ctx.stroke();
+    // Eyes & Smile
+    ctx.fillStyle = '#18181b';
+    ctx.beginPath();
+    ctx.arc(242, 88, 5, 0, Math.PI * 2);
+    ctx.arc(270, 88, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(256, 96, 16, 0.1, Math.PI - 0.1);
+    ctx.stroke();
+    // Body & Sarung
+    ctx.beginPath();
+    ctx.moveTo(256, 138);
+    ctx.lineTo(256, 190);
+    ctx.stroke();
+    ctx.fillStyle = '#7f1d1d';
+    ctx.fillRect(238, 190, 36, 45);
+    ctx.strokeRect(238, 190, 36, 45);
+    // Legs
+    ctx.beginPath();
+    ctx.moveTo(246, 235);
+    ctx.lineTo(244, 265);
+    ctx.moveTo(266, 235);
+    ctx.lineTo(268, 265);
+    // Arms waving
+    ctx.moveTo(256, 150);
+    ctx.lineTo(210, 110);
+    ctx.moveTo(256, 150);
+    ctx.lineTo(285, 175);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  cachedStickmanPlaceholderTex = tex;
+  return tex;
+}
+
+let stickmanLoadPromise: Promise<void> | null = null;
+export function ensureStickmanLoaded(): Promise<void> {
+  if (cachedStickmanCutoutTex && cachedStickmanOriginalTex) {
+    return Promise.resolve();
+  }
+  if (!stickmanLoadPromise) {
+    stickmanLoadPromise = new Promise<void>((resolve) => {
+      loadStickmanTextures(() => resolve());
+    });
+  }
+  return stickmanLoadPromise;
+}
+
+if (typeof window !== 'undefined') {
+  void ensureStickmanLoaded();
+}
+
+/**
  * Hand-drawn sketchy pencil shadow lines under stickman feet
  * (matching the authentic cartoon line art from the user's reference image)
  */
@@ -1174,7 +1434,7 @@ function buildStickmanRig(colorHex: string): StickmanRig {
   };
 }
 
-function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
+export function applyStickmanPose(rig: StickmanRig, pose: StickmanPose, t: number) {
   // Reset transforms
   rig.root.position.set(0, 0, 0);
   rig.root.rotation.set(0, 0, 0);
@@ -1438,6 +1698,8 @@ export class Scene3DRenderer {
   private propCanvas: HTMLCanvasElement;
   private propTexture: THREE.CanvasTexture;
   private propMesh: THREE.Mesh;
+  private stickman2DMesh: THREE.Mesh;
+  private stickman2DMat: THREE.MeshBasicMaterial;
   private rig: StickmanRig;
   private badgeMesh: THREE.Mesh;
   private currentBadgeText = '';
@@ -1543,8 +1805,28 @@ export class Scene3DRenderer {
     this.propMesh.visible = false;
     this.scene.add(this.propMesh);
 
-    // Procedural Stickman Rig
+    // 2D Cartoon Stickman Character Plane (authentic hand-drawn art from user photo)
+    const meshH = 2.15;
+    const meshW = 2.15 * (1024 / 571);
+    const planeGeo = new THREE.PlaneGeometry(meshW, meshH);
+    planeGeo.translate(0, meshH / 2, 0); // Pivot at bottom feet
+    const initialTex =
+      cachedStickmanOriginalTex ||
+      cachedStickmanCutoutTex ||
+      getStickmanPlaceholderTexture();
+    this.stickman2DMat = new THREE.MeshBasicMaterial({
+      map: initialTex,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    this.stickman2DMesh = new THREE.Mesh(planeGeo, this.stickman2DMat);
+    this.stickman2DMesh.position.set(0, 0, 0.02);
+    this.scene.add(this.stickman2DMesh);
+
+    // Procedural Stickman Rig (kept hidden in 2D cartoon mode)
     this.rig = buildStickmanRig('#f8fafc');
+    this.rig.root.visible = false;
     this.scene.add(this.rig.root);
 
     // Floating Cartoon Speech/Fact Badge
@@ -1650,6 +1932,7 @@ export class Scene3DRenderer {
 
     if (config.mode === 'glb' && config.glbUrl && this.glbGroup) {
       this.rig.root.visible = false;
+      this.stickman2DMesh.visible = false;
       this.glbGroup.visible = true;
       this.groundSketchMesh.visible = false;
       this.propMesh.visible = false;
@@ -1665,28 +1948,86 @@ export class Scene3DRenderer {
       }
     } else {
       if (this.glbGroup) this.glbGroup.visible = false;
-      this.rig.root.visible = true;
-      const col = config.characterColor || '#f8fafc';
-      this.rig.bodyMaterial.color.set(col);
-      const isDark = col.toLowerCase() === '#1e293b' || col.toLowerCase() === '#000000';
-      this.rig.outlineMaterial.color.setHex(isDark ? 0x38bdf8 : 0x0f172a);
+      this.rig.root.visible = false; // Procedural 3D mannequin mesh is hidden
+      this.stickman2DMesh.visible = true; // Authentic 2D Cartoon Character is shown
 
-      const isBlangkon = (config.characterStyle ?? 'blangkon') === 'blangkon';
-      this.rig.blangkonGroup.visible = isBlangkon;
-      this.rig.sarungGroup.visible = isBlangkon;
+      // Update texture: for paper-sketch / light-studio use original/cutout; for dark/colored use transparent cutout
+      const isPaperSketch =
+        config.stageTheme === 'paper-sketch' || config.stageTheme === 'light-studio';
+      const targetTex = isPaperSketch
+        ? cachedStickmanOriginalTex || cachedStickmanCutoutTex || getStickmanPlaceholderTexture()
+        : cachedStickmanCutoutTex || cachedStickmanOriginalTex || getStickmanPlaceholderTexture();
 
-      if (isBlangkon) {
-        const pattern = config.sarungPattern || 'plaid-red';
-        const sarungTex = getSarungTexture(pattern);
-        if (this.rig.sarungMaterial.map !== sarungTex) {
-          this.rig.sarungMaterial.map = sarungTex;
-          this.rig.sarungMaterial.needsUpdate = true;
-          this.rig.sarungKnotMaterial.map = sarungTex;
-          this.rig.sarungKnotMaterial.needsUpdate = true;
+      if (this.stickman2DMat.map !== targetTex) {
+        this.stickman2DMat.map = targetTex;
+        this.stickman2DMat.needsUpdate = true;
+      }
+
+      // Cartoon kinematic physics (Squash & Stretch, Bobbing, Tilting)
+      let bounceY = 0;
+      let scaleX = 1.0;
+      let scaleY = 1.0;
+      let tiltZ = 0;
+      let posX = 0;
+
+      switch (config.pose) {
+        case 'wave': {
+          tiltZ = Math.sin(animTime * 5.5) * 0.045;
+          bounceY = Math.abs(Math.sin(animTime * 5.5)) * 0.04;
+          scaleY = 1.0 + Math.sin(animTime * 5.5) * 0.035;
+          scaleX = 1.0 - Math.sin(animTime * 5.5) * 0.025;
+          break;
+        }
+        case 'explain': {
+          bounceY = Math.sin(animTime * 4.8) * 0.025;
+          tiltZ = Math.sin(animTime * 3.2) * 0.028;
+          scaleY = 1.0 + Math.sin(animTime * 4.8) * 0.028;
+          scaleX = 1.0 - Math.sin(animTime * 4.8) * 0.02;
+          break;
+        }
+        case 'think': {
+          tiltZ = 0.048 + Math.sin(animTime * 2.2) * 0.022;
+          bounceY = Math.sin(animTime * 2.4) * 0.018;
+          scaleY = 1.0 + Math.sin(animTime * 2.4) * 0.015;
+          scaleX = 1.0 - Math.sin(animTime * 2.4) * 0.012;
+          break;
+        }
+        case 'shock': {
+          const jitterX = Math.sin(animTime * 45) * 0.018;
+          posX = jitterX;
+          bounceY = Math.abs(Math.sin(animTime * 8.5)) * 0.085;
+          scaleY = 1.08 + Math.sin(animTime * 14) * 0.045;
+          scaleX = 0.93 - Math.sin(animTime * 14) * 0.035;
+          tiltZ = Math.sin(animTime * 28) * 0.02;
+          break;
+        }
+        case 'point': {
+          tiltZ = -0.035 + Math.sin(animTime * 3.0) * 0.012;
+          bounceY = Math.sin(animTime * 4.0) * 0.02;
+          scaleY = 1.0 + Math.sin(animTime * 4.0) * 0.018;
+          scaleX = 1.0 - Math.sin(animTime * 4.0) * 0.014;
+          break;
+        }
+        case 'walk': {
+          bounceY = Math.abs(Math.sin(animTime * 7.0)) * 0.06;
+          tiltZ = Math.sin(animTime * 3.5) * 0.052;
+          scaleX = 1.0 + Math.sin(animTime * 7.0) * 0.03;
+          scaleY = 1.0 - Math.sin(animTime * 7.0) * 0.03;
+          break;
+        }
+        case 'idle':
+        default: {
+          bounceY = Math.sin(animTime * 3.5) * 0.015;
+          scaleY = 1.0 + Math.sin(animTime * 3.5) * 0.018;
+          scaleX = 1.0 - Math.sin(animTime * 3.5) * 0.014;
+          tiltZ = Math.sin(animTime * 1.8) * 0.012;
+          break;
         }
       }
 
-      applyStickmanPose(this.rig, config.pose, animTime);
+      this.stickman2DMesh.position.set(posX, Math.max(0, bounceY), 0.02);
+      this.stickman2DMesh.scale.set(scaleX, scaleY, 1);
+      this.stickman2DMesh.rotation.z = tiltZ;
 
       // Render Storytelling Prop (Illustrations & Visual Story Elements)
       const effectiveProp: StoryProp3D =
@@ -1706,14 +2047,14 @@ export class Scene3DRenderer {
 
         if (effectiveProp === 'comic-shock') {
           // Dynamic comic speed lines bursting behind the character!
-          this.propMesh.position.set(0, 1.25, -0.25);
-          this.propMesh.scale.set(1.9, 1.9, 1);
+          this.propMesh.position.set(0, 1.25, -0.15);
+          this.propMesh.scale.set(2.4, 2.4, 1);
         } else if (effectiveProp === 'thought-question' || effectiveProp === 'idea-bulb') {
-          this.propMesh.position.set(0.52, 1.74 + Math.sin(animTime * 3.5) * 0.035, 0.15);
-          this.propMesh.scale.set(1.25, 1.25, 1);
+          this.propMesh.position.set(0.68, 1.82 + Math.sin(animTime * 3.5) * 0.035, 0.15);
+          this.propMesh.scale.set(1.2, 1.2, 1);
         } else {
-          this.propMesh.position.set(0.68, 1.42 + Math.sin(animTime * 3.0) * 0.035, 0.15);
-          this.propMesh.scale.set(1.25, 1.25, 1);
+          this.propMesh.position.set(0.78, 1.48 + Math.sin(animTime * 3.0) * 0.035, 0.15);
+          this.propMesh.scale.set(1.2, 1.2, 1);
         }
         this.propMesh.lookAt(this.camera.position);
       } else {
@@ -1786,6 +2127,8 @@ export class Scene3DRenderer {
     const mat = this.badgeMesh.material as THREE.MeshBasicMaterial;
     mat.map?.dispose();
     this.propTexture.dispose();
+    this.stickman2DMesh.geometry.dispose();
+    this.stickman2DMat.dispose();
     this.renderer.dispose();
   }
 }

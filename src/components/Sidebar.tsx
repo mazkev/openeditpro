@@ -701,10 +701,10 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/60 shadow-sm'
               : 'text-gray-400 hover:text-cyan-300 hover:bg-[#1a1c24]'
           }`}
-          title="Studio 3D Stickman Fakta Unik & Model .glb"
+          title="Studio Kartun 2D Stickman Fakta Unik & 3D"
         >
           <Box className="w-5 h-5 mb-0.5 text-cyan-400" />
-          <span className="text-[10px] font-bold">3D</span>
+          <span className="text-[10px] font-bold">Kartun</span>
           {clips.some((c) => c.clipType === '3d') && (
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400" />
           )}
@@ -892,14 +892,14 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-gray-100 flex items-center space-x-1.5">
                   <Box className="w-4 h-4 text-cyan-400" />
-                  <span>Studio 3D Stickman</span>
+                  <span>Studio Kartun 2D Stickman</span>
                 </h2>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-semibold">
-                  Fakta Unik
+                  Fakta Unik Nusantara
                 </span>
               </div>
               <p className="text-[11px] text-gray-400 mt-0.5">
-                Buat video animasi 3D Stickman untuk konten fakta unik, edukasi, atau Shorts/TikTok.
+                Animasi 2D Si Stickman Blangkon khas konten fakta unik & edukasi, lengkap dengan ilustrasi objek cerita dan balon kata.
               </p>
             </div>
 
@@ -908,12 +908,12 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-cyan-200 flex items-center space-x-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Template Fakta Unik (3 Adegan)</span>
+                  <span>Template Fakta Unik (3 Adegan 2D)</span>
                 </span>
                 <span className="text-[10px] text-cyan-300/80 font-mono">11 detik</span>
               </div>
               <p className="text-[10px] text-gray-300 leading-relaxed">
-                Langsung membuat 3 adegan Stickman 3D lengkap dengan transisi & contoh subtitle (Berpikir → Menjelaskan → Mindblown).
+                Langsung membuat 3 adegan kartun 2D Stickman Blangkon lengkap dengan transisi & contoh subtitle (Berpikir → Menjelaskan → Kaget).
               </p>
               <button
                 type="button"
@@ -960,7 +960,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   const new3DClips: VideoClip[] = [
                     {
                       id: `3d-fact-1-${now}`,
-                      name: `3D ${charLabel} - Pembuka (Berpikir)`,
+                      name: `2D ${charLabel} - Pembuka (Berpikir)`,
                       url: '',
                       duration: 3.2,
                       trimStart: 0,
@@ -974,7 +974,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     },
                     {
                       id: `3d-fact-2-${now}`,
-                      name: `3D ${charLabel} - Isi Fakta (Jelaskan)`,
+                      name: `2D ${charLabel} - Isi Fakta (Jelaskan)`,
                       url: '',
                       duration: 4.8,
                       trimStart: 0,
@@ -988,7 +988,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     },
                     {
                       id: `3d-fact-3-${now}`,
-                      name: `3D ${charLabel} - Plot Twist (Kaget)`,
+                      name: `2D ${charLabel} - Plot Twist (Kaget)`,
                       url: '',
                       duration: 3.0,
                       trimStart: 0,
@@ -1057,11 +1057,11 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                 className="w-full py-2 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-xs rounded-lg transition-all shadow flex items-center justify-center space-x-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Muat Template 3D Fakta Unik</span>
+                <span>Muat Template Kartun Fakta Unik</span>
               </button>
             </div>
 
-            {/* MODE SWITCH: STICKMAN VS UPLOAD .GLB */}
+            {/* MODE SWITCH: STICKMAN 2D VS UPLOAD .GLB */}
             <div className="flex bg-[#101116] p-1 rounded-xl border border-[#232530]">
               <button
                 type="button"
@@ -1072,7 +1072,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
-                🕺 Stickman 3D
+                🎨 Stickman 2D
               </button>
               <button
                 type="button"
@@ -1397,7 +1397,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     name:
                       mode3d === 'glb'
                         ? `3D: ${glbName3d || 'Model'}`
-                        : `3D ${charLabel} (${poseLabel})`,
+                        : `2D ${charLabel} (${poseLabel})`,
                     url: '',
                     duration: duration3d,
                     trimStart: 0,
@@ -1414,7 +1414,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                 className="w-full py-2.5 px-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs rounded-xl transition-all shadow flex items-center justify-center space-x-1.5"
               >
                 <Plus className="w-4 h-4" />
-                <span>Tambahkan Adegan 3D ke Timeline</span>
+                <span>Tambahkan Adegan Kartun ke Timeline</span>
               </button>
 
               {selectedClip?.clipType === '3d' && (
@@ -1448,7 +1448,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                               name:
                                 mode3d === 'glb'
                                   ? `3D: ${glbName3d || 'Model'}`
-                                  : `3D ${charLabel} (${poseLabel})`,
+                                  : `2D ${charLabel} (${poseLabel})`,
                               duration: duration3d,
                               trimStart: 0,
                               trimEnd: duration3d,
@@ -1462,7 +1462,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   className="w-full py-2 px-3 bg-[#20222e] hover:bg-[#282b3a] text-cyan-300 border border-cyan-500/40 font-bold text-xs rounded-xl transition-all flex items-center justify-center space-x-1.5"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>Perbarui Klip 3D yang Dipilih</span>
+                  <span>Perbarui Klip Kartun yang Dipilih</span>
                 </button>
               )}
             </div>

@@ -28,7 +28,7 @@ import {
   getActiveTransitionInfo,
   type DrawableVideoFrame,
 } from './transition';
-import { Scene3DRenderer } from './scene3d';
+import { Scene3DRenderer, ensureStickmanLoaded } from './scene3d';
 
 export interface ExportProgress {
   progress: number; // 0 to 100
@@ -529,6 +529,9 @@ async function exportWithMediabunny(
     c.clipType === '3d' || !c.url ? null : new ClipFrameReader(c.url, c.trimStart, c.trimEnd)
   );
   const has3DClips = clips.some((c) => c.clipType === '3d' && c.scene3d);
+  if (has3DClips) {
+    await ensureStickmanLoaded();
+  }
   const scene3dA = has3DClips ? new Scene3DRenderer(width, height) : null;
   const scene3dB = has3DClips ? new Scene3DRenderer(width, height) : null;
 
@@ -728,6 +731,9 @@ async function exportWithMediaRecorder(
   onProgress({ progress: 12, status: 'Memuat dan menyinkronkan video...' });
   const videoElements: (HTMLVideoElement | null)[] = [];
   const has3DClips = clips.some((c) => c.clipType === '3d' && c.scene3d);
+  if (has3DClips) {
+    await ensureStickmanLoaded();
+  }
   const scene3dA = has3DClips ? new Scene3DRenderer(width, height) : null;
   const scene3dB = has3DClips ? new Scene3DRenderer(width, height) : null;
 
