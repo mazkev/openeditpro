@@ -2140,7 +2140,8 @@ function createFactBadgeTexture(text: string): THREE.CanvasTexture {
 function renderStageBackdropCanvas(
   theme: StageTheme3D,
   canvas: HTMLCanvasElement,
-  customBackdropImg?: HTMLImageElement | null
+  customBackdropImg?: HTMLImageElement | null,
+  progress = 0
 ): void {
   const w = canvas.width;
   const h = canvas.height;
@@ -2150,7 +2151,7 @@ function renderStageBackdropCanvas(
   ctx.clearRect(0, 0, w, h);
 
   if (customBackdropImg && customBackdropImg.complete && customBackdropImg.naturalWidth > 0) {
-    // Draw user-uploaded historical / story photo covering the backdrop cleanly
+    // Draw user-uploaded historical / story photo with smooth Ken Burns zoom & pan
     const imgRatio = customBackdropImg.naturalWidth / customBackdropImg.naturalHeight;
     const boxRatio = w / h;
     let drawW = w;
@@ -2165,7 +2166,15 @@ function renderStageBackdropCanvas(
       drawH = w / imgRatio;
       drawY = -(drawH - h) / 2;
     }
+
+    const zoom = 1.0 + progress * 0.14;
+    const panX = (progress - 0.5) * w * 0.035;
+    ctx.save();
+    ctx.translate(w / 2 + panX, h / 2);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-w / 2, -h / 2);
     ctx.drawImage(customBackdropImg, drawX, drawY, drawW, drawH);
+    ctx.restore();
 
     // Subtle cinematic vignette so Stickman & subtitles pop
     const vig = ctx.createRadialGradient(w * 0.5, h * 0.5, w * 0.25, w * 0.5, h * 0.5, w * 0.72);
@@ -3358,11 +3367,12 @@ export class Scene3DRenderer {
     this.renderer.setSize(width, height, false);
   }
 
-  private applyTheme(theme: StageTheme3D, customBackdropUrl = ''): void {
+  private applyTheme(theme: StageTheme3D, customBackdropUrl = '', progress = 0): void {
     const backdropImg = customBackdropUrl ? getCachedStoryImage(customBackdropUrl) : null;
     const hasImgNow = Boolean(backdropImg);
 
     if (
+      !hasImgNow &&
       this.currentTheme === theme &&
       this.currentBackdropUrl === customBackdropUrl &&
       this.currentBackdropHadImage === hasImgNow &&
@@ -3388,7 +3398,7 @@ export class Scene3DRenderer {
       this.floorMesh.visible = false;
       this.groundSketchMesh.visible = false;
       this.backdropMesh.visible = true;
-      renderStageBackdropCanvas(theme, this.backdropCanvas, backdropImg);
+      renderStageBackdropCanvas(theme, this.backdropCanvas, backdropImg, progress);
       this.backdropTexture.needsUpdate = true;
       this.hemiLight.intensity = 1.35;
       this.keyLight.intensity = 1.55;
@@ -3446,11 +3456,11 @@ export class Scene3DRenderer {
   }
 
   renderAt(timeSec: number, durationSec: number, config: Scene3DConfig): void {
-    this.applyTheme(config.stageTheme, config.customBackdropImageUrl || '');
-
     const safeDur = Math.max(0.1, durationSec);
     const progress = Math.max(0, Math.min(1, timeSec / safeDur));
     const animTime = timeSec * (config.animationSpeed || 1);
+
+    this.applyTheme(config.stageTheme, config.customBackdropImageUrl || '', progress);
 
     // Aspect-Aware Adaptive Camera & Layout Framing (16:9 vs 9:16 vs 1:1)
     const aspect = this.camera.aspect || 16 / 9;
