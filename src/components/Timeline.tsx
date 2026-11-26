@@ -82,7 +82,14 @@ export const Timeline: React.FC<TimelineProps> = ({
 
   // Dragging states
   const [dragAction, setDragAction] = useState<{
-    type: 'playhead' | 'trim-start' | 'trim-end' | 'voiceover' | 'subtitle';
+    type:
+      | 'playhead'
+      | 'trim-start'
+      | 'trim-end'
+      | 'voiceover'
+      | 'subtitle'
+      | 'subtitle-resize-start'
+      | 'subtitle-resize-end';
     targetId?: string;
     initialMouseX: number;
     initialValue: number;
@@ -166,6 +173,26 @@ export const Timeline: React.FC<TimelineProps> = ({
                   endTime: parseFloat(newEnd.toFixed(2)),
                 }
               : s
+          )
+        );
+      } else if (dragAction.type === 'subtitle-resize-start' && dragAction.targetId) {
+        const deltaX = e.clientX - dragAction.initialMouseX;
+        const deltaSec = deltaX / zoom;
+        const endT = dragAction.initialValue2 ?? 2;
+        const newStart = Math.max(0, Math.min(endT - 0.3, dragAction.initialValue + deltaSec));
+        setSubtitles((prev) =>
+          prev.map((s) =>
+            s.id === dragAction.targetId ? { ...s, startTime: parseFloat(newStart.toFixed(2)) } : s
+          )
+        );
+      } else if (dragAction.type === 'subtitle-resize-end' && dragAction.targetId) {
+        const deltaX = e.clientX - dragAction.initialMouseX;
+        const deltaSec = deltaX / zoom;
+        const startT = dragAction.initialValue;
+        const newEnd = Math.max(startT + 0.3, (dragAction.initialValue2 ?? startT + 2) + deltaSec);
+        setSubtitles((prev) =>
+          prev.map((s) =>
+            s.id === dragAction.targetId ? { ...s, endTime: parseFloat(newEnd.toFixed(2)) } : s
           )
         );
       }
@@ -835,13 +862,31 @@ export const Timeline: React.FC<TimelineProps> = ({
                       left: `${leftPx}px`,
                       width: `${widthPx}px`,
                     }}
-                    className={`absolute top-1.5 bottom-1.5 rounded-md px-2 flex items-center justify-between text-[10px] font-medium overflow-hidden shadow-sm cursor-grab active:cursor-grabbing transition-all ${
+                    className={`absolute top-1.5 bottom-1.5 rounded-md px-2.5 flex items-center justify-between text-[10px] font-medium overflow-hidden shadow-sm cursor-grab active:cursor-grabbing transition-all group ${
                       isSelected
                         ? 'bg-amber-500/35 border-2 border-amber-300 text-amber-100 ring-2 ring-amber-400/50 z-10'
                         : 'bg-amber-500/20 border border-amber-500/60 hover:border-amber-400 text-amber-200 hover:bg-amber-500/30'
                     }`}
-                    title={`Klik untuk memilih subtitle (${formatTime(sub.startTime)} - ${formatTime(sub.endTime)}), tekan tombol Hapus/Del untuk menghapus`}
+                    title={`Klik untuk memilih subtitle (${formatTime(sub.startTime)} - ${formatTime(sub.endTime)}), seret tepi kiri/kanan untuk ubah durasi`}
                   >
+                    {/* Left Resize Handle */}
+                    <div
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setSelectedSubtitleId(sub.id);
+                        setSelectedClipId(null);
+                        setSelectedVoiceoverId(null);
+                        setDragAction({
+                          type: 'subtitle-resize-start',
+                          targetId: sub.id,
+                          initialMouseX: e.clientX,
+                          initialValue: sub.startTime,
+                          initialValue2: sub.endTime,
+                        });
+                      }}
+                      className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-amber-300/60 z-20"
+                      title="Seret untuk ubah waktu mulai subtitle"
+                    />
                     <span className="truncate select-none pointer-events-none flex-1 min-w-0 pr-1">
                       {sub.text || '(Teks kosong)'}
                     </span>
@@ -852,11 +897,29 @@ export const Timeline: React.FC<TimelineProps> = ({
                         setSubtitles((prev) => prev.filter((s) => s.id !== sub.id));
                         if (selectedSubtitleId === sub.id) setSelectedSubtitleId(null);
                       }}
-                      className="p-0.5 rounded hover:bg-red-500/30 text-amber-300 hover:text-red-400 flex-shrink-0 transition-colors"
+                      className="p-0.5 rounded hover:bg-red-500/30 text-amber-300 hover:text-red-400 flex-shrink-0 transition-colors mr-1"
                       title="Hapus Subtitle Ini"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
+                    {/* Right Resize Handle */}
+                    <div
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setSelectedSubtitleId(sub.id);
+                        setSelectedClipId(null);
+                        setSelectedVoiceoverId(null);
+                        setDragAction({
+                          type: 'subtitle-resize-end',
+                          targetId: sub.id,
+                          initialMouseX: e.clientX,
+                          initialValue: sub.startTime,
+                          initialValue2: sub.endTime,
+                        });
+                      }}
+                      className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-amber-300/60 z-20"
+                      title="Seret untuk memperpanjang/memendekkan durasi subtitle"
+                    />
                   </div>
                 );
               })}
