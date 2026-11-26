@@ -658,6 +658,65 @@ const SidebarComponent: React.FC<SidebarProps> = ({
     }
   };
 
+  const handleNarrateSubtitles = async (singleSub?: Subtitle) => {
+    const targets = (singleSub ? [singleSub] : subtitles).filter((s) => s.text.trim().length > 0);
+    if (targets.length === 0) return;
+
+    setIsGeneratingTTS(true);
+    try {
+      const voiceObj = AVAILABLE_VOICES.find((v) => v.id === ttsVoice) || AVAILABLE_VOICES[0];
+      const lang = ttsVoice.startsWith('sys-') ? 'id' : voiceObj.lang;
+      const voiceLabel = ttsVoice.startsWith('sys-')
+        ? ttsVoice.replace(/^sys-/, '').slice(0, 15)
+        : voiceObj.name.split(' ')[0];
+      const edgeVoice = ttsVoice.startsWith('sys-')
+        ? undefined
+        : voiceObj.edgeVoice ||
+          (voiceObj.gender === 'female' ? 'id-ID-GadisNeural' : 'id-ID-ArdiNeural');
+      const effectivePitch = ttsVoice.startsWith('sys-')
+        ? ttsPitch
+        : (voiceObj.defaultPitch ?? 1.0) * ttsPitch;
+      const effectiveSpeed = ttsVoice.startsWith('sys-')
+        ? ttsSpeed
+        : (voiceObj.defaultSpeed ?? 1.0) * ttsSpeed;
+
+      const generatedVoiceovers: Voiceover[] = [];
+      for (let i = 0; i < targets.length; i++) {
+        const sub = targets[i];
+        setTtsStatus(`Merekam narasi ${i + 1}/${targets.length}...`);
+        const { url, duration } = await generateTTSAudio(sub.text, lang, {
+          pitch: effectivePitch,
+          speed: effectiveSpeed,
+          edgeVoice,
+        });
+        generatedVoiceovers.push({
+          id: `vo-sub-${sub.id}-${Date.now()}`,
+          name: `Narasi [${voiceLabel}]: ${sub.text.slice(0, 22)}${sub.text.length > 22 ? '...' : ''}`,
+          url,
+          duration,
+          startTime: parseFloat(Math.max(0, sub.startTime).toFixed(1)),
+          volume: 1,
+        });
+      }
+
+      setVoiceovers((prev) => {
+        const targetSubIds = new Set(targets.map((s) => s.id));
+        const filtered = prev.filter(
+          (v) => !Array.from(targetSubIds).some((sid) => v.id.startsWith(`vo-sub-${sid}-`))
+        );
+        return [...filtered, ...generatedVoiceovers];
+      });
+
+      setTtsStatus('');
+      if (setCurrentTime) setCurrentTime(targets[0].startTime);
+    } catch (err: unknown) {
+      console.error('Narrate subtitles error:', err);
+      alert('Gagal menarasikan subtitle: ' + (err instanceof Error ? err.message : 'Terjadi kesalahan'));
+    } finally {
+      setIsGeneratingTTS(false);
+    }
+  };
+
   const selectedClip = clips.find((c) => c.id === selectedClipId);
 
   // Sync 3D studio controls when user selects a 3D clip on the timeline
@@ -2463,6 +2522,55 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               </button>
             </div>
 
+            {/* NARASIKAN SUBTITLE MENJADI SUARA AI (TTS) */}
+            {subtitles.length > 0 && (
+              <div className="p-3 bg-gradient-to-r from-indigo-950/60 to-purple-950/50 border border-indigo-500/40 rounded-xl mb-3 shadow-md space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-200 flex items-center space-x-1.5">
+                    <Mic className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Narasikan Subtitle (Suara AI)</span>
+                  </span>
+                  <span className="text-[10px] text-indigo-300 font-mono">
+                    {subtitles.length} baris
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-300 leading-relaxed">
+                  Ubah semua teks subtitle di bawah menjadi suara narasi otomatis sesuai waktunya di Timeline.
+                </p>
+                <div className="flex items-center space-x-1.5">
+                  <select
+                    value={ttsVoice}
+                    onChange={(e) => setTtsVoice(e.target.value)}
+                    className="flex-1 bg-[#101115] border border-indigo-500/30 rounded-lg px-2 py-1.5 text-[11px] text-gray-200 outline-none focus:border-indigo-400"
+                  >
+                    {AVAILABLE_VOICES.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={isGeneratingTTS}
+                    onClick={() => handleNarrateSubtitles()}
+                    className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center space-x-1 shadow transition-all"
+                  >
+                    {isGeneratingTTS ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Volume2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>{isGeneratingTTS ? 'Proses...' : 'Narasikan Semua'}</span>
+                  </button>
+                </div>
+                {ttsStatus && (
+                  <p className="text-[10px] text-indigo-300 font-medium animate-pulse">
+                    {ttsStatus}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* POPULAR SUBTITLE STYLE PRESETS */}
             <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] mb-3 space-y-2">
               <div className="flex items-center justify-between">
@@ -2719,16 +2827,30 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                           ({formatTime(sub.startTime)} - {formatTime(sub.endTime)})
                         </span>
                       </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSubtitles((prev) => prev.filter((s) => s.id !== sub.id));
-                        }}
-                        className="text-gray-500 hover:text-red-400 p-1 transition-colors"
-                        title="Hapus Subtitle"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          type="button"
+                          disabled={isGeneratingTTS || !sub.text.trim()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleNarrateSubtitles(sub);
+                          }}
+                          className="text-indigo-400 hover:text-indigo-300 disabled:opacity-40 p-1 rounded hover:bg-indigo-500/15 transition-colors"
+                          title="Narasikan baris subtitle ini dengan suara AI"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSubtitles((prev) => prev.filter((s) => s.id !== sub.id));
+                          }}
+                          className="text-gray-500 hover:text-red-400 p-1 transition-colors"
+                          title="Hapus Subtitle"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <textarea
