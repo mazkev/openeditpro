@@ -1681,6 +1681,622 @@ function createFactBadgeTexture(text: string): THREE.CanvasTexture {
 }
 
 /**
+ * Fully Articulated 2D Vector Cartoon Character Engine (Si Stickman Blangkon)
+ * - Renders crisp vector cartoon line art matching the user reference photo.
+ * - Dynamic blinking eyes with expressive pupil tracking.
+ * - Animated talking mouth (lip-sync mouth flap during explanations, gasp during shock, smile during greeting).
+ * - Articulated bending arms and hands (waves, gestures, scratches chin, clenches cheeks).
+ * - Natural breathing, head tilting, sarung swaying, and stepping legs.
+ */
+export function renderArticulatedStickman2D(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  pose: StickmanPose,
+  t: number,
+  config: Scene3DConfig
+): void {
+  ctx.clearRect(0, 0, width, height);
+
+  const cx = width / 2; // 512
+  const groundY = height * 0.88; // ~900
+
+  // 1. Natural Breathing & Organic Kinematics
+  const breatheY = Math.sin(t * 3.5) * 4.5;
+  const breatheScaleY = 1.0 + Math.sin(t * 3.5) * 0.012;
+  const breatheScaleX = 1.0 - Math.sin(t * 3.5) * 0.008;
+
+  let bodyOffsetY = 0;
+  let bodyOffsetX = 0;
+  let bodyTilt = 0;
+
+  if (pose === 'shock') {
+    bodyOffsetY = -Math.abs(Math.sin(t * 8.5)) * 32;
+    bodyOffsetX = Math.sin(t * 45.0) * 4.5;
+    bodyTilt = Math.sin(t * 28.0) * 0.02;
+  } else if (pose === 'walk') {
+    bodyOffsetY = -Math.abs(Math.sin(t * 7.0)) * 18;
+    bodyTilt = Math.sin(t * 3.5) * 0.035;
+  } else if (pose === 'wave') {
+    bodyTilt = Math.sin(t * 5.5) * 0.025;
+  } else if (pose === 'think') {
+    bodyTilt = 0.035 + Math.sin(t * 2.2) * 0.015;
+  }
+
+  ctx.save();
+  ctx.translate(cx + bodyOffsetX, groundY + bodyOffsetY);
+  ctx.scale(breatheScaleX, breatheScaleY);
+  ctx.rotate(bodyTilt);
+
+  // Colors & Styles
+  const strokeColor = '#18181b';
+  const fillColor = '#ffffff';
+  const lineWidth = 8;
+
+  // Ground sketch lines (matching original artwork)
+  ctx.save();
+  ctx.strokeStyle = '#18181b';
+  ctx.lineWidth = 4.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-110, 0);
+  ctx.lineTo(130, 0);
+  ctx.moveTo(-75, 4);
+  ctx.lineTo(45, 4);
+  ctx.stroke();
+  ctx.restore();
+
+  // Reference points relative to feet at (0, 0):
+  const pelvisY = -180 + breatheY;
+  const shoulderY = -345 + breatheY;
+  const neckY = -365 + breatheY;
+  const headR = 88;
+  const headCenterY = neckY - headR; // ~ -453
+
+  // 2. LEGS & FEET
+  const leftHipX = -26;
+  const rightHipX = 26;
+  let leftFootX = -40;
+  let leftFootY = 0;
+  let rightFootX = 35;
+  let rightFootY = 0;
+
+  if (pose === 'walk') {
+    const walkPhase = t * 7.0;
+    leftFootY = -Math.max(0, Math.sin(walkPhase)) * 32;
+    leftFootX = -40 + Math.cos(walkPhase) * 20;
+    rightFootY = -Math.max(0, Math.sin(walkPhase + Math.PI)) * 32;
+    rightFootX = 35 - Math.cos(walkPhase) * 20;
+  }
+
+  // Draw Legs
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Left Leg
+  ctx.beginPath();
+  ctx.moveTo(leftHipX, pelvisY + 30);
+  ctx.lineTo(leftFootX, leftFootY);
+  ctx.stroke();
+
+  // Right Leg
+  ctx.beginPath();
+  ctx.moveTo(rightHipX, pelvisY + 30);
+  ctx.lineTo(rightFootX, rightFootY);
+  ctx.stroke();
+
+  // Feet / Shoes (distinctive elongated cartoon shoes from reference image)
+  const drawFoot = (fx: number, fy: number, isRight: boolean) => {
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.beginPath();
+    if (isRight) {
+      ctx.moveTo(-10, -10);
+      ctx.quadraticCurveTo(38, -12, 42, -2);
+      ctx.quadraticCurveTo(35, 6, -10, 4);
+      ctx.closePath();
+    } else {
+      ctx.moveTo(10, -10);
+      ctx.quadraticCurveTo(-38, -12, -42, -2);
+      ctx.quadraticCurveTo(-35, 6, 10, 4);
+      ctx.closePath();
+    }
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  drawFoot(leftFootX, leftFootY, false);
+  drawFoot(rightFootX, rightFootY, true);
+
+  // 3. SARUNG & KNOT (Authentic Plaid Tartan Pattern)
+  const sarungPattern = config.sarungPattern || 'plaid-red';
+  const sarungTex = getSarungTexture(sarungPattern);
+  const sarungSway = pose === 'walk' ? Math.sin(t * 7.0) * 12 : Math.sin(t * 2.5) * 4;
+
+  ctx.save();
+  ctx.beginPath();
+  // Sarung trapezoid silhouette
+  const sarungTopY = pelvisY - 45;
+  const sarungBotY = pelvisY + 80;
+  ctx.moveTo(-52, sarungTopY);
+  ctx.lineTo(52, sarungTopY);
+  ctx.lineTo(68 + sarungSway, sarungBotY);
+  ctx.lineTo(-68 + sarungSway, sarungBotY);
+  ctx.closePath();
+
+  // Fill with sarung pattern
+  if (sarungTex.image) {
+    const pattern = ctx.createPattern(sarungTex.image as HTMLCanvasElement, 'repeat');
+    if (pattern) {
+      ctx.fillStyle = pattern;
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#6b111a';
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = '#6b111a';
+    ctx.fill();
+  }
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+
+  // Tied knot / folded belt at waist
+  ctx.beginPath();
+  ctx.roundRect(-24, sarungTopY - 8, 48, 22, 6);
+  if (sarungTex.image) {
+    const knotPattern = ctx.createPattern(sarungTex.image as HTMLCanvasElement, 'repeat');
+    if (knotPattern) {
+      ctx.fillStyle = knotPattern;
+      ctx.fill();
+    }
+  }
+  ctx.stroke();
+
+  // Folded knot cloth tail hanging down
+  ctx.beginPath();
+  ctx.moveTo(-6, sarungTopY + 14);
+  ctx.lineTo(8, sarungTopY + 14);
+  ctx.lineTo(14, sarungTopY + 68);
+  ctx.lineTo(-8, sarungTopY + 65);
+  ctx.closePath();
+  if (sarungTex.image) {
+    const tailPattern = ctx.createPattern(sarungTex.image as HTMLCanvasElement, 'repeat');
+    if (tailPattern) {
+      ctx.fillStyle = tailPattern;
+      ctx.fill();
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // 4. TORSO (White Shirt / Surjan with black stroke)
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(-36, shoulderY);
+  ctx.lineTo(36, shoulderY);
+  ctx.lineTo(44, sarungTopY);
+  ctx.lineTo(-44, sarungTopY);
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+  ctx.restore();
+
+  // 5. ARMS & HANDS (Articulated Kinematics)
+  const leftShoulderX = 36;
+  const rightShoulderX = -36;
+
+  // Draw Arm Helper (bends at elbow to wrist, with hand)
+  const drawSegmentedArm = (
+    sx: number,
+    sy: number,
+    ex: number,
+    ey: number,
+    wx: number,
+    wy: number,
+    handType: 'fist' | 'open' | 'pointing' | 'akimbo' | 'cheek' | 'chin',
+    angleHand = 0
+  ) => {
+    ctx.save();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Upper arm
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    // Forearm
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(wx, wy);
+    ctx.stroke();
+
+    // Hand
+    ctx.translate(wx, wy);
+    ctx.rotate(angleHand);
+    ctx.fillStyle = strokeColor; // Black stickman hands (matching reference photo)
+
+    if (handType === 'open') {
+      // Waving open hand with 4 cartoon fingers
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.fill();
+      // Fingers
+      for (let i = -1.5; i <= 1.5; i++) {
+        const fingerAngle = i * 0.28 - Math.PI / 2;
+        const fLen = 18 - Math.abs(i) * 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(fingerAngle) * fLen, Math.sin(fingerAngle) * fLen);
+        ctx.lineWidth = 5.5;
+        ctx.stroke();
+      }
+    } else if (handType === 'pointing') {
+      // Clenched fist with pointing index finger
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.fill();
+      // Index finger pointing out
+      ctx.beginPath();
+      ctx.moveTo(0, -3);
+      ctx.lineTo(24, -3);
+      ctx.lineWidth = 6;
+      ctx.stroke();
+    } else if (handType === 'cheek' || handType === 'chin') {
+      ctx.beginPath();
+      ctx.arc(0, 0, 13, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+
+  // RIGHT ARM (Viewer's Left - Primary Action Arm)
+  if (pose === 'wave') {
+    // Forearm rocks back and forth waving vigorously!
+    const waveAngle = -1.15 + Math.sin(t * 8.5) * 0.38;
+    const elbowX = rightShoulderX - 45;
+    const elbowY = shoulderY - 55;
+    const wristX = elbowX + Math.cos(waveAngle) * 85;
+    const wristY = elbowY + Math.sin(waveAngle) * 85;
+    drawSegmentedArm(rightShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'open', waveAngle + Math.PI / 2);
+  } else if (pose === 'explain') {
+    // Open palm gesture bobbing rhythmically
+    const gestureY = Math.sin(t * 6.0) * 16;
+    const elbowX = rightShoulderX - 48;
+    const elbowY = shoulderY + 45;
+    const wristX = elbowX - 52;
+    const wristY = elbowY - 25 + gestureY;
+    drawSegmentedArm(rightShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'open', -0.5);
+  } else if (pose === 'think') {
+    // Arm bends up to scratch chin / temple
+    const tap = Math.sin(t * 7.0) * 3;
+    const elbowX = rightShoulderX - 35;
+    const elbowY = shoulderY + 55;
+    const wristX = -18;
+    const wristY = headCenterY + headR - 12 + tap;
+    drawSegmentedArm(rightShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'chin', -1.2);
+  } else if (pose === 'shock') {
+    // Clutch right cheek!
+    const elbowX = rightShoulderX - 55;
+    const elbowY = shoulderY - 35;
+    const wristX = -headR * 0.85;
+    const wristY = headCenterY + 15;
+    drawSegmentedArm(rightShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'cheek', 0.6);
+  } else if (pose === 'point') {
+    // Arm points across to the right side
+    const elbowX = rightShoulderX + 25;
+    const elbowY = shoulderY - 15;
+    const wristX = elbowX + 110;
+    const wristY = elbowY - 20;
+    drawSegmentedArm(rightShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'pointing', 0);
+  } else if (pose === 'walk') {
+    // Arm swings
+    const armSwing = Math.sin(t * 7.0) * 45;
+    const elbowX = rightShoulderX - 25;
+    const elbowY = shoulderY + 45;
+    const wristX = elbowX + armSwing;
+    const wristY = elbowY + 35;
+    drawSegmentedArm(rightShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'fist', 0);
+  } else {
+    // Idle: relaxed resting arm
+    const elbowX = rightShoulderX - 32;
+    const elbowY = shoulderY + 45;
+    const wristX = elbowX - 10;
+    const wristY = elbowY + 45;
+    drawSegmentedArm(rightShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'fist', 0);
+  }
+
+  // LEFT ARM (Viewer's Right)
+  if (pose === 'shock') {
+    // Clutch left cheek!
+    const elbowX = leftShoulderX + 55;
+    const elbowY = shoulderY - 35;
+    const wristX = headR * 0.85;
+    const wristY = headCenterY + 15;
+    drawSegmentedArm(leftShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'cheek', -0.6);
+  } else if (pose === 'walk') {
+    // Counter-phase arm swing
+    const armSwing = -Math.sin(t * 7.0) * 45;
+    const elbowX = leftShoulderX + 25;
+    const elbowY = shoulderY + 45;
+    const wristX = elbowX + armSwing;
+    const wristY = elbowY + 35;
+    drawSegmentedArm(leftShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'fist', 0);
+  } else {
+    // Classic Akimbo: hand resting on hip (exact match to reference photo!)
+    const elbowX = leftShoulderX + 46;
+    const elbowY = shoulderY + 52;
+    const wristX = leftShoulderX + 18;
+    const wristY = sarungTopY + 16;
+    drawSegmentedArm(leftShoulderX, shoulderY, elbowX, elbowY, wristX, wristY, 'akimbo', 0);
+  }
+
+  // 6. HEAD & NECK
+  const headNodY = pose === 'explain' ? Math.sin(t * 6.5) * 5 : 0;
+  const headTiltAngle =
+    pose === 'think' ? 0.08 + Math.sin(t * 2.2) * 0.03 : Math.sin(t * 2.5) * 0.02;
+
+  ctx.save();
+  ctx.translate(0, headCenterY + headNodY);
+  ctx.rotate(headTiltAngle);
+
+  // Big Round White Head
+  ctx.beginPath();
+  ctx.arc(0, 0, headR, 0, Math.PI * 2);
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+
+  // 7. BLANGKON (Traditional Javanese Batik Headwear)
+  const batikTex = getBatikBlangkonTexture();
+
+  ctx.save();
+  // Mondholan (the iconic rounded bun at back right)
+  const mondholanX = headR * 0.88;
+  const mondholanY = -12;
+  ctx.beginPath();
+  ctx.ellipse(mondholanX, mondholanY, 24, 34, 0.35, 0, Math.PI * 2);
+  if (batikTex.image) {
+    const bPat = ctx.createPattern(batikTex.image as HTMLCanvasElement, 'repeat');
+    if (bPat) {
+      ctx.fillStyle = bPat;
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#451a03';
+      ctx.fill();
+    }
+  }
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+
+  // Contour swirls on mondholan
+  ctx.strokeStyle = '#291003';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(mondholanX, mondholanY, 14, 0.4, Math.PI * 1.5);
+  ctx.stroke();
+
+  // Blangkon Main Cap on Head
+  ctx.beginPath();
+  ctx.arc(0, 0, headR + 1, Math.PI, 0); // Upper hemisphere
+  // Forehead contour with distinctive inverted V-notch
+  ctx.quadraticCurveTo(headR * 0.5, 4, 0, 18); // Dip to center forehead
+  ctx.quadraticCurveTo(-headR * 0.5, 4, -headR - 1, 0);
+  ctx.closePath();
+
+  if (batikTex.image) {
+    const bPat = ctx.createPattern(batikTex.image as HTMLCanvasElement, 'repeat');
+    if (bPat) {
+      ctx.fillStyle = bPat;
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#451a03';
+      ctx.fill();
+    }
+  }
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+
+  // Pleated wiron fold lines across blangkon
+  ctx.strokeStyle = 'rgba(254, 215, 170, 0.45)';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(-headR * 0.85, -20);
+  ctx.quadraticCurveTo(0, -6, headR * 0.85, -20);
+  ctx.moveTo(-headR * 0.75, -45);
+  ctx.quadraticCurveTo(0, -32, headR * 0.75, -45);
+  ctx.stroke();
+  ctx.restore();
+
+  // 8. EYES & NATURAL BLINKING
+  const blinkCycle = t % 3.4;
+  const isBlinking = blinkCycle < 0.14;
+  const eyeBlinkScale = isBlinking ? Math.max(0.08, Math.sin((blinkCycle / 0.14) * Math.PI)) : 1.0;
+
+  let pupilDx = 0;
+  let pupilDy = 0;
+  let eyeScale = 1.0;
+
+  if (pose === 'think') {
+    pupilDx = 8;
+    pupilDy = -12; // Looking up thoughtfully
+  } else if (pose === 'point') {
+    pupilDx = 11;
+    pupilDy = 0;
+  } else if (pose === 'shock') {
+    eyeScale = 1.35; // Bulging shock eyes!
+  }
+
+  const drawEye = (ex: number, ey: number) => {
+    ctx.save();
+    ctx.translate(ex, ey);
+    ctx.scale(eyeScale, eyeScale * eyeBlinkScale);
+
+    // Eye outline & white eyeball
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 24, 30, 0, 0, Math.PI * 2);
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 6.5;
+    ctx.stroke();
+
+    // Pupil
+    if (!isBlinking) {
+      const pupilR = pose === 'shock' ? 7 : 11;
+      ctx.beginPath();
+      ctx.arc(pupilDx, pupilDy, pupilR, 0, Math.PI * 2);
+      ctx.fillStyle = strokeColor;
+      ctx.fill();
+
+      // Specular highlight dot
+      ctx.beginPath();
+      ctx.arc(pupilDx - 3.5, pupilDy - 3.5, 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+
+  const eyeLeftX = -32;
+  const eyeRightX = 32;
+  const eyeY = 22;
+
+  drawEye(eyeLeftX, eyeY);
+  drawEye(eyeRightX, eyeY);
+
+  // 9. EYEBROWS
+  ctx.save();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+
+  if (pose === 'shock') {
+    // High arched shock brows
+    ctx.beginPath();
+    ctx.arc(eyeLeftX, -16, 26, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(eyeRightX, -16, 26, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+  } else if (pose === 'think') {
+    // Left brow arched high, right brow furrowed
+    ctx.beginPath();
+    ctx.arc(eyeLeftX, -18, 24, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(eyeRightX - 22, -8);
+    ctx.lineTo(eyeRightX + 22, -2);
+    ctx.stroke();
+  } else {
+    // Friendly arched smiling brows
+    ctx.beginPath();
+    ctx.arc(eyeLeftX, -8, 22, Math.PI * 1.18, Math.PI * 1.82);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(eyeRightX, -8, 22, Math.PI * 1.18, Math.PI * 1.82);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 10. MOUTH (Animated Lip-Sync, Talking, Smile & Gasp)
+  ctx.save();
+  ctx.translate(0, 56);
+
+  if (pose === 'explain') {
+    // DYNAMIC TALKING MOUTH FLAP (LIP SYNC)!
+    const talkCycle = Math.abs(Math.sin(t * 13.5));
+    const mouthOpen = 8 + talkCycle * 24;
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 26, mouthOpen, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#4c0519'; // Deep cavity
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 6.5;
+    ctx.stroke();
+
+    // Upper teeth
+    if (mouthOpen > 14) {
+      ctx.beginPath();
+      ctx.rect(-16, -mouthOpen + 2, 32, 9);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+    // Pink tongue
+    ctx.beginPath();
+    ctx.ellipse(0, mouthOpen - 4, 16, 8, 0, 0, Math.PI);
+    ctx.fillStyle = '#fb7185';
+    ctx.fill();
+  } else if (pose === 'shock') {
+    // Huge open O gasp
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 20, 32, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#1e1b4b';
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 7;
+    ctx.stroke();
+  } else if (pose === 'think') {
+    // Small sideways pursed curious mouth
+    ctx.beginPath();
+    ctx.arc(10, 0, 12, 0.4, Math.PI * 1.1);
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  } else {
+    // Broad open cartoon smile (classic Kok Bisa smile from reference photo)
+    ctx.beginPath();
+    ctx.arc(0, -6, 32, 0.15, Math.PI - 0.15);
+    ctx.closePath();
+    ctx.fillStyle = '#881337'; // Warm dark red mouth cavity
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 6.5;
+    ctx.stroke();
+
+    // White teeth band
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-26, -6, 52, 9);
+    // Coral tongue
+    ctx.beginPath();
+    ctx.arc(0, 22, 18, 0, Math.PI * 2);
+    ctx.fillStyle = '#fb7185';
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  ctx.restore(); // End head
+  ctx.restore(); // End body
+}
+
+/**
  * Deterministic Three.js 2D/3D Explainer Studio Renderer shared by PreviewPlayer and Mediabunny MP4 Export.
  */
 export class Scene3DRenderer {
@@ -1698,6 +2314,9 @@ export class Scene3DRenderer {
   private propCanvas: HTMLCanvasElement;
   private propTexture: THREE.CanvasTexture;
   private propMesh: THREE.Mesh;
+  private stickmanCanvas: HTMLCanvasElement;
+  private stickmanCtx: CanvasRenderingContext2D | null;
+  private stickmanTex: THREE.CanvasTexture;
   private stickman2DMesh: THREE.Mesh;
   private stickman2DMat: THREE.MeshBasicMaterial;
   private rig: StickmanRig;
@@ -1805,17 +2424,21 @@ export class Scene3DRenderer {
     this.propMesh.visible = false;
     this.scene.add(this.propMesh);
 
-    // 2D Cartoon Stickman Character Plane (authentic hand-drawn art from user photo)
-    const meshH = 2.15;
-    const meshW = 2.15 * (1024 / 571);
-    const planeGeo = new THREE.PlaneGeometry(meshW, meshH);
-    planeGeo.translate(0, meshH / 2, 0); // Pivot at bottom feet
-    const initialTex =
-      cachedStickmanOriginalTex ||
-      cachedStickmanCutoutTex ||
-      getStickmanPlaceholderTexture();
+    // Fully Articulated 2D Cartoon Character Canvas & Texture
+    this.stickmanCanvas = document.createElement('canvas');
+    this.stickmanCanvas.width = 1024;
+    this.stickmanCanvas.height = 1024;
+    this.stickmanCtx = this.stickmanCanvas.getContext('2d');
+    this.stickmanTex = new THREE.CanvasTexture(this.stickmanCanvas);
+    this.stickmanTex.colorSpace = THREE.SRGBColorSpace;
+
+    // 2D Cartoon Stickman Character Plane (Pivot at bottom feet)
+    const meshSize = 2.15;
+    const planeGeo = new THREE.PlaneGeometry(meshSize, meshSize);
+    planeGeo.translate(0, meshSize / 2, 0);
+
     this.stickman2DMat = new THREE.MeshBasicMaterial({
-      map: initialTex,
+      map: this.stickmanTex,
       transparent: true,
       side: THREE.DoubleSide,
       depthWrite: false,
@@ -1951,83 +2574,107 @@ export class Scene3DRenderer {
       this.rig.root.visible = false; // Procedural 3D mannequin mesh is hidden
       this.stickman2DMesh.visible = true; // Authentic 2D Cartoon Character is shown
 
-      // Update texture: for paper-sketch / light-studio use original/cutout; for dark/colored use transparent cutout
-      const isPaperSketch =
-        config.stageTheme === 'paper-sketch' || config.stageTheme === 'light-studio';
-      const targetTex = isPaperSketch
-        ? cachedStickmanOriginalTex || cachedStickmanCutoutTex || getStickmanPlaceholderTexture()
-        : cachedStickmanCutoutTex || cachedStickmanOriginalTex || getStickmanPlaceholderTexture();
+      const animType = config.cartoonAnimType ?? 'articulated';
 
-      if (this.stickman2DMat.map !== targetTex) {
-        this.stickman2DMat.map = targetTex;
-        this.stickman2DMat.needsUpdate = true;
+      if (animType === 'photo-cutout') {
+        // Fallback to static cutout photo with cartoon squash & stretch kinematics
+        const isPaperSketch =
+          config.stageTheme === 'paper-sketch' || config.stageTheme === 'light-studio';
+        const targetTex = isPaperSketch
+          ? cachedStickmanOriginalTex || cachedStickmanCutoutTex || getStickmanPlaceholderTexture()
+          : cachedStickmanCutoutTex || cachedStickmanOriginalTex || getStickmanPlaceholderTexture();
+
+        if (this.stickman2DMat.map !== targetTex) {
+          this.stickman2DMat.map = targetTex;
+          this.stickman2DMat.needsUpdate = true;
+        }
+
+        let bounceY = 0;
+        let scaleX = 1.0;
+        let scaleY = 1.0;
+        let tiltZ = 0;
+        let posX = 0;
+
+        switch (config.pose) {
+          case 'wave': {
+            tiltZ = Math.sin(animTime * 5.5) * 0.045;
+            bounceY = Math.abs(Math.sin(animTime * 5.5)) * 0.04;
+            scaleY = 1.0 + Math.sin(animTime * 5.5) * 0.035;
+            scaleX = 1.0 - Math.sin(animTime * 5.5) * 0.025;
+            break;
+          }
+          case 'explain': {
+            bounceY = Math.sin(animTime * 4.8) * 0.025;
+            tiltZ = Math.sin(animTime * 3.2) * 0.028;
+            scaleY = 1.0 + Math.sin(animTime * 4.8) * 0.028;
+            scaleX = 1.0 - Math.sin(animTime * 4.8) * 0.02;
+            break;
+          }
+          case 'think': {
+            tiltZ = 0.048 + Math.sin(animTime * 2.2) * 0.022;
+            bounceY = Math.sin(animTime * 2.4) * 0.018;
+            scaleY = 1.0 + Math.sin(animTime * 2.4) * 0.015;
+            scaleX = 1.0 - Math.sin(animTime * 2.4) * 0.012;
+            break;
+          }
+          case 'shock': {
+            const jitterX = Math.sin(animTime * 45) * 0.018;
+            posX = jitterX;
+            bounceY = Math.abs(Math.sin(animTime * 8.5)) * 0.085;
+            scaleY = 1.08 + Math.sin(animTime * 14) * 0.045;
+            scaleX = 0.93 - Math.sin(animTime * 14) * 0.035;
+            tiltZ = Math.sin(animTime * 28) * 0.02;
+            break;
+          }
+          case 'point': {
+            tiltZ = -0.035 + Math.sin(animTime * 3.0) * 0.012;
+            bounceY = Math.sin(animTime * 4.0) * 0.02;
+            scaleY = 1.0 + Math.sin(animTime * 4.0) * 0.018;
+            scaleX = 1.0 - Math.sin(animTime * 4.0) * 0.014;
+            break;
+          }
+          case 'walk': {
+            bounceY = Math.abs(Math.sin(animTime * 7.0)) * 0.06;
+            tiltZ = Math.sin(animTime * 3.5) * 0.052;
+            scaleX = 1.0 + Math.sin(animTime * 7.0) * 0.03;
+            scaleY = 1.0 - Math.sin(animTime * 7.0) * 0.03;
+            break;
+          }
+          case 'idle':
+          default: {
+            bounceY = Math.sin(animTime * 3.5) * 0.015;
+            scaleY = 1.0 + Math.sin(animTime * 3.5) * 0.018;
+            scaleX = 1.0 - Math.sin(animTime * 3.5) * 0.014;
+            tiltZ = Math.sin(animTime * 1.8) * 0.012;
+            break;
+          }
+        }
+
+        this.stickman2DMesh.position.set(posX, Math.max(0, bounceY), 0.02);
+        this.stickman2DMesh.scale.set(1.793 * scaleX, scaleY, 1);
+        this.stickman2DMesh.rotation.z = tiltZ;
+      } else {
+        // Articulated 2D Cartoon Engine (Living, expressive, articulated character)
+        if (this.stickmanCtx) {
+          renderArticulatedStickman2D(
+            this.stickmanCtx,
+            1024,
+            1024,
+            config.pose,
+            animTime,
+            config
+          );
+          this.stickmanTex.needsUpdate = true;
+        }
+        if (this.stickman2DMat.map !== this.stickmanTex) {
+          this.stickman2DMat.map = this.stickmanTex;
+          this.stickman2DMat.needsUpdate = true;
+        }
+
+        this.stickman2DMesh.position.set(0, 0, 0.02);
+        this.stickman2DMesh.scale.set(1, 1, 1);
+        this.stickman2DMesh.rotation.z = 0;
       }
-
-      // Cartoon kinematic physics (Squash & Stretch, Bobbing, Tilting)
-      let bounceY = 0;
-      let scaleX = 1.0;
-      let scaleY = 1.0;
-      let tiltZ = 0;
-      let posX = 0;
-
-      switch (config.pose) {
-        case 'wave': {
-          tiltZ = Math.sin(animTime * 5.5) * 0.045;
-          bounceY = Math.abs(Math.sin(animTime * 5.5)) * 0.04;
-          scaleY = 1.0 + Math.sin(animTime * 5.5) * 0.035;
-          scaleX = 1.0 - Math.sin(animTime * 5.5) * 0.025;
-          break;
-        }
-        case 'explain': {
-          bounceY = Math.sin(animTime * 4.8) * 0.025;
-          tiltZ = Math.sin(animTime * 3.2) * 0.028;
-          scaleY = 1.0 + Math.sin(animTime * 4.8) * 0.028;
-          scaleX = 1.0 - Math.sin(animTime * 4.8) * 0.02;
-          break;
-        }
-        case 'think': {
-          tiltZ = 0.048 + Math.sin(animTime * 2.2) * 0.022;
-          bounceY = Math.sin(animTime * 2.4) * 0.018;
-          scaleY = 1.0 + Math.sin(animTime * 2.4) * 0.015;
-          scaleX = 1.0 - Math.sin(animTime * 2.4) * 0.012;
-          break;
-        }
-        case 'shock': {
-          const jitterX = Math.sin(animTime * 45) * 0.018;
-          posX = jitterX;
-          bounceY = Math.abs(Math.sin(animTime * 8.5)) * 0.085;
-          scaleY = 1.08 + Math.sin(animTime * 14) * 0.045;
-          scaleX = 0.93 - Math.sin(animTime * 14) * 0.035;
-          tiltZ = Math.sin(animTime * 28) * 0.02;
-          break;
-        }
-        case 'point': {
-          tiltZ = -0.035 + Math.sin(animTime * 3.0) * 0.012;
-          bounceY = Math.sin(animTime * 4.0) * 0.02;
-          scaleY = 1.0 + Math.sin(animTime * 4.0) * 0.018;
-          scaleX = 1.0 - Math.sin(animTime * 4.0) * 0.014;
-          break;
-        }
-        case 'walk': {
-          bounceY = Math.abs(Math.sin(animTime * 7.0)) * 0.06;
-          tiltZ = Math.sin(animTime * 3.5) * 0.052;
-          scaleX = 1.0 + Math.sin(animTime * 7.0) * 0.03;
-          scaleY = 1.0 - Math.sin(animTime * 7.0) * 0.03;
-          break;
-        }
-        case 'idle':
-        default: {
-          bounceY = Math.sin(animTime * 3.5) * 0.015;
-          scaleY = 1.0 + Math.sin(animTime * 3.5) * 0.018;
-          scaleX = 1.0 - Math.sin(animTime * 3.5) * 0.014;
-          tiltZ = Math.sin(animTime * 1.8) * 0.012;
-          break;
-        }
-      }
-
-      this.stickman2DMesh.position.set(posX, Math.max(0, bounceY), 0.02);
-      this.stickman2DMesh.scale.set(scaleX, scaleY, 1);
-      this.stickman2DMesh.rotation.z = tiltZ;
 
       // Render Storytelling Prop (Illustrations & Visual Story Elements)
       const effectiveProp: StoryProp3D =
@@ -2127,6 +2774,7 @@ export class Scene3DRenderer {
     const mat = this.badgeMesh.material as THREE.MeshBasicMaterial;
     mat.map?.dispose();
     this.propTexture.dispose();
+    this.stickmanTex.dispose();
     this.stickman2DMesh.geometry.dispose();
     this.stickman2DMat.dispose();
     this.renderer.dispose();

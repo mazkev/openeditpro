@@ -243,6 +243,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [camera3d, setCamera3d] = useState<CameraPreset3D>('presenter');
   const [duration3d, setDuration3d] = useState(5);
   const [speed3d, setSpeed3d] = useState(1.0);
+  const [cartoonAnimType3d, setCartoonAnimType3d] = useState<'articulated' | 'photo-cutout'>('articulated');
   const [factBadge3d, setFactBadge3d] = useState('TAHUKAH KAMU?');
   const [mode3d, setMode3d] = useState<'stickman' | 'glb'>('stickman');
   const [glbUrl3d, setGlbUrl3d] = useState('');
@@ -672,6 +673,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         if (s.characterStyle) setCharacterStyle3d(s.characterStyle);
         if (s.sarungPattern) setSarungPattern3d(s.sarungPattern);
         if (s.storyProp) setProp3d(s.storyProp);
+        if (s.cartoonAnimType) setCartoonAnimType3d(s.cartoonAnimType);
         setDuration3d(dur);
       });
     }
@@ -930,6 +932,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     cameraPreset: 'presenter',
                     animationSpeed: 1.0,
                     factBadgeText: 'KOK BISA?!',
+                    cartoonAnimType: 'articulated',
                   };
                   const scene2: Scene3DConfig = {
                     mode: 'stickman',
@@ -942,6 +945,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     cameraPreset: 'zoom-in',
                     animationSpeed: 1.0,
                     factBadgeText: '3 JANTUNG GURITA',
+                    cartoonAnimType: 'articulated',
                   };
                   const scene3: Scene3DConfig = {
                     mode: 'stickman',
@@ -954,6 +958,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     cameraPreset: 'presenter',
                     animationSpeed: 1.1,
                     factBadgeText: 'MIND BLOWN!',
+                    cartoonAnimType: 'articulated',
                   };
 
                   const charLabel = characterStyle3d === 'blangkon' ? 'Stickman Blangkon' : 'Stickman';
@@ -1089,6 +1094,54 @@ const SidebarComponent: React.FC<SidebarProps> = ({
 
             {mode3d === 'stickman' ? (
               <div className="space-y-3">
+                {/* MODE ANIMASI 2D: ARTIKULASI HIDUP VS CUTOUT STATIS */}
+                <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-200 block">
+                      Tipe Gerakan Karakter 2D:
+                    </span>
+                    <span className="text-[10px] text-cyan-400 font-semibold">
+                      {cartoonAnimType3d === 'articulated' ? 'Hidup Berartikulasi' : 'Kertas Statis'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCartoonAnimType3d('articulated')}
+                      className={`p-2 rounded-lg border text-left transition-all ${
+                        cartoonAnimType3d === 'articulated'
+                          ? 'bg-cyan-950/70 border-cyan-400 text-white ring-1 ring-cyan-400/50'
+                          : 'bg-[#12131a] border-[#232532] text-gray-300 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="text-xs font-bold flex items-center space-x-1">
+                        <span>🎭</span>
+                        <span>Animasi Hidup</span>
+                      </div>
+                      <p className="text-[9.5px] text-gray-400 mt-0.5 leading-tight">
+                        Mata kedip, mulut bicara (lip-sync), lengan bertekuk melambai & menunjuk.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCartoonAnimType3d('photo-cutout')}
+                      className={`p-2 rounded-lg border text-left transition-all ${
+                        cartoonAnimType3d === 'photo-cutout'
+                          ? 'bg-cyan-950/70 border-cyan-400 text-white ring-1 ring-cyan-400/50'
+                          : 'bg-[#12131a] border-[#232532] text-gray-300 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="text-xs font-bold flex items-center space-x-1">
+                        <span>📄</span>
+                        <span>Cutout Foto</span>
+                      </div>
+                      <p className="text-[9.5px] text-gray-400 mt-0.5 leading-tight">
+                        Foto potongan asli bergoyang (*flat paper cutout*).
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
                 {/* GAYA KARAKTER 3D */}
                 <div className="space-y-1.5">
                   <span className="text-xs font-bold text-gray-200 block">
@@ -1387,6 +1440,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     cameraPreset: camera3d,
                     animationSpeed: speed3d,
                     factBadgeText: factBadge3d.trim() || undefined,
+                    cartoonAnimType: cartoonAnimType3d,
                     glbUrl: mode3d === 'glb' ? glbUrl3d : undefined,
                   };
                   const poseLabel =
@@ -1432,6 +1486,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       cameraPreset: camera3d,
                       animationSpeed: speed3d,
                       factBadgeText: factBadge3d.trim() || undefined,
+                      cartoonAnimType: cartoonAnimType3d,
                       glbUrl:
                         mode3d === 'glb'
                           ? glbUrl3d || selectedClip.scene3d?.glbUrl

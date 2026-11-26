@@ -164,6 +164,7 @@ export interface Scene3DConfig {
   characterStyle?: StickmanCharacterStyle;
   sarungPattern?: SarungPattern;
   storyProp?: StoryProp3D;
+  cartoonAnimType?: 'articulated' | 'photo-cutout';
 }
 
 export const STORY_PROPS_3D: {
