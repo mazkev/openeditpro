@@ -249,6 +249,9 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [ambientEffect3d, setAmbientEffect3d] = useState<AmbientEffect3D>('auto');
   const [customPropImageUrl3d, setCustomPropImageUrl3d] = useState('');
   const [customBackdropImageUrl3d, setCustomBackdropImageUrl3d] = useState('');
+  const [dialogueMode3d, setDialogueMode3d] = useState(false);
+  const [partnerPose3d, setPartnerPose3d] = useState<StickmanPose>('think');
+  const [activeSpeaker3d, setActiveSpeaker3d] = useState<'main' | 'partner' | 'both'>('main');
   const [factBadge3d, setFactBadge3d] = useState('TAHUKAH KAMU?');
   const [mode3d, setMode3d] = useState<'stickman' | 'glb'>('stickman');
   const [glbUrl3d, setGlbUrl3d] = useState('');
@@ -809,6 +812,9 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         if (s.ambientEffect) setAmbientEffect3d(s.ambientEffect);
         setCustomPropImageUrl3d(s.customPropImageUrl || '');
         setCustomBackdropImageUrl3d(s.customBackdropImageUrl || '');
+        setDialogueMode3d(Boolean(s.dialogueMode));
+        if (s.partnerPose) setPartnerPose3d(s.partnerPose);
+        if (s.activeSpeaker) setActiveSpeaker3d(s.activeSpeaker);
         setDuration3d(dur);
       });
     }
@@ -1371,6 +1377,88 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   </div>
                 </div>
 
+                {/* MODE DIALOG 2 KARAKTER (SI BLANGKON + TEMAN PECI) */}
+                <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-200 flex items-center space-x-1.5">
+                      <span>👥</span>
+                      <span>Mode Dialog 2 Karakter</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDialogueMode3d((v) => !v)}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                        dialogueMode3d
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400'
+                          : 'bg-[#12131a] text-gray-400 border-[#252834] hover:text-gray-200'
+                      }`}
+                    >
+                      {dialogueMode3d ? 'Aktif ✓' : 'Nonaktif'}
+                    </button>
+                  </div>
+                  {dialogueMode3d && (
+                    <div className="space-y-2 pt-1.5 border-t border-[#232530]">
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1">
+                          Yang Berbicara (Lip-Sync Suara):
+                        </span>
+                        <div className="grid grid-cols-3 gap-1">
+                          {(
+                            [
+                              ['main', 'Si Blangkon'],
+                              ['partner', 'Teman Peci'],
+                              ['both', 'Keduanya'],
+                            ] as const
+                          ).map(([val, label]) => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setActiveSpeaker3d(val)}
+                              className={`py-1 px-1.5 rounded text-[10px] font-bold border transition-all ${
+                                activeSpeaker3d === val
+                                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400'
+                                  : 'bg-[#12131a] text-gray-400 border-[#232532]'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1">
+                          Pose / Reaksi Teman Peci:
+                        </span>
+                        <div className="grid grid-cols-3 gap-1">
+                          {(
+                            [
+                              ['think', '🤔 Berpikir'],
+                              ['shock', '😱 Kaget'],
+                              ['explain', '🗣️ Bicara'],
+                              ['wave', '👋 Sapa'],
+                              ['point', '👉 Tunjuk'],
+                              ['idle', '🧍 Diam'],
+                            ] as const
+                          ).map(([pId, pName]) => (
+                            <button
+                              key={pId}
+                              type="button"
+                              onClick={() => setPartnerPose3d(pId)}
+                              className={`py-1 px-1 rounded text-[10px] font-medium border transition-all ${
+                                partnerPose3d === pId
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400'
+                                  : 'bg-[#12131a] text-gray-400 border-[#232532]'
+                              }`}
+                            >
+                              {pName}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* GAYA KARAKTER 3D */}
                 <div className="space-y-1.5">
                   <span className="text-xs font-bold text-gray-200 block">
@@ -1882,6 +1970,9 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     ambientEffect: ambientEffect3d,
                     customPropImageUrl: customPropImageUrl3d || undefined,
                     customBackdropImageUrl: customBackdropImageUrl3d || undefined,
+                    dialogueMode: dialogueMode3d,
+                    partnerPose: partnerPose3d,
+                    activeSpeaker: activeSpeaker3d,
                     glbUrl: mode3d === 'glb' ? glbUrl3d : undefined,
                   };
                   const poseLabel =
@@ -1931,6 +2022,9 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       ambientEffect: ambientEffect3d,
                       customPropImageUrl: customPropImageUrl3d || undefined,
                       customBackdropImageUrl: customBackdropImageUrl3d || undefined,
+                      dialogueMode: dialogueMode3d,
+                      partnerPose: partnerPose3d,
+                      activeSpeaker: activeSpeaker3d,
                       glbUrl:
                         mode3d === 'glb'
                           ? glbUrl3d || selectedClip.scene3d?.glbUrl

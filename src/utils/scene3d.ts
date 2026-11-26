@@ -2427,7 +2427,8 @@ export function renderArticulatedStickman2D(
   pose: StickmanPose,
   t: number,
   config: Scene3DConfig,
-  audioMouthOpen?: number | null
+  audioMouthOpen?: number | null,
+  characterVariant: 'blangkon' | 'friend' = 'blangkon'
 ): void {
   ctx.clearRect(0, 0, width, height);
 
@@ -2548,7 +2549,12 @@ export function renderArticulatedStickman2D(
   drawFoot(rightFootX, rightFootY, true);
 
   // 3. SARUNG & KNOT (Authentic Plaid Tartan Pattern)
-  const sarungPattern = config.sarungPattern || 'plaid-red';
+  const sarungPattern =
+    characterVariant === 'friend'
+      ? config.sarungPattern === 'plaid-green'
+        ? 'plaid-red'
+        : 'plaid-green'
+      : config.sarungPattern || 'plaid-red';
   const sarungTex = getSarungTexture(sarungPattern);
   const sarungSway = pose === 'walk' ? Math.sin(t * 7.0) * 12 : Math.sin(t * 2.5) * 4;
 
@@ -2800,68 +2806,105 @@ export function renderArticulatedStickman2D(
   ctx.lineWidth = lineWidth;
   ctx.stroke();
 
-  // 7. BLANGKON (Traditional Javanese Batik Headwear)
-  const batikTex = getBatikBlangkonTexture();
+  // 7. HEADWEAR (Blangkon for Main Character, Nusantara Peci/Songkok for Friend)
+  if (characterVariant === 'friend') {
+    ctx.save();
+    // Cute hair tuft peeking on forehead
+    ctx.fillStyle = '#18181b';
+    ctx.beginPath();
+    ctx.moveTo(-25, -52);
+    ctx.quadraticCurveTo(-5, -26, 12, -48);
+    ctx.quadraticCurveTo(22, -28, 35, -52);
+    ctx.closePath();
+    ctx.fill();
 
-  ctx.save();
-  // Mondholan (the iconic rounded bun at back right)
-  const mondholanX = headR * 0.88;
-  const mondholanY = -12;
-  ctx.beginPath();
-  ctx.ellipse(mondholanX, mondholanY, 24, 34, 0.35, 0, Math.PI * 2);
-  if (batikTex.image) {
-    const bPat = ctx.createPattern(batikTex.image as HTMLCanvasElement, 'repeat');
-    if (bPat) {
-      ctx.fillStyle = bPat;
-      ctx.fill();
-    } else {
-      ctx.fillStyle = '#451a03';
-      ctx.fill();
+    // Nusantara Black Peci / Songkok tilted slightly back
+    ctx.translate(0, -52);
+    ctx.rotate(0.06);
+    ctx.fillStyle = '#1e293b';
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    ctx.moveTo(-76, 18);
+    ctx.lineTo(-68, -48);
+    ctx.quadraticCurveTo(0, -58, 68, -48);
+    ctx.lineTo(76, 18);
+    ctx.quadraticCurveTo(0, 8, -76, 18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Subtle gold trim line on Peci
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-69, 4);
+    ctx.quadraticCurveTo(0, -5, 69, 4);
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    const batikTex = getBatikBlangkonTexture();
+
+    ctx.save();
+    // Mondholan (the iconic rounded bun at back right)
+    const mondholanX = headR * 0.88;
+    const mondholanY = -12;
+    ctx.beginPath();
+    ctx.ellipse(mondholanX, mondholanY, 24, 34, 0.35, 0, Math.PI * 2);
+    if (batikTex.image) {
+      const bPat = ctx.createPattern(batikTex.image as HTMLCanvasElement, 'repeat');
+      if (bPat) {
+        ctx.fillStyle = bPat;
+        ctx.fill();
+      } else {
+        ctx.fillStyle = '#451a03';
+        ctx.fill();
+      }
     }
-  }
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = lineWidth;
-  ctx.stroke();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
 
-  // Contour swirls on mondholan
-  ctx.strokeStyle = '#291003';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.arc(mondholanX, mondholanY, 14, 0.4, Math.PI * 1.5);
-  ctx.stroke();
+    // Contour swirls on mondholan
+    ctx.strokeStyle = '#291003';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(mondholanX, mondholanY, 14, 0.4, Math.PI * 1.5);
+    ctx.stroke();
 
-  // Blangkon Main Cap on Head
-  ctx.beginPath();
-  ctx.arc(0, 0, headR + 1, Math.PI, 0); // Upper hemisphere
-  // Forehead contour with distinctive inverted V-notch
-  ctx.quadraticCurveTo(headR * 0.5, 4, 0, 18); // Dip to center forehead
-  ctx.quadraticCurveTo(-headR * 0.5, 4, -headR - 1, 0);
-  ctx.closePath();
+    // Blangkon Main Cap on Head
+    ctx.beginPath();
+    ctx.arc(0, 0, headR + 1, Math.PI, 0); // Upper hemisphere
+    // Forehead contour with distinctive inverted V-notch
+    ctx.quadraticCurveTo(headR * 0.5, 4, 0, 18); // Dip to center forehead
+    ctx.quadraticCurveTo(-headR * 0.5, 4, -headR - 1, 0);
+    ctx.closePath();
 
-  if (batikTex.image) {
-    const bPat = ctx.createPattern(batikTex.image as HTMLCanvasElement, 'repeat');
-    if (bPat) {
-      ctx.fillStyle = bPat;
-      ctx.fill();
-    } else {
-      ctx.fillStyle = '#451a03';
-      ctx.fill();
+    if (batikTex.image) {
+      const bPat = ctx.createPattern(batikTex.image as HTMLCanvasElement, 'repeat');
+      if (bPat) {
+        ctx.fillStyle = bPat;
+        ctx.fill();
+      } else {
+        ctx.fillStyle = '#451a03';
+        ctx.fill();
+      }
     }
-  }
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = lineWidth;
-  ctx.stroke();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
 
-  // Pleated wiron fold lines across blangkon
-  ctx.strokeStyle = 'rgba(254, 215, 170, 0.45)';
-  ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  ctx.moveTo(-headR * 0.85, -20);
-  ctx.quadraticCurveTo(0, -6, headR * 0.85, -20);
-  ctx.moveTo(-headR * 0.75, -45);
-  ctx.quadraticCurveTo(0, -32, headR * 0.75, -45);
-  ctx.stroke();
-  ctx.restore();
+    // Pleated wiron fold lines across blangkon
+    ctx.strokeStyle = 'rgba(254, 215, 170, 0.45)';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(-headR * 0.85, -20);
+    ctx.quadraticCurveTo(0, -6, headR * 0.85, -20);
+    ctx.moveTo(-headR * 0.75, -45);
+    ctx.quadraticCurveTo(0, -32, headR * 0.75, -45);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // 8. EYES & NATURAL BLINKING
   const blinkCycle = t % 3.4;
@@ -3224,6 +3267,11 @@ export class Scene3DRenderer {
   private stickmanTex: THREE.CanvasTexture;
   private stickman2DMesh: THREE.Mesh;
   private stickman2DMat: THREE.MeshBasicMaterial;
+  private partnerCanvas: HTMLCanvasElement;
+  private partnerCtx: CanvasRenderingContext2D | null;
+  private partnerTex: THREE.CanvasTexture;
+  private partner2DMesh: THREE.Mesh;
+  private partner2DMat: THREE.MeshBasicMaterial;
   private rig: StickmanRig;
   private badgeMesh: THREE.Mesh;
   private currentBadgeText = '';
@@ -3370,6 +3418,24 @@ export class Scene3DRenderer {
     this.stickman2DMesh = new THREE.Mesh(planeGeo, this.stickman2DMat);
     this.stickman2DMesh.position.set(0, 0, 0.02);
     this.scene.add(this.stickman2DMesh);
+
+    // Partner 2D Cartoon Character (for 2-character dialogue mode)
+    this.partnerCanvas = document.createElement('canvas');
+    this.partnerCanvas.width = 1024;
+    this.partnerCanvas.height = 1024;
+    this.partnerCtx = this.partnerCanvas.getContext('2d');
+    this.partnerTex = new THREE.CanvasTexture(this.partnerCanvas);
+    this.partnerTex.colorSpace = THREE.SRGBColorSpace;
+    this.partner2DMat = new THREE.MeshBasicMaterial({
+      map: this.partnerTex,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    this.partner2DMesh = new THREE.Mesh(planeGeo, this.partner2DMat);
+    this.partner2DMesh.position.set(0.65, 0, 0.02);
+    this.partner2DMesh.visible = false;
+    this.scene.add(this.partner2DMesh);
 
     // Procedural Stickman Rig (kept hidden in 2D cartoon mode)
     this.rig = buildStickmanRig('#f8fafc');
@@ -3565,6 +3631,7 @@ export class Scene3DRenderer {
     if (config.mode === 'glb' && config.glbUrl && this.glbGroup) {
       this.rig.root.visible = false;
       this.stickman2DMesh.visible = false;
+      this.partner2DMesh.visible = false;
       this.glbGroup.visible = true;
       this.groundSketchMesh.visible = false;
       this.propMesh.visible = false;
@@ -3662,8 +3729,14 @@ export class Scene3DRenderer {
         this.stickman2DMesh.position.set(posX, Math.max(0, bounceY), 0.02);
         this.stickman2DMesh.scale.set(1.793 * scaleX, scaleY, 1);
         this.stickman2DMesh.rotation.z = tiltZ;
+        this.partner2DMesh.visible = false;
       } else {
         // Articulated 2D Cartoon Engine (Living, expressive, articulated character)
+        const isDialogue = Boolean(config.dialogueMode);
+        const speaker = config.activeSpeaker ?? 'main';
+        const mainMouth = isDialogue && speaker === 'partner' ? 0 : options?.mouthOpen;
+        const partnerMouth = isDialogue && speaker === 'main' ? 0 : options?.mouthOpen;
+
         if (this.stickmanCtx) {
           renderArticulatedStickman2D(
             this.stickmanCtx,
@@ -3672,7 +3745,8 @@ export class Scene3DRenderer {
             config.pose,
             animTime,
             config,
-            options?.mouthOpen
+            mainMouth,
+            'blangkon'
           );
           this.stickmanTex.needsUpdate = true;
         }
@@ -3690,26 +3764,58 @@ export class Scene3DRenderer {
           popScale = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
         }
 
-        const hasCustomPropImg = Boolean(config.customPropImageUrl);
-        const hasCustomBackdropImg = Boolean(config.customBackdropImageUrl);
-        let stickmanX = 0;
-        if (!isPortrait) {
-          if (hasCustomPropImg) stickmanX = -0.36;
-          else if (hasCustomBackdropImg) stickmanX = -0.52;
-        }
+        if (isDialogue) {
+          this.partner2DMesh.visible = true;
+          if (this.partnerCtx) {
+            renderArticulatedStickman2D(
+              this.partnerCtx,
+              1024,
+              1024,
+              config.partnerPose || 'think',
+              animTime + 0.35,
+              { ...config, ambientEffect: 'none' },
+              partnerMouth,
+              'friend'
+            );
+            this.partnerTex.needsUpdate = true;
+          }
+          const charScale = popScale * (isPortrait ? 0.78 : 0.92);
+          const xOffset = isPortrait ? 0.34 : 0.62;
+          this.stickman2DMesh.position.set(-xOffset, 0, 0.02);
+          this.stickman2DMesh.scale.set(charScale, charScale, 1);
+          this.stickman2DMesh.rotation.z = 0;
 
-        this.stickman2DMesh.position.set(stickmanX, 0, 0.02);
-        this.stickman2DMesh.scale.set(popScale, popScale, 1);
-        this.stickman2DMesh.rotation.z = 0;
+          // Mirror partner horizontally so he faces Si Blangkon
+          this.partner2DMesh.position.set(xOffset, 0, 0.02);
+          this.partner2DMesh.scale.set(-charScale, charScale, 1);
+          this.partner2DMesh.rotation.z = 0;
+        } else {
+          this.partner2DMesh.visible = false;
+          const hasCustomPropImg = Boolean(config.customPropImageUrl);
+          const hasCustomBackdropImg = Boolean(config.customBackdropImageUrl);
+          let stickmanX = 0;
+          if (!isPortrait) {
+            if (hasCustomPropImg) stickmanX = -0.36;
+            else if (hasCustomBackdropImg) stickmanX = -0.52;
+          }
+
+          this.stickman2DMesh.position.set(stickmanX, 0, 0.02);
+          this.stickman2DMesh.scale.set(popScale, popScale, 1);
+          this.stickman2DMesh.rotation.z = 0;
+        }
       }
 
       // Render Storytelling Prop (Custom Uploaded Image Card OR Built-in Procedural Prop)
+      const isDialogueProp = Boolean(config.dialogueMode);
       const customPropImg = getCachedStoryImage(config.customPropImageUrl);
       if (customPropImg) {
         this.propMesh.visible = true;
         renderCustomPropImageCanvas(customPropImg, animTime, this.propCanvas);
         this.propTexture.needsUpdate = true;
-        if (isPortrait) {
+        if (isDialogueProp) {
+          this.propMesh.position.set(0, isPortrait ? 1.88 : 1.62 + Math.sin(animTime * 2.5) * 0.025, 0.15);
+          this.propMesh.scale.set(isPortrait ? 0.9 : 1.05, isPortrait ? 0.9 : 1.05, 1);
+        } else if (isPortrait) {
           this.propMesh.position.set(0.32, 1.88 + Math.sin(animTime * 2.5) * 0.025, 0.15);
           this.propMesh.scale.set(1.02, 1.02, 1);
         } else {
@@ -3738,6 +3844,9 @@ export class Scene3DRenderer {
             this.propMesh.position.set(0, 1.15, -0.15);
             const shockScale = isPortrait ? 1.55 : 2.15;
             this.propMesh.scale.set(shockScale, shockScale, 1);
+          } else if (isDialogueProp) {
+            this.propMesh.position.set(0, (isPortrait ? 1.88 : 1.66) + Math.sin(animTime * 3.5) * 0.03, 0.15);
+            this.propMesh.scale.set(0.95, 0.95, 1);
           } else if (effectiveProp === 'thought-question' || effectiveProp === 'idea-bulb') {
             if (isPortrait) {
               this.propMesh.position.set(0.38, 1.88 + Math.sin(animTime * 3.5) * 0.03, 0.15);
@@ -3798,6 +3907,8 @@ export class Scene3DRenderer {
     this.stickmanTex.dispose();
     this.stickman2DMesh.geometry.dispose();
     this.stickman2DMat.dispose();
+    this.partnerTex.dispose();
+    this.partner2DMat.dispose();
     this.renderer.dispose();
   }
 }

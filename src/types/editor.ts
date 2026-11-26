@@ -176,6 +176,9 @@ export interface Scene3DConfig {
   ambientEffect?: AmbientEffect3D;
   customPropImageUrl?: string;
   customBackdropImageUrl?: string;
+  dialogueMode?: boolean;
+  partnerPose?: StickmanPose;
+  activeSpeaker?: 'main' | 'partner' | 'both';
 }
 
 export const STORY_PROPS_3D: {
