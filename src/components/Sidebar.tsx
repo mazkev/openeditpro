@@ -2752,15 +2752,21 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               </div>
             )}
 
-            {/* POPULAR SUBTITLE STYLE PRESETS */}
-            <div className="bg-[#171820] p-3 rounded-xl border border-[#252834] mb-3 space-y-2">
-              <div className="flex items-center justify-between">
+            {/* POPULAR SUBTITLE STYLE PRESETS (Collapsible so Subtitle Cards stay visible!) */}
+            <details className="bg-[#171820] p-3 rounded-xl border border-[#252834] mb-3 group">
+              <summary className="flex items-center justify-between cursor-pointer list-none select-none">
                 <span className="text-xs font-bold text-gray-200 flex items-center space-x-1.5">
                   <Palette className="w-3.5 h-3.5 text-teal-400" />
-                  <span>Preset Gaya Teks (CapCut)</span>
+                  <span>Preset Gaya & Warna Teks (Global)</span>
                 </span>
-                <span className="text-[10px] text-gray-400">Pilih tema</span>
-              </div>
+                <span className="text-[10px] text-teal-400 font-semibold group-open:hidden">
+                  Buka ▼
+                </span>
+                <span className="text-[10px] text-gray-400 hidden group-open:inline">
+                  Tutup ▲
+                </span>
+              </summary>
+              <div className="space-y-2 mt-2.5 pt-2 border-t border-[#232530]">
 
               <div className="grid grid-cols-3 gap-1.5">
                 {SUBTITLE_PRESETS.map((preset) => (
@@ -2982,13 +2988,14 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   className="w-full accent-teal-400"
                 />
               </div>
-            </div>
+              </div>
+            </details>
 
-            <p className="text-[11px] text-gray-400 mb-3">
-              Keterangan teks akan ditampilkan otomatis sesuai rentang waktu yang diatur:
+            <p className="text-[11px] text-gray-400 mb-2">
+              Daftar Kartu Subtitle ({subtitles.length}) — edit teks, waktu, & durasi di bawah:
             </p>
 
-            <div className="space-y-3 flex-1 overflow-y-auto">
+            <div className="space-y-3 pb-6">
               {subtitles.length === 0 ? (
                 <div className="text-center py-10 text-gray-500 text-xs bg-[#171820] rounded-xl border border-[#252834]">
                   Belum ada subtitle. Klik tombol "+ Tambah Teks" di atas.
