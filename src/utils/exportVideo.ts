@@ -22,6 +22,7 @@ import type {
   Voiceover,
   Watermark,
 } from '../types/editor';
+import { getActiveKaraokeWordIndex } from '../types/editor';
 import {
   drawCanvasTransition,
   drawSingleFrameToCanvas,
@@ -211,6 +212,13 @@ function createOverlayRenderers(
         Math.max(totalTextHeight / 2 + marginY, rawTargetY)
       );
 
+      const allWords = rawText.trim().split(/\s+/);
+      const subDur = Math.max(0.1, sub.endTime - sub.startTime);
+      const subProg = Math.max(0, Math.min(1, (currentTime - sub.startTime) / subDur));
+      const activeWordIdx = sub.karaokeHighlight ? getActiveKaraokeWordIndex(allWords, subProg) : -1;
+      const hlColor = sub.karaokeColor || '#facc15';
+      let globalWordCursor = 0;
+
       lines.forEach((line, index) => {
         const lineY = targetY - totalTextHeight / 2 + index * lineHeight + lineHeight / 2;
         const metrics = ctx.measureText(line);
@@ -244,14 +252,54 @@ function createOverlayRenderers(
 
         const rawStroke = (sub.strokeWidth ?? 1.5) * scale;
         const effectiveStroke = Math.min(rawStroke, Math.max(1.0 * scale, fontSize * 0.08));
-        if (effectiveStroke > 0) {
-          ctx.lineWidth = effectiveStroke * 2;
-          ctx.strokeStyle = sub.strokeColor || 'rgba(0, 0, 0, 0.9)';
-          ctx.strokeText(line, width / 2, lineY);
-        }
 
-        ctx.fillStyle = sub.color || '#ffffff';
-        ctx.fillText(line, width / 2, lineY);
+        if (sub.karaokeHighlight) {
+          const lineWords = line.trim().split(/\s+/).filter(Boolean);
+          const spaceW = ctx.measureText(' ').width;
+          const wordWidths = lineWords.map((w) => ctx.measureText(w).width);
+          const totalLineW =
+            wordWidths.reduce((a, b) => a + b, 0) + Math.max(0, lineWords.length - 1) * spaceW;
+
+          let cursorX = width / 2 - totalLineW / 2;
+          ctx.textAlign = 'left';
+
+          lineWords.forEach((word, wIdx) => {
+            const wGlobalIdx = globalWordCursor++;
+            const isActive = wGlobalIdx === activeWordIdx;
+            const isFuture = wGlobalIdx > activeWordIdx;
+            const wordW = wordWidths[wIdx];
+
+            ctx.save();
+            ctx.globalAlpha = isFuture ? 0.72 : 1;
+            if (isActive) {
+              ctx.translate(cursorX + wordW / 2, lineY);
+              ctx.scale(1.08, 1.08);
+              ctx.translate(-(cursorX + wordW / 2), -lineY);
+              ctx.shadowColor = hlColor;
+              ctx.shadowBlur = Math.round(12 * scale);
+            }
+            if (effectiveStroke > 0) {
+              ctx.lineWidth = effectiveStroke * 2;
+              ctx.strokeStyle = sub.strokeColor || 'rgba(0, 0, 0, 0.9)';
+              ctx.strokeText(word, cursorX, lineY);
+            }
+            ctx.fillStyle = isActive ? hlColor : sub.color || '#ffffff';
+            ctx.fillText(word, cursorX, lineY);
+            ctx.restore();
+
+            cursorX += wordW + spaceW;
+          });
+          ctx.textAlign = 'center';
+        } else {
+          if (effectiveStroke > 0) {
+            ctx.lineWidth = effectiveStroke * 2;
+            ctx.strokeStyle = sub.strokeColor || 'rgba(0, 0, 0, 0.9)';
+            ctx.strokeText(line, width / 2, lineY);
+          }
+
+          ctx.fillStyle = sub.color || '#ffffff';
+          ctx.fillText(line, width / 2, lineY);
+        }
       });
 
       ctx.restore();

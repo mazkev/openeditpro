@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { VideoClip, Subtitle, Watermark, Voiceover, AspectRatio, BackgroundMusic } from '../types/editor';
+import { getActiveKaraokeWordIndex } from '../types/editor';
 import { formatTime } from '../utils/time';
 import { getActiveTransitionInfo, getCssTransitionStyles } from '../utils/transition';
 import { Scene3DRenderer } from '../utils/scene3d';
@@ -574,7 +575,38 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                         : 'none',
                   }}
                 >
-                  {sub.text}
+                  {sub.karaokeHighlight ? (() => {
+                    const words = sub.text.trim().split(/\s+/);
+                    const subDur = Math.max(0.1, sub.endTime - sub.startTime);
+                    const prog = Math.max(0, Math.min(1, (currentTime - sub.startTime) / subDur));
+                    const activeIdx = getActiveKaraokeWordIndex(words, prog);
+                    const hlColor = sub.karaokeColor || '#facc15';
+                    return words.map((word, wIdx) => {
+                      const isActive = wIdx === activeIdx;
+                      const isFuture = wIdx > activeIdx;
+                      return (
+                        <React.Fragment key={wIdx}>
+                          <span
+                            className={`inline-block transition-transform duration-75 ${
+                              isActive ? 'scale-110' : ''
+                            }`}
+                            style={{
+                              color: isActive ? hlColor : undefined,
+                              opacity: isFuture ? 0.72 : 1,
+                              textShadow: isActive
+                                ? `0 0 12px ${hlColor}, 0 2px 4px rgba(0,0,0,0.9)`
+                                : undefined,
+                            }}
+                          >
+                            {word}
+                          </span>
+                          {wIdx < words.length - 1 ? ' ' : ''}
+                        </React.Fragment>
+                      );
+                    });
+                  })() : (
+                    sub.text
+                  )}
                 </div>
               </div>
             );

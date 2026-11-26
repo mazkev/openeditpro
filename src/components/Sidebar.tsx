@@ -2852,6 +2852,63 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               </div>
             )}
 
+            {/* KARAOKE HIGHLIGHT (PER KATA MENYALA) */}
+            {subtitles.length > 0 && (
+              <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] mb-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-amber-300 flex items-center space-x-1.5">
+                    <span>✨</span>
+                    <span>Karaoke (Kata Menyala)</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Sorot kata satu per satu ala TikTok / Shorts
+                  </p>
+                </div>
+                <div className="flex items-center space-x-1.5 flex-shrink-0">
+                  {subtitles.some((s) => s.karaokeHighlight) && (
+                    <div className="flex items-center space-x-1">
+                      {['#facc15', '#38bdf8', '#4ade80', '#f472b6'].map((col) => (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() =>
+                            setSubtitles((prev) => prev.map((s) => ({ ...s, karaokeColor: col })))
+                          }
+                          className={`w-4 h-4 rounded-full border ${
+                            (subtitles[0]?.karaokeColor || '#facc15') === col
+                              ? 'border-white scale-115'
+                              : 'border-gray-600'
+                          }`}
+                          style={{ backgroundColor: col }}
+                          title="Warna sorot karaoke"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextVal = !subtitles.some((s) => s.karaokeHighlight);
+                      setSubtitles((prev) =>
+                        prev.map((s) => ({
+                          ...s,
+                          karaokeHighlight: nextVal,
+                          karaokeColor: s.karaokeColor || '#facc15',
+                        }))
+                      );
+                    }}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
+                      subtitles.some((s) => s.karaokeHighlight)
+                        ? 'bg-amber-400 text-slate-950 border-amber-300'
+                        : 'bg-[#101115] text-gray-300 border-[#2b2d3d] hover:border-amber-400/50'
+                    }`}
+                  >
+                    {subtitles.some((s) => s.karaokeHighlight) ? 'Aktif ✓' : 'Aktifkan'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* POPULAR SUBTITLE STYLE PRESETS (Collapsible so Subtitle Cards stay visible!) */}
             <details className="bg-[#171820] p-3 rounded-xl border border-[#252834] mb-3 group">
               <summary className="flex items-center justify-between cursor-pointer list-none select-none">

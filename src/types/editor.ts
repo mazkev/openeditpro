@@ -499,6 +499,22 @@ export interface Subtitle {
   isUppercase?: boolean;
   glowColor?: string;
   stylePreset?: string;
+  karaokeHighlight?: boolean;
+  karaokeColor?: string;
+}
+
+export function getActiveKaraokeWordIndex(words: string[], progress: number): number {
+  if (words.length <= 1) return 0;
+  const clamped = Math.max(0, Math.min(0.9999, progress));
+  const weights = words.map((w) => Math.max(2, w.length));
+  const totalW = weights.reduce((a, b) => a + b, 0);
+  const target = clamped * totalW;
+  let acc = 0;
+  for (let i = 0; i < weights.length; i++) {
+    acc += weights[i];
+    if (target <= acc) return i;
+  }
+  return words.length - 1;
 }
 
 export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
