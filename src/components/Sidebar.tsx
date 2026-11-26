@@ -54,7 +54,7 @@ import {
   STAGE_THEMES_3D,
   CHARACTER_COLORS_3D,
 } from '../types/editor';
-import { create3DClipThumbnail } from '../utils/scene3d';
+import { create3DClipThumbnail, ensureStoryImageLoaded } from '../utils/scene3d';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
 import {
@@ -247,11 +247,16 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [speed3d, setSpeed3d] = useState(1.0);
   const [cartoonAnimType3d, setCartoonAnimType3d] = useState<'articulated' | 'photo-cutout'>('articulated');
   const [ambientEffect3d, setAmbientEffect3d] = useState<AmbientEffect3D>('auto');
+  const [customPropImageUrl3d, setCustomPropImageUrl3d] = useState('');
+  const [customBackdropImageUrl3d, setCustomBackdropImageUrl3d] = useState('');
   const [factBadge3d, setFactBadge3d] = useState('TAHUKAH KAMU?');
   const [mode3d, setMode3d] = useState<'stickman' | 'glb'>('stickman');
   const [glbUrl3d, setGlbUrl3d] = useState('');
   const [glbName3d, setGlbName3d] = useState('');
   const glbInputRef = useRef<HTMLInputElement>(null);
+  const customPropInputRef = useRef<HTMLInputElement>(null);
+  const customBackdropInputRef = useRef<HTMLInputElement>(null);
+  const batchStoryImagesRef = useRef<HTMLInputElement>(null);
   const lastSynced3DClipIdRef = useRef<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -678,6 +683,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         if (s.storyProp) setProp3d(s.storyProp);
         if (s.cartoonAnimType) setCartoonAnimType3d(s.cartoonAnimType);
         if (s.ambientEffect) setAmbientEffect3d(s.ambientEffect);
+        setCustomPropImageUrl3d(s.customPropImageUrl || '');
+        setCustomBackdropImageUrl3d(s.customBackdropImageUrl || '');
         setDuration3d(dur);
       });
     }
@@ -1308,6 +1315,181 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   </div>
                 </div>
 
+                {/* GAMBAR CERITA / SEJARAH (UPLOAD FOTO & MULTI-ADEGAN) */}
+                <div className="bg-gradient-to-br from-emerald-950/40 via-[#171820] to-cyan-950/30 p-3 rounded-xl border border-emerald-500/35 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-200 block">
+                      3c. Gambar Cerita / Sejarah:
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">
+                      Slide & Foto Asli
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-300 leading-relaxed">
+                    Untuk video cerita (mis. Sejarah Indonesia), unggah foto pahlawan, peta, atau ilustrasi agar tampil di sebelah atau di belakang Stickman.
+                  </p>
+
+                  {/* Hidden File Inputs */}
+                  <input
+                    ref={customPropInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const url = URL.createObjectURL(file);
+                      await ensureStoryImageLoaded(url);
+                      setCustomPropImageUrl3d(url);
+                      e.target.value = '';
+                    }}
+                  />
+                  <input
+                    ref={customBackdropInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const url = URL.createObjectURL(file);
+                      await ensureStoryImageLoaded(url);
+                      setCustomBackdropImageUrl3d(url);
+                      e.target.value = '';
+                    }}
+                  />
+                  <input
+                    ref={batchStoryImagesRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length === 0) return;
+
+                      const poseCycle: StickmanPose[] = ['think', 'explain', 'point', 'shock', 'wave'];
+                      const transitionCycle: TransitionType[] = ['fade', 'slide-left', 'zoom-in'];
+                      const now = Date.now();
+
+                      const newClips: VideoClip[] = [];
+                      for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const url = URL.createObjectURL(file);
+                        await ensureStoryImageLoaded(url);
+                        const pose = poseCycle[i % poseCycle.length];
+                        const sceneCfg: Scene3DConfig = {
+                          mode: 'stickman',
+                          characterStyle: characterStyle3d,
+                          sarungPattern: sarungPattern3d,
+                          pose,
+                          storyProp: 'none',
+                          customPropImageUrl: url,
+                          characterColor: color3d,
+                          stageTheme: theme3d || 'paper-sketch',
+                          cameraPreset: i % 2 === 0 ? 'presenter' : 'zoom-in',
+                          animationSpeed: speed3d,
+                          cartoonAnimType: cartoonAnimType3d,
+                          ambientEffect: ambientEffect3d,
+                          factBadgeText: `BAGIAN ${i + 1}`,
+                        };
+                        const cleanName = file.name.replace(/\.[^/.]+$/, '').slice(0, 22);
+                        newClips.push({
+                          id: `story-img-${now}-${i}`,
+                          name: `Cerita ${i + 1}: ${cleanName}`,
+                          url: '',
+                          duration: duration3d,
+                          trimStart: 0,
+                          trimEnd: duration3d,
+                          thumbnailUrl: create3DClipThumbnail(sceneCfg),
+                          volume: 0,
+                          speed: 1,
+                          clipType: '3d',
+                          scene3d: sceneCfg,
+                          transition:
+                            i < files.length - 1
+                              ? { type: transitionCycle[i % transitionCycle.length], duration: 0.4 }
+                              : undefined,
+                        });
+                      }
+
+                      setClips((prev) => [...prev, ...newClips]);
+                      if (newClips.length > 0) setSelectedClipId(newClips[0].id);
+                      e.target.value = '';
+                    }}
+                  />
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => customPropInputRef.current?.click()}
+                      className={`p-2 rounded-lg border text-left transition-all ${
+                        customPropImageUrl3d
+                          ? 'bg-emerald-900/50 border-emerald-400 text-white'
+                          : 'bg-[#12131a] border-[#252834] text-gray-300 hover:border-emerald-500/60'
+                      }`}
+                    >
+                      <div className="text-[11px] font-bold flex items-center justify-between">
+                        <span>🖼️ Kartu Foto</span>
+                        {customPropImageUrl3d && <span className="text-emerald-400">✓</span>}
+                      </div>
+                      <p className="text-[9.5px] text-gray-400 mt-0.5">
+                        Foto di bingkai samping
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => customBackdropInputRef.current?.click()}
+                      className={`p-2 rounded-lg border text-left transition-all ${
+                        customBackdropImageUrl3d
+                          ? 'bg-emerald-900/50 border-emerald-400 text-white'
+                          : 'bg-[#12131a] border-[#252834] text-gray-300 hover:border-emerald-500/60'
+                      }`}
+                    >
+                      <div className="text-[11px] font-bold flex items-center justify-between">
+                        <span>🌄 Latar Penuh</span>
+                        {customBackdropImageUrl3d && <span className="text-emerald-400">✓</span>}
+                      </div>
+                      <p className="text-[9.5px] text-gray-400 mt-0.5">
+                        Foto penuh di belakang
+                      </p>
+                    </button>
+                  </div>
+
+                  {(customPropImageUrl3d || customBackdropImageUrl3d) && (
+                    <div className="flex items-center space-x-2 text-[10px]">
+                      {customPropImageUrl3d && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomPropImageUrl3d('')}
+                          className="text-red-400 hover:text-red-300 underline"
+                        >
+                          Hapus Kartu Foto
+                        </button>
+                      )}
+                      {customBackdropImageUrl3d && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomBackdropImageUrl3d('')}
+                          className="text-red-400 hover:text-red-300 underline"
+                        >
+                          Hapus Latar Penuh
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => batchStoryImagesRef.current?.click()}
+                    className="w-full py-2 px-2.5 bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-lg transition-all shadow flex items-center justify-center space-x-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Banyak Gambar (Auto Adegan)</span>
+                  </button>
+                </div>
+
                 {/* WARNA STICKMAN */}
                 <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
                   <span className="text-xs font-semibold text-gray-200 block">
@@ -1480,6 +1662,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     factBadgeText: factBadge3d.trim() || undefined,
                     cartoonAnimType: cartoonAnimType3d,
                     ambientEffect: ambientEffect3d,
+                    customPropImageUrl: customPropImageUrl3d || undefined,
+                    customBackdropImageUrl: customBackdropImageUrl3d || undefined,
                     glbUrl: mode3d === 'glb' ? glbUrl3d : undefined,
                   };
                   const poseLabel =
@@ -1527,6 +1711,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       factBadgeText: factBadge3d.trim() || undefined,
                       cartoonAnimType: cartoonAnimType3d,
                       ambientEffect: ambientEffect3d,
+                      customPropImageUrl: customPropImageUrl3d || undefined,
+                      customBackdropImageUrl: customBackdropImageUrl3d || undefined,
                       glbUrl:
                         mode3d === 'glb'
                           ? glbUrl3d || selectedClip.scene3d?.glbUrl

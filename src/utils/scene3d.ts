@@ -1328,6 +1328,133 @@ function renderStoryPropCanvas(
 }
 
 /**
+ * Custom Story Image Loader & Cache (for user-uploaded historical photos, maps, illustrations)
+ */
+const storyImageCache = new Map<string, HTMLImageElement>();
+const storyImagePromises = new Map<string, Promise<HTMLImageElement | null>>();
+
+export function ensureStoryImageLoaded(url: string): Promise<HTMLImageElement | null> {
+  if (!url) return Promise.resolve(null);
+  const cached = storyImageCache.get(url);
+  if (cached && cached.complete && cached.naturalWidth > 0) {
+    return Promise.resolve(cached);
+  }
+  const existing = storyImagePromises.get(url);
+  if (existing) return existing;
+
+  const promise = new Promise<HTMLImageElement | null>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      storyImageCache.set(url, img);
+      resolve(img);
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+  storyImagePromises.set(url, promise);
+  return promise;
+}
+
+function getCachedStoryImage(url?: string): HTMLImageElement | null {
+  if (!url) return null;
+  const cached = storyImageCache.get(url);
+  if (cached && cached.complete && cached.naturalWidth > 0) {
+    return cached;
+  }
+  void ensureStoryImageLoaded(url);
+  return null;
+}
+
+/**
+ * Renders a user-uploaded story/history image inside a charming comic polaroid card frame.
+ */
+function renderCustomPropImageCanvas(
+  img: HTMLImageElement,
+  t: number,
+  canvas: HTMLCanvasElement
+): void {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const wobble = Math.sin(t * 2.2) * 0.035;
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(-0.04 + wobble);
+
+  const cardW = 400;
+  const cardH = 340;
+  const rx = -cardW / 2;
+  const ry = -cardH / 2;
+
+  // Comic hard drop shadow
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+  ctx.beginPath();
+  ctx.roundRect(rx + 14, ry + 16, cardW, cardH, 24);
+  ctx.fill();
+
+  // White polaroid card background
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#18181b';
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.roundRect(rx, ry, cardW, cardH, 24);
+  ctx.fill();
+  ctx.stroke();
+
+  // Inner clipped photo area (cover fit)
+  const pad = 22;
+  const imgX = rx + pad;
+  const imgY = ry + pad;
+  const imgW = cardW - pad * 2;
+  const imgH = cardH - pad * 2 - 14;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(imgX, imgY, imgW, imgH, 12);
+  ctx.clip();
+
+  const imgRatio = (img.naturalWidth || 1) / (img.naturalHeight || 1);
+  const boxRatio = imgW / imgH;
+  let drawW = imgW;
+  let drawH = imgH;
+  let drawX = imgX;
+  let drawY = imgY;
+
+  if (imgRatio > boxRatio) {
+    drawW = imgH * imgRatio;
+    drawX = imgX - (drawW - imgW) / 2;
+  } else {
+    drawH = imgW / imgRatio;
+    drawY = imgY - (drawH - imgH) / 2;
+  }
+  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  ctx.restore();
+
+  // Inner border stroke around photo
+  ctx.strokeStyle = '#18181b';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.roundRect(imgX, imgY, imgW, imgH, 12);
+  ctx.stroke();
+
+  // Cute comic tape / pin at top center
+  ctx.fillStyle = '#fde047';
+  ctx.strokeStyle = '#18181b';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.roundRect(-45, ry - 14, 90, 28, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
  * Helper to create a crisp stickman limb with cel-shaded outline
  */
 function createStickLimb(
@@ -2010,13 +2137,44 @@ function createFactBadgeTexture(text: string): THREE.CanvasTexture {
  * Creates rich hand-drawn / cartoon backgrounds for each stage theme so the character
  * stands inside a real storytelling environment rather than an empty void.
  */
-function renderStageBackdropCanvas(theme: StageTheme3D, canvas: HTMLCanvasElement): void {
+function renderStageBackdropCanvas(
+  theme: StageTheme3D,
+  canvas: HTMLCanvasElement,
+  customBackdropImg?: HTMLImageElement | null
+): void {
   const w = canvas.width;
   const h = canvas.height;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
   ctx.clearRect(0, 0, w, h);
+
+  if (customBackdropImg && customBackdropImg.complete && customBackdropImg.naturalWidth > 0) {
+    // Draw user-uploaded historical / story photo covering the backdrop cleanly
+    const imgRatio = customBackdropImg.naturalWidth / customBackdropImg.naturalHeight;
+    const boxRatio = w / h;
+    let drawW = w;
+    let drawH = h;
+    let drawX = 0;
+    let drawY = 0;
+
+    if (imgRatio > boxRatio) {
+      drawW = h * imgRatio;
+      drawX = -(drawW - w) / 2;
+    } else {
+      drawH = w / imgRatio;
+      drawY = -(drawH - h) / 2;
+    }
+    ctx.drawImage(customBackdropImg, drawX, drawY, drawW, drawH);
+
+    // Subtle cinematic vignette so Stickman & subtitles pop
+    const vig = ctx.createRadialGradient(w * 0.5, h * 0.5, w * 0.25, w * 0.5, h * 0.5, w * 0.72);
+    vig.addColorStop(0, 'rgba(15, 23, 42, 0.08)');
+    vig.addColorStop(1, 'rgba(15, 23, 42, 0.42)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, w, h);
+    return;
+  }
 
   switch (theme) {
     case 'chalkboard': {
@@ -3025,6 +3183,8 @@ export class Scene3DRenderer {
   private badgeMesh: THREE.Mesh;
   private currentBadgeText = '';
   private currentTheme: StageTheme3D = 'paper-sketch';
+  private currentBackdropUrl = '';
+  private currentBackdropHadImage = false;
   private glbGroup: THREE.Group | null = null;
   private glbMixer: THREE.AnimationMixer | null = null;
   private glbAnimations: THREE.AnimationClip[] = [];
@@ -3198,9 +3358,23 @@ export class Scene3DRenderer {
     this.renderer.setSize(width, height, false);
   }
 
-  private applyTheme(theme: StageTheme3D): void {
-    if (this.currentTheme === theme && this.scene.background) return;
+  private applyTheme(theme: StageTheme3D, customBackdropUrl = ''): void {
+    const backdropImg = customBackdropUrl ? getCachedStoryImage(customBackdropUrl) : null;
+    const hasImgNow = Boolean(backdropImg);
+
+    if (
+      this.currentTheme === theme &&
+      this.currentBackdropUrl === customBackdropUrl &&
+      this.currentBackdropHadImage === hasImgNow &&
+      this.scene.background
+    ) {
+      return;
+    }
+
     this.currentTheme = theme;
+    this.currentBackdropUrl = customBackdropUrl;
+    this.currentBackdropHadImage = hasImgNow;
+
     const p = THEME_PALETTES[theme] || THEME_PALETTES['paper-sketch'];
     this.scene.background = new THREE.Color(p.bg);
     this.scene.fog = new THREE.Fog(p.fog, 6, 15);
@@ -3208,13 +3382,13 @@ export class Scene3DRenderer {
     this.rimLight.color.setHex(p.rim);
     this.keyLight.color.setHex(p.key);
 
-    if (p.isCartoon) {
+    if (p.isCartoon || hasImgNow) {
       this.gridHelper.visible = false;
       this.podiumRing.visible = false;
       this.floorMesh.visible = false;
       this.groundSketchMesh.visible = false;
       this.backdropMesh.visible = true;
-      renderStageBackdropCanvas(theme, this.backdropCanvas);
+      renderStageBackdropCanvas(theme, this.backdropCanvas, backdropImg);
       this.backdropTexture.needsUpdate = true;
       this.hemiLight.intensity = 1.35;
       this.keyLight.intensity = 1.55;
@@ -3272,7 +3446,7 @@ export class Scene3DRenderer {
   }
 
   renderAt(timeSec: number, durationSec: number, config: Scene3DConfig): void {
-    this.applyTheme(config.stageTheme);
+    this.applyTheme(config.stageTheme, config.customBackdropImageUrl || '');
 
     const safeDur = Math.max(0.1, durationSec);
     const progress = Math.max(0, Math.min(1, timeSec / safeDur));
@@ -3464,52 +3638,75 @@ export class Scene3DRenderer {
           popScale = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
         }
 
-        this.stickman2DMesh.position.set(0, 0, 0.02);
+        const hasCustomPropImg = Boolean(config.customPropImageUrl);
+        const hasCustomBackdropImg = Boolean(config.customBackdropImageUrl);
+        let stickmanX = 0;
+        if (!isPortrait) {
+          if (hasCustomPropImg) stickmanX = -0.36;
+          else if (hasCustomBackdropImg) stickmanX = -0.52;
+        }
+
+        this.stickman2DMesh.position.set(stickmanX, 0, 0.02);
         this.stickman2DMesh.scale.set(popScale, popScale, 1);
         this.stickman2DMesh.rotation.z = 0;
       }
 
-      // Render Storytelling Prop (Illustrations & Visual Story Elements)
-      const effectiveProp: StoryProp3D =
-        config.storyProp ??
-        (config.pose === 'think'
-          ? 'thought-question'
-          : config.pose === 'shock'
-          ? 'comic-shock'
-          : config.pose === 'explain'
-          ? 'idea-bulb'
-          : 'none');
-
-      if (effectiveProp !== 'none') {
+      // Render Storytelling Prop (Custom Uploaded Image Card OR Built-in Procedural Prop)
+      const customPropImg = getCachedStoryImage(config.customPropImageUrl);
+      if (customPropImg) {
         this.propMesh.visible = true;
-        renderStoryPropCanvas(effectiveProp, animTime, this.propCanvas);
+        renderCustomPropImageCanvas(customPropImg, animTime, this.propCanvas);
         this.propTexture.needsUpdate = true;
-
-        if (effectiveProp === 'comic-shock') {
-          // Dynamic comic speed lines bursting behind the character!
-          this.propMesh.position.set(0, 1.15, -0.15);
-          const shockScale = isPortrait ? 1.55 : 2.15;
-          this.propMesh.scale.set(shockScale, shockScale, 1);
-        } else if (effectiveProp === 'thought-question' || effectiveProp === 'idea-bulb') {
-          if (isPortrait) {
-            this.propMesh.position.set(0.38, 1.88 + Math.sin(animTime * 3.5) * 0.03, 0.15);
-            this.propMesh.scale.set(0.85, 0.85, 1);
-          } else {
-            this.propMesh.position.set(0.68, 1.66 + Math.sin(animTime * 3.5) * 0.035, 0.15);
-            this.propMesh.scale.set(1.1, 1.1, 1);
-          }
+        if (isPortrait) {
+          this.propMesh.position.set(0.32, 1.88 + Math.sin(animTime * 2.5) * 0.025, 0.15);
+          this.propMesh.scale.set(1.02, 1.02, 1);
         } else {
-          if (isPortrait) {
-            this.propMesh.position.set(0.4, 1.72 + Math.sin(animTime * 3.0) * 0.03, 0.15);
-            this.propMesh.scale.set(0.85, 0.85, 1);
-          } else {
-            this.propMesh.position.set(0.76, 1.44 + Math.sin(animTime * 3.0) * 0.035, 0.15);
-            this.propMesh.scale.set(1.1, 1.1, 1);
-          }
+          this.propMesh.position.set(0.74, 1.28 + Math.sin(animTime * 2.5) * 0.03, 0.15);
+          this.propMesh.scale.set(1.42, 1.42, 1);
         }
         this.propMesh.lookAt(this.camera.position);
       } else {
-        this.propMesh.visible = false;
+        const effectiveProp: StoryProp3D =
+          config.storyProp ??
+          (config.pose === 'think'
+            ? 'thought-question'
+            : config.pose === 'shock'
+            ? 'comic-shock'
+            : config.pose === 'explain'
+            ? 'idea-bulb'
+            : 'none');
+
+        if (effectiveProp !== 'none') {
+          this.propMesh.visible = true;
+          renderStoryPropCanvas(effectiveProp, animTime, this.propCanvas);
+          this.propTexture.needsUpdate = true;
+
+          if (effectiveProp === 'comic-shock') {
+            // Dynamic comic speed lines bursting behind the character!
+            this.propMesh.position.set(0, 1.15, -0.15);
+            const shockScale = isPortrait ? 1.55 : 2.15;
+            this.propMesh.scale.set(shockScale, shockScale, 1);
+          } else if (effectiveProp === 'thought-question' || effectiveProp === 'idea-bulb') {
+            if (isPortrait) {
+              this.propMesh.position.set(0.38, 1.88 + Math.sin(animTime * 3.5) * 0.03, 0.15);
+              this.propMesh.scale.set(0.85, 0.85, 1);
+            } else {
+              this.propMesh.position.set(0.68, 1.66 + Math.sin(animTime * 3.5) * 0.035, 0.15);
+              this.propMesh.scale.set(1.1, 1.1, 1);
+            }
+          } else {
+            if (isPortrait) {
+              this.propMesh.position.set(0.4, 1.72 + Math.sin(animTime * 3.0) * 0.03, 0.15);
+              this.propMesh.scale.set(0.85, 0.85, 1);
+            } else {
+              this.propMesh.position.set(0.76, 1.44 + Math.sin(animTime * 3.0) * 0.035, 0.15);
+              this.propMesh.scale.set(1.1, 1.1, 1);
+            }
+          }
+          this.propMesh.lookAt(this.camera.position);
+        } else {
+          this.propMesh.visible = false;
+        }
       }
     }
 

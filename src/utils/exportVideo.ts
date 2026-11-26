@@ -28,7 +28,7 @@ import {
   getActiveTransitionInfo,
   type DrawableVideoFrame,
 } from './transition';
-import { Scene3DRenderer, ensureStickmanLoaded } from './scene3d';
+import { Scene3DRenderer, ensureStickmanLoaded, ensureStoryImageLoaded } from './scene3d';
 
 export interface ExportProgress {
   progress: number; // 0 to 100
@@ -531,6 +531,12 @@ async function exportWithMediabunny(
   const has3DClips = clips.some((c) => c.clipType === '3d' && c.scene3d);
   if (has3DClips) {
     await ensureStickmanLoaded();
+    const storyUrls = clips
+      .flatMap((c) => [c.scene3d?.customPropImageUrl, c.scene3d?.customBackdropImageUrl])
+      .filter((u): u is string => Boolean(u));
+    if (storyUrls.length > 0) {
+      await Promise.all(storyUrls.map((u) => ensureStoryImageLoaded(u)));
+    }
   }
   const scene3dA = has3DClips ? new Scene3DRenderer(width, height) : null;
   const scene3dB = has3DClips ? new Scene3DRenderer(width, height) : null;
@@ -733,6 +739,12 @@ async function exportWithMediaRecorder(
   const has3DClips = clips.some((c) => c.clipType === '3d' && c.scene3d);
   if (has3DClips) {
     await ensureStickmanLoaded();
+    const storyUrls = clips
+      .flatMap((c) => [c.scene3d?.customPropImageUrl, c.scene3d?.customBackdropImageUrl])
+      .filter((u): u is string => Boolean(u));
+    if (storyUrls.length > 0) {
+      await Promise.all(storyUrls.map((u) => ensureStoryImageLoaded(u)));
+    }
   }
   const scene3dA = has3DClips ? new Scene3DRenderer(width, height) : null;
   const scene3dB = has3DClips ? new Scene3DRenderer(width, height) : null;

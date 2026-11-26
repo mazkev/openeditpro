@@ -174,6 +174,8 @@ export interface Scene3DConfig {
   storyProp?: StoryProp3D;
   cartoonAnimType?: 'articulated' | 'photo-cutout';
   ambientEffect?: AmbientEffect3D;
+  customPropImageUrl?: string;
+  customBackdropImageUrl?: string;
 }
 
 export const STORY_PROPS_3D: {
