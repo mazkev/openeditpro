@@ -218,6 +218,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   onExtractAudio,
   onToggleMuteClip,
 }) => {
+  const selectedClip = clips.find((c) => c.id === selectedClipId);
+
   const [internalActiveTab, setInternalActiveTab] = useState<TabType>('media');
   const activeTab = controlledActiveTab ?? internalActiveTab;
   const setActiveTab = controlledSetActiveTab ?? setInternalActiveTab;
@@ -645,8 +647,6 @@ const SidebarComponent: React.FC<SidebarProps> = ({
       setIsGeneratingTTS(false);
     }
   };
-
-  const selectedClip = clips.find((c) => c.id === selectedClipId);
 
   // Sync 3D studio controls when user selects a 3D clip on the timeline
   useEffect(() => {
