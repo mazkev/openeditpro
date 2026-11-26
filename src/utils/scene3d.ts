@@ -996,6 +996,331 @@ function renderStoryPropCanvas(
       break;
     }
 
+    case 'coffee-cup': {
+      // Warm cartoon coffee cup with rising steam waves
+      ctx.save();
+      ctx.translate(256, 300);
+
+      // Rising steam
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      for (let i = -1; i <= 1; i++) {
+        const sx = i * 48;
+        const wave = Math.sin(t * 4.5 + i * 1.4) * 14;
+        ctx.beginPath();
+        ctx.moveTo(sx, -70);
+        ctx.quadraticCurveTo(sx + wave, -120, sx - wave, -170);
+        ctx.stroke();
+      }
+
+      // Cup handle
+      ctx.beginPath();
+      ctx.arc(100, 10, 48, -Math.PI / 2, Math.PI / 2);
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 22;
+      ctx.stroke();
+      ctx.strokeStyle = '#fef3c7';
+      ctx.lineWidth = 10;
+      ctx.stroke();
+
+      // Cup body
+      ctx.fillStyle = '#fef3c7';
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.moveTo(-105, -55);
+      ctx.lineTo(105, -55);
+      ctx.quadraticCurveTo(95, 110, 0, 115);
+      ctx.quadraticCurveTo(-95, 110, -105, -55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Coffee surface
+      ctx.fillStyle = '#78350f';
+      ctx.beginPath();
+      ctx.ellipse(0, -55, 102, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Saucer
+      ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.ellipse(0, 120, 130, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+
+    case 'microphone': {
+      // Retro podcast microphone with pulsing sound waves
+      ctx.save();
+      ctx.translate(256, 260);
+      const pulse = Math.sin(t * 7) * 0.12 + 1;
+
+      // Sound waves
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      for (const dir of [-1, 1]) {
+        for (let r = 1; r <= 2; r++) {
+          ctx.beginPath();
+          ctx.arc(dir * 20, -30, 85 * r * 0.65 * pulse, dir > 0 ? -0.6 : Math.PI - 0.6, dir > 0 ? 0.6 : Math.PI + 0.6);
+          ctx.stroke();
+        }
+      }
+
+      // Stand base
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 10;
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.roundRect(-70, 135, 140, 26, 12);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, 65);
+      ctx.lineTo(0, 135);
+      ctx.stroke();
+
+      // Mic capsule
+      ctx.fillStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.roundRect(-55, -130, 110, 165, 55);
+      ctx.fill();
+      ctx.stroke();
+
+      // Grille lines
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 6;
+      for (let y = -95; y <= -20; y += 24) {
+        ctx.beginPath();
+        ctx.moveTo(-40, y);
+        ctx.lineTo(40, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+      break;
+    }
+
+    case 'earth-globe': {
+      // Cartoon rotating Earth globe with clouds
+      ctx.save();
+      ctx.translate(256, 256);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(0, 0, 135, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.clip();
+      const shift = ((t * 45) % 260) - 130;
+      ctx.fillStyle = '#4ade80';
+      // Stylized continents
+      ctx.beginPath();
+      ctx.ellipse(-50 + shift, -30, 55, 42, 0.3, 0, Math.PI * 2);
+      ctx.ellipse(60 + shift, 35, 60, 48, -0.2, 0, Math.PI * 2);
+      ctx.ellipse(-190 + shift, 20, 50, 40, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Bold outline
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.arc(0, 0, 135, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Specular shine
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 12;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(0, 0, 108, -Math.PI * 0.85, -Math.PI * 0.55);
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+
+    case 'clock-time': {
+      // Classic cartoon clock with ticking hands
+      ctx.save();
+      ctx.translate(256, 256);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.arc(0, 0, 135, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Inner rim
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(0, 0, 118, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Tick marks
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 6;
+      for (let i = 0; i < 12; i++) {
+        const a = (i * Math.PI) / 6;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 95, Math.sin(a) * 95);
+        ctx.lineTo(Math.cos(a) * 110, Math.sin(a) * 110);
+        ctx.stroke();
+      }
+
+      // Ticking hands
+      const secAngle = t * 4 - Math.PI / 2;
+      const hrAngle = t * 0.4 - Math.PI / 2;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(hrAngle) * 58, Math.sin(hrAngle) * 58);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(secAngle) * 86, Math.sin(secAngle) * 86);
+      ctx.stroke();
+
+      ctx.fillStyle = '#18181b';
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
+
+    case 'camera-flash': {
+      // Cartoon camera with blinking flash star
+      ctx.save();
+      ctx.translate(256, 270);
+
+      // Camera body
+      ctx.fillStyle = '#334155';
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.roundRect(-130, -75, 260, 165, 28);
+      ctx.fill();
+      ctx.stroke();
+
+      // Top viewfinder
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.roundRect(-55, -112, 110, 38, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      // Lens
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(0, 10, 62, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(0, 10, 42, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Flash star burst
+      const flashAlpha = Math.max(0, Math.sin(t * 5));
+      if (flashAlpha > 0.2) {
+        ctx.save();
+        ctx.translate(88, -42);
+        ctx.scale(flashAlpha * 1.15, flashAlpha * 1.15);
+        ctx.fillStyle = '#fef08a';
+        ctx.strokeStyle = '#eab308';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const r = i % 2 === 0 ? 44 : 14;
+          const a = (i * Math.PI) / 4;
+          if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+          else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+      break;
+    }
+
+    case 'trophy-star': {
+      // Golden world record trophy with sparkles
+      ctx.save();
+      ctx.translate(256, 270);
+      const bob = Math.sin(t * 4) * 8;
+      ctx.translate(0, bob);
+
+      // Handles
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 20;
+      ctx.beginPath();
+      ctx.arc(-85, -50, 40, Math.PI / 2, (3 * Math.PI) / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(85, -50, 40, -Math.PI / 2, Math.PI / 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.arc(-85, -50, 40, Math.PI / 2, (3 * Math.PI) / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(85, -50, 40, -Math.PI / 2, Math.PI / 2);
+      ctx.stroke();
+
+      // Cup
+      ctx.fillStyle = '#fbbf24';
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.moveTo(-90, -110);
+      ctx.lineTo(90, -110);
+      ctx.quadraticCurveTo(80, 30, 0, 45);
+      ctx.quadraticCurveTo(-80, 30, -90, -110);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Stem & Base
+      ctx.fillRect(-18, 45, 36, 55);
+      ctx.strokeRect(-18, 45, 36, 55);
+      ctx.fillStyle = '#78350f';
+      ctx.beginPath();
+      ctx.roundRect(-70, 95, 140, 38, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      // Star on cup
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? 32 : 14;
+        const a = (i * Math.PI) / 5 - Math.PI / 2;
+        if (i === 0) ctx.moveTo(Math.cos(a) * r, -40 + Math.sin(a) * r);
+        else ctx.lineTo(Math.cos(a) * r, -40 + Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
+
     case 'none':
     default:
       break;
@@ -2545,6 +2870,129 @@ export function renderArticulatedStickman2D(
 
   ctx.restore(); // End head
   ctx.restore(); // End body
+
+  // 11. CARTOON MICRO-EFFECTS (Sparkles, Dust Puffs, Sweat Drop, Shock Sparks, Confetti, Music)
+  const fxMode = config.ambientEffect ?? 'auto';
+  if (fxMode !== 'none') {
+    const drawStar4 = (sx: number, sy: number, r: number, color: string, alpha: number) => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(sx, sy);
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const rad = i % 2 === 0 ? r : r * 0.35;
+        const a = (i * Math.PI) / 4;
+        if (i === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+        else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    if (fxMode === 'auto') {
+      if (pose === 'think') {
+        // Cute cartoon sweat drop near temple
+        const dropY = 395 + ((t * 25) % 24);
+        const dropAlpha = Math.max(0.2, 1 - ((t * 25) % 24) / 24);
+        ctx.save();
+        ctx.globalAlpha = dropAlpha;
+        ctx.translate(cx - 115, dropY);
+        ctx.fillStyle = '#38bdf8';
+        ctx.strokeStyle = '#18181b';
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -18);
+        ctx.quadraticCurveTo(14, 4, 0, 14);
+        ctx.quadraticCurveTo(-14, 4, 0, -18);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      } else if (pose === 'shock') {
+        // Comic shock sparks around head
+        ctx.save();
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 4; i++) {
+          const ang = -Math.PI * 0.85 + i * 0.58;
+          const pulseR = 140 + Math.sin(t * 18 + i) * 14;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(ang) * pulseR, 420 + Math.sin(ang) * pulseR);
+          ctx.lineTo(cx + Math.cos(ang) * (pulseR + 28), 420 + Math.sin(ang) * (pulseR + 28));
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (pose === 'walk') {
+        // Cartoon footstep dust puffs
+        const puffPhase = (t * 3.5) % 1;
+        ctx.save();
+        ctx.globalAlpha = (1 - puffPhase) * 0.65;
+        ctx.fillStyle = '#e2e8f0';
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+        const px = cx - 80 - puffPhase * 45;
+        const py = groundY - 12 - puffPhase * 18;
+        ctx.beginPath();
+        ctx.arc(px, py, 12 + puffPhase * 10, 0, Math.PI * 2);
+        ctx.arc(px + 18, py + 4, 9 + puffPhase * 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      } else if (pose === 'explain' || pose === 'wave') {
+        // Subtle twinkling cartoon stars
+        const s1 = 0.5 + 0.5 * Math.sin(t * 5);
+        const s2 = 0.5 + 0.5 * Math.sin(t * 5 + 2.1);
+        drawStar4(cx - 175, 410 + Math.sin(t * 3) * 10, 14 + s1 * 6, '#fde047', 0.4 + s1 * 0.6);
+        drawStar4(cx + 180, 480 + Math.cos(t * 3.2) * 10, 12 + s2 * 6, '#38bdf8', 0.4 + s2 * 0.6);
+      }
+    } else if (fxMode === 'sparkles') {
+      const pts = [
+        [-210, 320, '#fde047'], [215, 340, '#38bdf8'], [-185, 580, '#fb7185'],
+        [195, 560, '#fde047'], [-140, 220, '#a855f7'], [155, 210, '#4ade80'],
+      ] as const;
+      pts.forEach(([ox, oy, col], idx) => {
+        const pulse = 0.5 + 0.5 * Math.sin(t * 5.5 + idx * 1.3);
+        drawStar4(cx + ox, oy + Math.sin(t * 2.5 + idx) * 12, 12 + pulse * 8, col, 0.35 + pulse * 0.65);
+      });
+    } else if (fxMode === 'confetti') {
+      const colors = ['#f43f5e', '#fbbf24', '#38bdf8', '#4ade80', '#a855f7'];
+      for (let i = 0; i < 16; i++) {
+        const fall = ((t * 140 + i * 73) % 720);
+        const x = cx - 260 + ((i * 37) % 520) + Math.sin(t * 4 + i) * 18;
+        const y = 160 + fall;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(t * 5 + i);
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.strokeStyle = '#18181b';
+        ctx.lineWidth = 2;
+        ctx.fillRect(-8, -5, 16, 10);
+        ctx.strokeRect(-8, -5, 16, 10);
+        ctx.restore();
+      }
+    } else if (fxMode === 'music-notes') {
+      const notes = ['♪', '♫', '♩'] as const;
+      for (let i = 0; i < 5; i++) {
+        const rise = ((t * 65 + i * 80) % 320);
+        const nx = cx + (i % 2 === 0 ? -185 : 185) + Math.sin(t * 3 + i) * 20;
+        const ny = 600 - rise;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - rise / 320);
+        ctx.font = 'bold 42px sans-serif';
+        ctx.fillStyle = i % 2 === 0 ? '#38bdf8' : '#f43f5e';
+        ctx.strokeStyle = '#18181b';
+        ctx.lineWidth = 3;
+        ctx.fillText(notes[i % notes.length], nx, ny);
+        ctx.strokeText(notes[i % notes.length], nx, ny);
+        ctx.restore();
+      }
+    }
+  }
 }
 
 /**
@@ -3007,8 +3455,17 @@ export class Scene3DRenderer {
           this.stickman2DMat.needsUpdate = true;
         }
 
+        // Snappy cartoon pop-in entrance at the start of each clip
+        let popScale = 1.0;
+        if (timeSec < 0.28) {
+          const p = Math.max(0, Math.min(1, timeSec / 0.28));
+          const c1 = 1.70158;
+          const c3 = c1 + 1;
+          popScale = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+        }
+
         this.stickman2DMesh.position.set(0, 0, 0.02);
-        this.stickman2DMesh.scale.set(1, 1, 1);
+        this.stickman2DMesh.scale.set(popScale, popScale, 1);
         this.stickman2DMesh.rotation.z = 0;
       }
 

@@ -149,7 +149,15 @@ export type StoryProp3D =
   | 'money-gold'
   | 'ancient-book'
   | 'magnifier'
-  | 'fire-energy';
+  | 'fire-energy'
+  | 'coffee-cup'
+  | 'microphone'
+  | 'earth-globe'
+  | 'clock-time'
+  | 'camera-flash'
+  | 'trophy-star';
+
+export type AmbientEffect3D = 'auto' | 'sparkles' | 'confetti' | 'music-notes' | 'none';
 
 export interface Scene3DConfig {
   mode: 'stickman' | 'glb';
@@ -165,6 +173,7 @@ export interface Scene3DConfig {
   sarungPattern?: SarungPattern;
   storyProp?: StoryProp3D;
   cartoonAnimType?: 'articulated' | 'photo-cutout';
+  ambientEffect?: AmbientEffect3D;
 }
 
 export const STORY_PROPS_3D: {
@@ -228,10 +237,84 @@ export const STORY_PROPS_3D: {
     description: 'Lidah api kartun berenergi membara',
   },
   {
+    id: 'coffee-cup',
+    name: 'Cangkir Kopi Hangat',
+    icon: '☕',
+    description: 'Kopi mengepul santai untuk fakta ngobrol / kuliner',
+  },
+  {
+    id: 'microphone',
+    name: 'Mikrofon Podcast',
+    icon: '🎙️',
+    description: 'Mikrofon retro dengan gelombang suara berdenyut',
+  },
+  {
+    id: 'earth-globe',
+    name: 'Bola Dunia (Geografi)',
+    icon: '🌍',
+    description: 'Bumi berputar dengan awan untuk fakta negara & dunia',
+  },
+  {
+    id: 'clock-time',
+    name: 'Jam Waktu & Sejarah',
+    icon: '⏳',
+    description: 'Jam klasik berdetak untuk fakta masa lalu / waktu',
+  },
+  {
+    id: 'camera-flash',
+    name: 'Kamera & Kilatan',
+    icon: '📸',
+    description: 'Kamera kartun berkilat untuk bukti & fakta viral',
+  },
+  {
+    id: 'trophy-star',
+    name: 'Piala Rekor Dunia',
+    icon: '🏆',
+    description: 'Piala emas berkilau untuk fakta rekor terbesar/tercepat',
+  },
+  {
     id: 'none',
     name: 'Tanpa Objek Tambahan',
     icon: '🚫',
     description: 'Fokus murni ke karakter & gerakan presenter',
+  },
+];
+
+export const AMBIENT_EFFECTS_3D: {
+  id: AmbientEffect3D;
+  name: string;
+  icon: string;
+  description: string;
+}[] = [
+  {
+    id: 'auto',
+    name: 'Otomatis (Sesuai Pose)',
+    icon: '✨',
+    description: 'Debu langkah, keringat berpikir, kilat kaget & kilau ide otomatis',
+  },
+  {
+    id: 'sparkles',
+    name: 'Kilau Bintang',
+    icon: '🌟',
+    description: 'Bintang kartun kecil berkelip melayang di sekitar karakter',
+  },
+  {
+    id: 'confetti',
+    name: 'Konfeti Ceria',
+    icon: '🎉',
+    description: 'Hujan konfeti warna-warni meriah ala perayaan fakta seru',
+  },
+  {
+    id: 'music-notes',
+    name: 'Nada Musik',
+    icon: '🎵',
+    description: 'Not balok musik melayang santai di udara',
+  },
+  {
+    id: 'none',
+    name: 'Bersih (Tanpa Efek)',
+    icon: '🧼',
+    description: 'Tanpa partikel efek tambahan',
   },
 ];
 

@@ -40,6 +40,7 @@ import type {
   CameraPreset3D,
   StageTheme3D,
   StoryProp3D,
+  AmbientEffect3D,
   Scene3DConfig,
 } from '../types/editor';
 import {
@@ -48,6 +49,7 @@ import {
   STICKMAN_STYLES,
   SARUNG_PATTERNS,
   STORY_PROPS_3D,
+  AMBIENT_EFFECTS_3D,
   CAMERA_PRESETS_3D,
   STAGE_THEMES_3D,
   CHARACTER_COLORS_3D,
@@ -244,6 +246,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [duration3d, setDuration3d] = useState(5);
   const [speed3d, setSpeed3d] = useState(1.0);
   const [cartoonAnimType3d, setCartoonAnimType3d] = useState<'articulated' | 'photo-cutout'>('articulated');
+  const [ambientEffect3d, setAmbientEffect3d] = useState<AmbientEffect3D>('auto');
   const [factBadge3d, setFactBadge3d] = useState('TAHUKAH KAMU?');
   const [mode3d, setMode3d] = useState<'stickman' | 'glb'>('stickman');
   const [glbUrl3d, setGlbUrl3d] = useState('');
@@ -674,6 +677,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         if (s.sarungPattern) setSarungPattern3d(s.sarungPattern);
         if (s.storyProp) setProp3d(s.storyProp);
         if (s.cartoonAnimType) setCartoonAnimType3d(s.cartoonAnimType);
+        if (s.ambientEffect) setAmbientEffect3d(s.ambientEffect);
         setDuration3d(dur);
       });
     }
@@ -1270,6 +1274,40 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   </div>
                 </div>
 
+                {/* EFEK KECIL & PARTIKEL */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-200 block">
+                      3b. Efek Kecil & Partikel:
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-semibold">
+                      Micro-Animations
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {AMBIENT_EFFECTS_3D.map((fx) => (
+                      <button
+                        key={fx.id}
+                        type="button"
+                        onClick={() => setAmbientEffect3d(fx.id)}
+                        className={`p-1.5 rounded-xl border text-left transition-all ${
+                          ambientEffect3d === fx.id
+                            ? 'bg-amber-950/60 border-amber-400 text-white ring-1 ring-amber-400/50'
+                            : 'bg-[#171820] border-[#252834] text-gray-300 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-base">{fx.icon}</span>
+                          <span className="text-[11px] font-bold truncate">{fx.name}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-1">
+                          {fx.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* WARNA STICKMAN */}
                 <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
                   <span className="text-xs font-semibold text-gray-200 block">
@@ -1441,6 +1479,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     animationSpeed: speed3d,
                     factBadgeText: factBadge3d.trim() || undefined,
                     cartoonAnimType: cartoonAnimType3d,
+                    ambientEffect: ambientEffect3d,
                     glbUrl: mode3d === 'glb' ? glbUrl3d : undefined,
                   };
                   const poseLabel =
@@ -1487,6 +1526,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       animationSpeed: speed3d,
                       factBadgeText: factBadge3d.trim() || undefined,
                       cartoonAnimType: cartoonAnimType3d,
+                      ambientEffect: ambientEffect3d,
                       glbUrl:
                         mode3d === 'glb'
                           ? glbUrl3d || selectedClip.scene3d?.glbUrl
