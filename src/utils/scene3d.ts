@@ -1681,12 +1681,252 @@ function createFactBadgeTexture(text: string): THREE.CanvasTexture {
 }
 
 /**
+ * Illustrated 2D Explainer Stage Backdrop Generator
+ * Creates rich hand-drawn / cartoon backgrounds for each stage theme so the character
+ * stands inside a real storytelling environment rather than an empty void.
+ */
+function renderStageBackdropCanvas(theme: StageTheme3D, canvas: HTMLCanvasElement): void {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, w, h);
+
+  switch (theme) {
+    case 'chalkboard': {
+      // Deep green classroom chalkboard
+      const grad = ctx.createRadialGradient(w * 0.5, h * 0.45, 50, w * 0.5, h * 0.5, w * 0.65);
+      grad.addColorStop(0, '#1f4230');
+      grad.addColorStop(1, '#12261c');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Faint chalk dust smudges & science doodles
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.lineWidth = 3;
+      ctx.font = 'italic bold 36px "Comic Sans MS", cursive, sans-serif';
+      ctx.fillText('E = mc²', w * 0.08, h * 0.22);
+      ctx.fillText('?!', w * 0.85, h * 0.25);
+
+      // Atom doodle top-left
+      ctx.save();
+      ctx.translate(w * 0.15, h * 0.42);
+      for (let i = 0; i < 3; i++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 42, 14, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Wooden frame border
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 28;
+      ctx.strokeRect(0, 0, w, h);
+      ctx.strokeStyle = '#451a03';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(14, 14, w - 28, h - 28);
+      ctx.restore();
+      break;
+    }
+
+    case 'cozy-room': {
+      // Warm cozy studio room
+      const wallGrad = ctx.createLinearGradient(0, 0, 0, h * 0.78);
+      wallGrad.addColorStop(0, '#fdf6e7');
+      wallGrad.addColorStop(1, '#f3e5c8');
+      ctx.fillStyle = wallGrad;
+      ctx.fillRect(0, 0, w, h * 0.78);
+
+      // Wooden floor
+      ctx.fillStyle = '#d6b384';
+      ctx.fillRect(0, h * 0.78, w, h * 0.22);
+      ctx.strokeStyle = '#a67c52';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.78);
+      ctx.lineTo(w, h * 0.78);
+      ctx.stroke();
+
+      // Framed wall picture left
+      ctx.fillStyle = '#fef3c7';
+      ctx.fillRect(w * 0.08, h * 0.18, 150, 110);
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(w * 0.08, h * 0.18, 150, 110);
+      // Mini mountain inside frame
+      ctx.fillStyle = '#86efac';
+      ctx.beginPath();
+      ctx.moveTo(w * 0.08 + 10, h * 0.18 + 102);
+      ctx.lineTo(w * 0.08 + 65, h * 0.18 + 38);
+      ctx.lineTo(w * 0.08 + 140, h * 0.18 + 102);
+      ctx.fill();
+
+      // Warm window light right
+      ctx.fillStyle = '#e0f2fe';
+      ctx.fillRect(w * 0.76, h * 0.14, 170, 210);
+      ctx.strokeStyle = '#92400e';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(w * 0.76, h * 0.14, 170, 210);
+      ctx.beginPath();
+      ctx.moveTo(w * 0.76 + 85, h * 0.14);
+      ctx.lineTo(w * 0.76 + 85, h * 0.14 + 210);
+      ctx.moveTo(w * 0.76, h * 0.14 + 105);
+      ctx.lineTo(w * 0.76 + 170, h * 0.14 + 105);
+      ctx.stroke();
+      break;
+    }
+
+    case 'countryside': {
+      // Nusantara sky & rolling green hills
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.75);
+      skyGrad.addColorStop(0, '#7dd3fc');
+      skyGrad.addColorStop(1, '#e0f2fe');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Warm Sun
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.arc(w * 0.84, h * 0.18, 52, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#eab308';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // Fluffy Cartoon Clouds
+      const drawCloud = (cx: number, cy: number, s: number) => {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 28 * s, 0, Math.PI * 2);
+        ctx.arc(cx + 26 * s, cy - 10 * s, 32 * s, 0, Math.PI * 2);
+        ctx.arc(cx + 54 * s, cy, 26 * s, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      drawCloud(w * 0.14, h * 0.2, 1.1);
+      drawCloud(w * 0.56, h * 0.14, 0.9);
+
+      // Distant Volcano / Mountain Silhouette
+      ctx.fillStyle = '#6ee7b7';
+      ctx.beginPath();
+      ctx.moveTo(w * 0.05, h * 0.74);
+      ctx.lineTo(w * 0.28, h * 0.42);
+      ctx.lineTo(w * 0.34, h * 0.42);
+      ctx.lineTo(w * 0.58, h * 0.74);
+      ctx.closePath();
+      ctx.fill();
+
+      // Rolling Green Hills
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.72);
+      ctx.quadraticCurveTo(w * 0.3, h * 0.62, w * 0.65, h * 0.72);
+      ctx.quadraticCurveTo(w * 0.85, h * 0.78, w, h * 0.68);
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(0, h * 0.78, w, h * 0.22);
+      break;
+    }
+
+    case 'cosmic': {
+      // Deep space nebula
+      const spaceGrad = ctx.createRadialGradient(w * 0.5, h * 0.4, 40, w * 0.5, h * 0.5, w * 0.7);
+      spaceGrad.addColorStop(0, '#1e1b4b');
+      spaceGrad.addColorStop(0.5, '#0f172a');
+      spaceGrad.addColorStop(1, '#020617');
+      ctx.fillStyle = spaceGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Twinkling stars
+      ctx.fillStyle = '#ffffff';
+      const starCoords = [
+        [0.1, 0.15, 3], [0.22, 0.3, 2], [0.35, 0.12, 3.5], [0.72, 0.18, 3],
+        [0.85, 0.28, 2.5], [0.15, 0.6, 2], [0.88, 0.55, 3], [0.62, 0.1, 2],
+        [0.45, 0.25, 2], [0.92, 0.12, 3.5], [0.08, 0.42, 2.5], [0.78, 0.42, 2],
+      ];
+      for (const [sx, sy, sr] of starCoords) {
+        ctx.beginPath();
+        ctx.arc(w * sx, h * sy, sr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Distant glowing planet
+      ctx.save();
+      ctx.translate(w * 0.16, h * 0.24);
+      ctx.fillStyle = '#818cf8';
+      ctx.beginPath();
+      ctx.arc(0, 0, 34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#c7d2fe';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 62, 16, -0.3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+
+    case 'dark-studio': {
+      const darkGrad = ctx.createRadialGradient(w * 0.5, h * 0.45, 40, w * 0.5, h * 0.5, w * 0.65);
+      darkGrad.addColorStop(0, '#1e293b');
+      darkGrad.addColorStop(1, '#090d16');
+      ctx.fillStyle = darkGrad;
+      ctx.fillRect(0, 0, w, h);
+      break;
+    }
+
+    case 'paper-sketch':
+    case 'light-studio':
+    default: {
+      // Warm cream sketch paper with subtle notebook lines & corner doodles
+      ctx.fillStyle = '#fcfbf7';
+      ctx.fillRect(0, 0, w, h);
+
+      // Subtle ruled sketch paper lines
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
+      ctx.lineWidth = 2;
+      for (let y = 80; y < h; y += 56) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Faint hand-drawn doodles in corners
+      ctx.strokeStyle = 'rgba(100, 116, 139, 0.22)';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      // Small star top-left
+      ctx.beginPath();
+      ctx.moveTo(w * 0.09, h * 0.16 - 14);
+      ctx.lineTo(w * 0.09, h * 0.16 + 14);
+      ctx.moveTo(w * 0.09 - 14, h * 0.16);
+      ctx.lineTo(w * 0.09 + 14, h * 0.16);
+      ctx.stroke();
+
+      // Swirl bottom-right
+      ctx.beginPath();
+      ctx.arc(w * 0.9, h * 0.2, 16, 0, Math.PI * 1.5);
+      ctx.stroke();
+      break;
+    }
+  }
+}
+
+/**
  * Fully Articulated 2D Vector Cartoon Character Engine (Si Stickman Blangkon)
  * - Renders crisp vector cartoon line art matching the user reference photo.
+ * - Soft cel-shading & cheek blush for appealing cartoon depth.
  * - Dynamic blinking eyes with expressive pupil tracking.
- * - Animated talking mouth (lip-sync mouth flap during explanations, gasp during shock, smile during greeting).
+ * - Multi-harmonic talking mouth (natural speech syllables during explanations).
  * - Articulated bending arms and hands (waves, gestures, scratches chin, clenches cheeks).
- * - Natural breathing, head tilting, sarung swaying, and stepping legs.
  */
 export function renderArticulatedStickman2D(
   ctx: CanvasRenderingContext2D,
@@ -1699,7 +1939,7 @@ export function renderArticulatedStickman2D(
   ctx.clearRect(0, 0, width, height);
 
   const cx = width / 2; // 512
-  const groundY = height * 0.88; // ~900
+  const groundY = height * 0.93; // Grounded cleanly near bottom of plane
 
   // 1. Natural Breathing & Organic Kinematics
   const breatheY = Math.sin(t * 3.5) * 4.5;
@@ -1725,7 +1965,7 @@ export function renderArticulatedStickman2D(
 
   ctx.save();
   ctx.translate(cx + bodyOffsetX, groundY + bodyOffsetY);
-  ctx.scale(breatheScaleX, breatheScaleY);
+  ctx.scale(breatheScaleX * 1.15, breatheScaleY * 1.15);
   ctx.rotate(bodyTilt);
 
   // Colors & Styles
@@ -2187,6 +2427,17 @@ export function renderArticulatedStickman2D(
   drawEye(eyeLeftX, eyeY);
   drawEye(eyeRightX, eyeY);
 
+  // Subtle warm cartoon cheek blush for friendly appeal
+  if (pose === 'wave' || pose === 'explain' || pose === 'idle' || pose === 'walk') {
+    ctx.save();
+    ctx.fillStyle = 'rgba(251, 113, 133, 0.24)';
+    ctx.beginPath();
+    ctx.ellipse(-56, 46, 15, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(56, 46, 15, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   // 9. EYEBROWS
   ctx.save();
   ctx.strokeStyle = strokeColor;
@@ -2226,9 +2477,9 @@ export function renderArticulatedStickman2D(
   ctx.translate(0, 56);
 
   if (pose === 'explain') {
-    // DYNAMIC TALKING MOUTH FLAP (LIP SYNC)!
-    const talkCycle = Math.abs(Math.sin(t * 13.5));
-    const mouthOpen = 8 + talkCycle * 24;
+    // DYNAMIC MULTI-HARMONIC TALKING MOUTH FLAP (NATURAL SPEECH SYLLABLES)
+    const talkCycle = Math.abs(Math.sin(t * 11.5) * 0.65 + Math.sin(t * 17.3) * 0.35);
+    const mouthOpen = 6 + talkCycle * 25;
 
     ctx.beginPath();
     ctx.ellipse(0, 0, 26, mouthOpen, 0, 0, Math.PI * 2);
@@ -2311,6 +2562,9 @@ export class Scene3DRenderer {
   private gridHelper: THREE.GridHelper;
   private podiumRing: THREE.Mesh;
   private groundSketchMesh: THREE.Mesh;
+  private backdropCanvas: HTMLCanvasElement;
+  private backdropTexture: THREE.CanvasTexture;
+  private backdropMesh: THREE.Mesh;
   private propCanvas: HTMLCanvasElement;
   private propTexture: THREE.CanvasTexture;
   private propMesh: THREE.Mesh;
@@ -2407,6 +2661,23 @@ export class Scene3DRenderer {
     this.groundSketchMesh.position.set(0, 0.003, 0.05);
     this.scene.add(this.groundSketchMesh);
 
+    // Illustrated 2D Scenery Backdrop Plane
+    this.backdropCanvas = document.createElement('canvas');
+    this.backdropCanvas.width = 1280;
+    this.backdropCanvas.height = 720;
+    this.backdropTexture = new THREE.CanvasTexture(this.backdropCanvas);
+    this.backdropTexture.colorSpace = THREE.SRGBColorSpace;
+    const backdropMat = new THREE.MeshBasicMaterial({
+      map: this.backdropTexture,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+    });
+    const backdropGeo = new THREE.PlaneGeometry(14, 8.2);
+    this.backdropMesh = new THREE.Mesh(backdropGeo, backdropMat);
+    this.backdropMesh.position.set(0, 1.35, -2.4);
+    this.scene.add(this.backdropMesh);
+
     // Procedural Storytelling Prop Billboard (Floating illustrations)
     this.propCanvas = document.createElement('canvas');
     this.propCanvas.width = 512;
@@ -2492,13 +2763,19 @@ export class Scene3DRenderer {
     if (p.isCartoon) {
       this.gridHelper.visible = false;
       this.podiumRing.visible = false;
-      this.groundSketchMesh.visible = theme === 'paper-sketch' || theme === 'light-studio';
+      this.floorMesh.visible = false;
+      this.groundSketchMesh.visible = false;
+      this.backdropMesh.visible = true;
+      renderStageBackdropCanvas(theme, this.backdropCanvas);
+      this.backdropTexture.needsUpdate = true;
       this.hemiLight.intensity = 1.35;
       this.keyLight.intensity = 1.55;
     } else {
       this.gridHelper.visible = true;
       this.podiumRing.visible = true;
+      this.floorMesh.visible = true;
       this.groundSketchMesh.visible = false;
+      this.backdropMesh.visible = false;
       this.hemiLight.intensity = 0.9;
       this.keyLight.intensity = 1.85;
       (this.podiumRing.material as THREE.MeshBasicMaterial).color.setHex(p.rim);
@@ -2552,6 +2829,65 @@ export class Scene3DRenderer {
     const safeDur = Math.max(0.1, durationSec);
     const progress = Math.max(0, Math.min(1, timeSec / safeDur));
     const animTime = timeSec * (config.animationSpeed || 1);
+
+    // Aspect-Aware Adaptive Camera & Layout Framing (16:9 vs 9:16 vs 1:1)
+    const aspect = this.camera.aspect || 16 / 9;
+    const isPortrait = aspect < 0.85; // 9:16 TikTok / Shorts
+    const isSquare = aspect >= 0.85 && aspect < 1.2; // 1:1
+    const distScale = isPortrait ? 1.42 : isSquare ? 1.15 : 1.0;
+
+    const lookTarget = new THREE.Vector3(0, isPortrait ? 1.15 : 1.12, 0);
+    const themeObj = THEME_PALETTES[config.stageTheme] || THEME_PALETTES['paper-sketch'];
+
+    switch (config.cameraPreset) {
+      case 'orbit': {
+        const angle = -0.35 + progress * Math.PI * 0.7;
+        const rDist = 3.45 * distScale;
+        this.camera.position.set(Math.sin(angle) * rDist, 1.38, Math.cos(angle) * rDist);
+        break;
+      }
+      case 'zoom-in': {
+        const z = (3.85 - progress * 0.95) * distScale;
+        this.camera.position.set(isPortrait ? 0 : 0.1, 1.24 - progress * 0.05, z);
+        break;
+      }
+      case 'low-angle': {
+        this.camera.position.set(Math.sin(progress * 0.6) * 0.45, 0.82, 3.25 * distScale);
+        lookTarget.y = 1.22;
+        break;
+      }
+      case 'pan': {
+        const x = (-0.5 + progress * 1.0) * (isPortrait ? 0.35 : 1.0);
+        this.camera.position.set(x, 1.25, 3.45 * distScale);
+        break;
+      }
+      case 'presenter':
+      default: {
+        if (themeObj.isCartoon) {
+          if (isPortrait) {
+            // 9:16 Portrait Framing: centered, generous horizontal margin, tall vertical headroom
+            this.camera.position.set(0, 1.22, 4.75);
+            lookTarget.set(0, 1.18, 0);
+          } else if (isSquare) {
+            // 1:1 Square Framing
+            this.camera.position.set(0.05, 1.2, 3.9);
+            lookTarget.set(0.05, 1.15, 0);
+          } else {
+            // 16:9 Landscape Framing (Kok Bisa style)
+            this.camera.position.set(0.12, 1.18, 3.45);
+            lookTarget.set(0.12, 1.12, 0);
+          }
+        } else {
+          this.camera.position.set(
+            Math.sin(timeSec * 0.8) * 0.14,
+            1.36 + Math.cos(timeSec * 0.7) * 0.04,
+            3.45 * distScale
+          );
+        }
+        break;
+      }
+    }
+    this.camera.lookAt(lookTarget);
 
     if (config.mode === 'glb' && config.glbUrl && this.glbGroup) {
       this.rig.root.visible = false;
@@ -2694,14 +3030,25 @@ export class Scene3DRenderer {
 
         if (effectiveProp === 'comic-shock') {
           // Dynamic comic speed lines bursting behind the character!
-          this.propMesh.position.set(0, 1.25, -0.15);
-          this.propMesh.scale.set(2.4, 2.4, 1);
+          this.propMesh.position.set(0, 1.15, -0.15);
+          const shockScale = isPortrait ? 1.55 : 2.15;
+          this.propMesh.scale.set(shockScale, shockScale, 1);
         } else if (effectiveProp === 'thought-question' || effectiveProp === 'idea-bulb') {
-          this.propMesh.position.set(0.68, 1.82 + Math.sin(animTime * 3.5) * 0.035, 0.15);
-          this.propMesh.scale.set(1.2, 1.2, 1);
+          if (isPortrait) {
+            this.propMesh.position.set(0.38, 1.88 + Math.sin(animTime * 3.5) * 0.03, 0.15);
+            this.propMesh.scale.set(0.85, 0.85, 1);
+          } else {
+            this.propMesh.position.set(0.68, 1.66 + Math.sin(animTime * 3.5) * 0.035, 0.15);
+            this.propMesh.scale.set(1.1, 1.1, 1);
+          }
         } else {
-          this.propMesh.position.set(0.78, 1.48 + Math.sin(animTime * 3.0) * 0.035, 0.15);
-          this.propMesh.scale.set(1.2, 1.2, 1);
+          if (isPortrait) {
+            this.propMesh.position.set(0.4, 1.72 + Math.sin(animTime * 3.0) * 0.03, 0.15);
+            this.propMesh.scale.set(0.85, 0.85, 1);
+          } else {
+            this.propMesh.position.set(0.76, 1.44 + Math.sin(animTime * 3.0) * 0.035, 0.15);
+            this.propMesh.scale.set(1.1, 1.1, 1);
+          }
         }
         this.propMesh.lookAt(this.camera.position);
       } else {
@@ -2709,6 +3056,8 @@ export class Scene3DRenderer {
       }
     }
 
+    const aspectForBadge = this.camera.aspect || 16 / 9;
+    const isPortraitBadge = aspectForBadge < 0.85;
     const badgeText = (config.factBadgeText || '').trim();
     if (badgeText) {
       if (badgeText !== this.currentBadgeText) {
@@ -2719,53 +3068,17 @@ export class Scene3DRenderer {
         mat.needsUpdate = true;
       }
       this.badgeMesh.visible = true;
-      this.badgeMesh.position.set(-0.15, 2.38 + Math.sin(timeSec * 2.5) * 0.035, 0);
+      if (isPortraitBadge) {
+        this.badgeMesh.position.set(0, 2.38 + Math.sin(timeSec * 2.5) * 0.03, 0);
+        this.badgeMesh.scale.set(0.85, 0.85, 1);
+      } else {
+        this.badgeMesh.position.set(-0.08, 2.02 + Math.sin(timeSec * 2.5) * 0.03, 0);
+        this.badgeMesh.scale.set(0.95, 0.95, 1);
+      }
       this.badgeMesh.lookAt(this.camera.position);
     } else {
       this.badgeMesh.visible = false;
     }
-
-    const lookTarget = new THREE.Vector3(0, 1.25, 0);
-    const themeObj = THEME_PALETTES[config.stageTheme] || THEME_PALETTES['paper-sketch'];
-
-    switch (config.cameraPreset) {
-      case 'orbit': {
-        const angle = -0.45 + progress * Math.PI * 0.9;
-        this.camera.position.set(Math.sin(angle) * 3.5, 1.5, Math.cos(angle) * 3.5);
-        break;
-      }
-      case 'zoom-in': {
-        const z = 3.9 - progress * 1.35;
-        this.camera.position.set(0.12, 1.32 - progress * 0.06, z);
-        break;
-      }
-      case 'low-angle': {
-        this.camera.position.set(Math.sin(progress * 0.6) * 0.6, 0.76, 3.1);
-        lookTarget.y = 1.32;
-        break;
-      }
-      case 'pan': {
-        const x = -0.75 + progress * 1.5;
-        this.camera.position.set(x, 1.35, 3.4);
-        break;
-      }
-      case 'presenter':
-      default: {
-        if (themeObj.isCartoon) {
-          // Stable, beautifully framed 2D explainer camera shot (Kok Bisa style)
-          this.camera.position.set(0.12, 1.26, 3.25);
-          lookTarget.set(0.12, 1.18, 0);
-        } else {
-          this.camera.position.set(
-            Math.sin(timeSec * 0.8) * 0.14,
-            1.36 + Math.cos(timeSec * 0.7) * 0.04,
-            3.45
-          );
-        }
-        break;
-      }
-    }
-    this.camera.lookAt(lookTarget);
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -2774,6 +3087,8 @@ export class Scene3DRenderer {
     const mat = this.badgeMesh.material as THREE.MeshBasicMaterial;
     mat.map?.dispose();
     this.propTexture.dispose();
+    this.backdropTexture.dispose();
+    this.backdropMesh.geometry.dispose();
     this.stickmanTex.dispose();
     this.stickman2DMesh.geometry.dispose();
     this.stickman2DMat.dispose();

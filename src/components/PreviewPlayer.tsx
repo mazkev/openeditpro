@@ -369,11 +369,11 @@ export const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
   );
 
   // Aspect ratio styles
-  let aspectClass = 'aspect-video w-full max-w-[850px] max-h-[460px]';
+  let aspectClass = 'aspect-video w-full max-w-[850px] max-h-full';
   if (aspectRatio === '9:16') {
-    aspectClass = 'aspect-[9/16] h-[460px] max-w-[300px]';
+    aspectClass = 'aspect-[9/16] h-full max-h-[520px] w-auto max-w-full';
   } else if (aspectRatio === '1:1') {
-    aspectClass = 'aspect-square h-[440px] max-w-[440px]';
+    aspectClass = 'aspect-square h-full max-h-[480px] w-auto max-w-full';
   }
 
   // Watermark position styling
