@@ -39,6 +39,7 @@ import type {
   SarungPattern,
   CameraPreset3D,
   StageTheme3D,
+  StoryProp3D,
   Scene3DConfig,
 } from '../types/editor';
 import {
@@ -46,6 +47,7 @@ import {
   STICKMAN_POSES,
   STICKMAN_STYLES,
   SARUNG_PATTERNS,
+  STORY_PROPS_3D,
   CAMERA_PRESETS_3D,
   STAGE_THEMES_3D,
   CHARACTER_COLORS_3D,
@@ -218,8 +220,6 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   onExtractAudio,
   onToggleMuteClip,
 }) => {
-  const selectedClip = clips.find((c) => c.id === selectedClipId);
-
   const [internalActiveTab, setInternalActiveTab] = useState<TabType>('media');
   const activeTab = controlledActiveTab ?? internalActiveTab;
   const setActiveTab = controlledSetActiveTab ?? setInternalActiveTab;
@@ -237,8 +237,9 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [characterStyle3d, setCharacterStyle3d] = useState<StickmanCharacterStyle>('blangkon');
   const [sarungPattern3d, setSarungPattern3d] = useState<SarungPattern>('plaid-red');
   const [pose3d, setPose3d] = useState<StickmanPose>('explain');
+  const [prop3d, setProp3d] = useState<StoryProp3D>('thought-question');
   const [color3d, setColor3d] = useState('#f8fafc');
-  const [theme3d, setTheme3d] = useState<StageTheme3D>('dark-studio');
+  const [theme3d, setTheme3d] = useState<StageTheme3D>('paper-sketch');
   const [camera3d, setCamera3d] = useState<CameraPreset3D>('presenter');
   const [duration3d, setDuration3d] = useState(5);
   const [speed3d, setSpeed3d] = useState(1.0);
@@ -648,6 +649,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({
     }
   };
 
+  const selectedClip = clips.find((c) => c.id === selectedClipId);
+
   // Sync 3D studio controls when user selects a 3D clip on the timeline
   useEffect(() => {
     if (
@@ -668,6 +671,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
         if (s.mode) setMode3d(s.mode);
         if (s.characterStyle) setCharacterStyle3d(s.characterStyle);
         if (s.sarungPattern) setSarungPattern3d(s.sarungPattern);
+        if (s.storyProp) setProp3d(s.storyProp);
         setDuration3d(dur);
       });
     }
@@ -920,31 +924,34 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     characterStyle: characterStyle3d,
                     sarungPattern: sarungPattern3d,
                     pose: 'think',
+                    storyProp: 'thought-question',
                     characterColor: color3d,
-                    stageTheme: theme3d,
-                    cameraPreset: 'zoom-in',
+                    stageTheme: theme3d || 'paper-sketch',
+                    cameraPreset: 'presenter',
                     animationSpeed: 1.0,
-                    factBadgeText: 'TAHUKAH KAMU?',
+                    factBadgeText: 'KOK BISA?!',
                   };
                   const scene2: Scene3DConfig = {
                     mode: 'stickman',
                     characterStyle: characterStyle3d,
                     sarungPattern: sarungPattern3d,
                     pose: 'explain',
+                    storyProp: 'octopus-hearts',
                     characterColor: color3d,
-                    stageTheme: theme3d,
-                    cameraPreset: 'presenter',
+                    stageTheme: theme3d || 'paper-sketch',
+                    cameraPreset: 'zoom-in',
                     animationSpeed: 1.0,
-                    factBadgeText: 'FAKTA UNIK #1',
+                    factBadgeText: '3 JANTUNG GURITA',
                   };
                   const scene3: Scene3DConfig = {
                     mode: 'stickman',
                     characterStyle: characterStyle3d,
                     sarungPattern: sarungPattern3d,
                     pose: 'shock',
+                    storyProp: 'comic-shock',
                     characterColor: color3d,
-                    stageTheme: 'neon-cyber',
-                    cameraPreset: 'low-angle',
+                    stageTheme: theme3d || 'paper-sketch',
+                    cameraPreset: 'presenter',
                     animationSpeed: 1.1,
                     factBadgeText: 'MIND BLOWN!',
                   };
@@ -1176,10 +1183,44 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   </div>
                 </div>
 
+                {/* OBJEK ILUSTRASI CERITA (STORY PROPS) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-200 block">
+                      3. Objek Ilustrasi Cerita:
+                    </span>
+                    <span className="text-[10px] text-cyan-400 font-semibold">
+                      Elemen Pendukung Fakta
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {STORY_PROPS_3D.map((pr) => (
+                      <button
+                        key={pr.id}
+                        type="button"
+                        onClick={() => setProp3d(pr.id)}
+                        className={`p-1.5 rounded-xl border text-left transition-all ${
+                          prop3d === pr.id
+                            ? 'bg-cyan-950/70 border-cyan-400 text-white ring-1 ring-cyan-400/50'
+                            : 'bg-[#171820] border-[#252834] text-gray-300 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-base">{pr.icon}</span>
+                          <span className="text-[11px] font-bold truncate">{pr.name}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-1">
+                          {pr.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* WARNA STICKMAN */}
                 <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
                   <span className="text-xs font-semibold text-gray-200 block">
-                    3. Warna Karakter Stickman:
+                    4. Warna Karakter Stickman:
                   </span>
                   <div className="flex items-center space-x-2">
                     {CHARACTER_COLORS_3D.map((c) => (
@@ -1228,25 +1269,28 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               </div>
             )}
 
-            {/* PAPAN JUDUL 3D */}
+            {/* PAPAN JUDUL / BALON KARTUN */}
             <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-1.5">
-              <span className="text-xs font-semibold text-gray-200 block">
-                3. Papan Judul 3D (Opsional):
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-200 block">
+                  Balon Judul / Fakta (Opsional):
+                </span>
+                <span className="text-[10px] text-gray-400">Balon Kartun</span>
+              </div>
               <input
                 type="text"
                 value={factBadge3d}
                 onChange={(e) => setFactBadge3d(e.target.value)}
-                placeholder="Contoh: TAHUKAH KAMU? (kosongkan jika tidak perlu)"
+                placeholder="Contoh: KOK BISA?! (kosongkan jika tidak perlu)"
                 className="w-full bg-[#101116] border border-[#2b2d3d] rounded-lg px-2.5 py-1.5 text-xs text-gray-200 outline-none focus:border-cyan-400"
               />
             </div>
 
-            {/* TEMA PANGGUNG & KAMERA */}
+            {/* TEMA LATAR PANGGUNG KARTUN & KAMERA */}
             <div className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] space-y-2.5">
               <div>
                 <span className="text-xs font-semibold text-gray-200 block mb-1.5">
-                  4. Latar Panggung 3D:
+                  Latar Panggung Kartun:
                 </span>
                 <div className="grid grid-cols-2 gap-1.5">
                   {STAGE_THEMES_3D.map((th) => (
@@ -1256,12 +1300,12 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       onClick={() => setTheme3d(th.id)}
                       className={`flex items-center space-x-2 p-1.5 rounded-lg border text-[11px] font-medium transition-all ${
                         theme3d === th.id
-                          ? 'border-cyan-400 bg-cyan-950/50 text-white'
+                          ? 'border-cyan-400 bg-cyan-950/60 text-white ring-1 ring-cyan-400/50'
                           : 'border-[#232532] bg-[#12131a] text-gray-300 hover:border-gray-600'
                       }`}
                     >
                       <span
-                        className="w-3.5 h-3.5 rounded-full border border-white/20 flex-shrink-0"
+                        className="w-3.5 h-3.5 rounded border border-white/20 flex-shrink-0"
                         style={{ backgroundColor: th.bgPreview }}
                       />
                       <span className="truncate">{th.name}</span>
@@ -1337,6 +1381,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     characterStyle: characterStyle3d,
                     sarungPattern: sarungPattern3d,
                     pose: pose3d,
+                    storyProp: prop3d,
                     characterColor: color3d,
                     stageTheme: theme3d,
                     cameraPreset: camera3d,
@@ -1381,6 +1426,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       characterStyle: characterStyle3d,
                       sarungPattern: sarungPattern3d,
                       pose: pose3d,
+                      storyProp: prop3d,
                       characterColor: color3d,
                       stageTheme: theme3d,
                       cameraPreset: camera3d,

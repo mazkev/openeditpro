@@ -5,6 +5,7 @@ import type {
   Scene3DConfig,
   StageTheme3D,
   StickmanPose,
+  StoryProp3D,
 } from '../types/editor';
 
 interface StickmanRig {
@@ -38,8 +39,53 @@ interface StickmanRig {
 
 const THEME_PALETTES: Record<
   StageTheme3D,
-  { bg: number; fog: number; floor: number; grid: number; rim: number; key: number }
+  { bg: number; fog: number; floor: number; grid: number; rim: number; key: number; isCartoon?: boolean }
 > = {
+  'paper-sketch': {
+    bg: 0xfcfbf7,
+    fog: 0xfcfbf7,
+    floor: 0xfcfbf7,
+    grid: 0xe5e7eb,
+    rim: 0xffffff,
+    key: 0xffffff,
+    isCartoon: true,
+  },
+  'chalkboard': {
+    bg: 0x183325,
+    fog: 0x183325,
+    floor: 0x142b20,
+    grid: 0x274e3b,
+    rim: 0xa7f3d0,
+    key: 0xffffff,
+    isCartoon: true,
+  },
+  'cozy-room': {
+    bg: 0xfbf4e6,
+    fog: 0xfbf4e6,
+    floor: 0xf5ebd6,
+    grid: 0xe8dcbf,
+    rim: 0xfde68a,
+    key: 0xffffff,
+    isCartoon: true,
+  },
+  'countryside': {
+    bg: 0xbae6fd,
+    fog: 0xbae6fd,
+    floor: 0x86efac,
+    grid: 0x4ade80,
+    rim: 0xfef08a,
+    key: 0xffffff,
+    isCartoon: true,
+  },
+  'cosmic': {
+    bg: 0x090d16,
+    fog: 0x090d16,
+    floor: 0x0f172a,
+    grid: 0x1e293b,
+    rim: 0x38bdf8,
+    key: 0xf8fafc,
+    isCartoon: true,
+  },
   'dark-studio': {
     bg: 0x0b1120,
     fog: 0x0b1120,
@@ -47,30 +93,35 @@ const THEME_PALETTES: Record<
     grid: 0x1e293b,
     rim: 0x38bdf8,
     key: 0xffffff,
+    isCartoon: false,
+  },
+  // Backward compatibility aliases
+  'light-studio': {
+    bg: 0xfcfbf7,
+    fog: 0xfcfbf7,
+    floor: 0xfcfbf7,
+    grid: 0xe5e7eb,
+    rim: 0xffffff,
+    key: 0xffffff,
+    isCartoon: true,
   },
   'neon-cyber': {
-    bg: 0x130f2e,
-    fog: 0x130f2e,
-    floor: 0x1a143d,
-    grid: 0x7c3aed,
-    rim: 0x22d3ee,
+    bg: 0x090d16,
+    fog: 0x090d16,
+    floor: 0x0f172a,
+    grid: 0x1e293b,
+    rim: 0x38bdf8,
     key: 0xf8fafc,
-  },
-  'light-studio': {
-    bg: 0xf8fafc,
-    fog: 0xf8fafc,
-    floor: 0xf1f5f9,
-    grid: 0xd1d5db,
-    rim: 0x64748b,
-    key: 0xffffff,
+    isCartoon: true,
   },
   'warm-sunset': {
-    bg: 0x2a1205,
-    fog: 0x2a1205,
-    floor: 0x3b1808,
-    grid: 0x9a3412,
-    rim: 0xfbbf24,
-    key: 0xfff7ed,
+    bg: 0xfbf4e6,
+    fog: 0xfbf4e6,
+    floor: 0xf5ebd6,
+    grid: 0xe8dcbf,
+    rim: 0xfde68a,
+    key: 0xffffff,
+    isCartoon: true,
   },
 };
 
@@ -207,6 +258,488 @@ function getSarungTexture(pattern: SarungPattern): THREE.CanvasTexture {
   tex.repeat.set(2, 2);
   cachedSarungTextures.set(pattern, tex);
   return tex;
+}
+
+/**
+ * Hand-drawn sketchy pencil shadow lines under stickman feet
+ * (matching the authentic cartoon line art from the user's reference image)
+ */
+let cachedGroundSketchTex: THREE.CanvasTexture | null = null;
+function getGroundSketchTexture(): THREE.CanvasTexture {
+  if (cachedGroundSketchTex) return cachedGroundSketchTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  ctx.clearRect(0, 0, 512, 128);
+
+  ctx.strokeStyle = '#18181b';
+  ctx.lineWidth = 3.8;
+  ctx.lineCap = 'round';
+
+  // Main ground baseline with subtle pencil hand tremor
+  ctx.beginPath();
+  ctx.moveTo(60, 64);
+  ctx.quadraticCurveTo(256, 62, 452, 65);
+  ctx.stroke();
+
+  // Secondary scribble hatch lines under feet
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.moveTo(110, 74);
+  ctx.lineTo(210, 72);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(300, 73);
+  ctx.lineTo(405, 75);
+  ctx.stroke();
+
+  // Tiny hand scribble ticks
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.moveTo(420, 75);
+  ctx.lineTo(445, 75);
+  ctx.stroke();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  cachedGroundSketchTex = tex;
+  return tex;
+}
+
+/**
+ * Storytelling Props Generator (Illustrations & Visual Elements)
+ */
+function renderStoryPropCanvas(
+  prop: StoryProp3D,
+  t: number,
+  canvas: HTMLCanvasElement
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  canvas.width = 512;
+  canvas.height = 512;
+  ctx.clearRect(0, 0, 512, 512);
+
+  switch (prop) {
+    case 'thought-question': {
+      // Floating Thought Cloud + Bouncing Question Marks ("Kok Bisa?")
+      const bounce = Math.sin(t * 4.0) * 12;
+      const cloudY = 300;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 6;
+
+      ctx.beginPath();
+      ctx.arc(140, 420, 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(180, 380, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(230, cloudY, 52, 0, Math.PI * 2);
+      ctx.arc(290, cloudY - 26, 62, 0, Math.PI * 2);
+      ctx.arc(360, cloudY, 54, 0, Math.PI * 2);
+      ctx.arc(330, cloudY + 44, 46, 0, Math.PI * 2);
+      ctx.arc(250, cloudY + 40, 46, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Big vibrant cartoon question mark
+      ctx.save();
+      ctx.translate(290, cloudY + bounce);
+      ctx.font = 'bold 130px "Comic Sans MS", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 14;
+      ctx.strokeText('?', 0, 0);
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillText('?', 0, 0);
+
+      // Mini cyan question mark
+      ctx.font = 'bold 64px "Comic Sans MS", system-ui, sans-serif';
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 8;
+      ctx.strokeText('?', 70, -60);
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillText('?', 70, -60);
+      ctx.restore();
+      break;
+    }
+
+    case 'idea-bulb': {
+      // Glowing Idea Lightbulb with Radiating Comic Rays
+      const pulse = 1.0 + Math.sin(t * 6.0) * 0.08;
+      ctx.save();
+      ctx.translate(256, 256);
+      ctx.scale(pulse, pulse);
+
+      // Radiating light rays
+      ctx.strokeStyle = '#eab308';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 8; i++) {
+        const ang = (i * Math.PI) / 4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(ang) * 150, Math.sin(ang) * 150);
+        ctx.lineTo(Math.cos(ang) * 210, Math.sin(ang) * 210);
+        ctx.stroke();
+      }
+
+      // Bulb glass
+      ctx.beginPath();
+      ctx.arc(0, -30, 95, 0, Math.PI * 2);
+      ctx.fillStyle = '#fef08a';
+      ctx.fill();
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 10;
+      ctx.stroke();
+
+      // Glow filament
+      ctx.strokeStyle = '#ea580c';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(-35, 10);
+      ctx.lineTo(-20, -50);
+      ctx.lineTo(20, -50);
+      ctx.lineTo(35, 10);
+      ctx.stroke();
+
+      // Screw base
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(-45, 65, 90, 45);
+      ctx.strokeRect(-45, 65, 90, 45);
+
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(-30, 110, 60, 20);
+      ctx.strokeRect(-30, 110, 60, 20);
+      ctx.restore();
+      break;
+    }
+
+    case 'octopus-hearts': {
+      // Cute Purple Octopus + 3 Pulsing Red Hearts (Biology/Nature facts!)
+      ctx.save();
+      ctx.translate(256, 310);
+      ctx.fillStyle = '#a855f7';
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 9;
+
+      ctx.beginPath();
+      ctx.arc(0, -20, 80, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Big cute octopus eyes
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(-30, -30, 24, 0, Math.PI * 2);
+      ctx.arc(30, -30, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#18181b';
+      ctx.beginPath();
+      ctx.arc(-24, -30, 12, 0, Math.PI * 2);
+      ctx.arc(36, -30, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cute blush
+      ctx.fillStyle = 'rgba(244, 63, 94, 0.45)';
+      ctx.beginPath();
+      ctx.arc(-45, -5, 12, 0, Math.PI * 2);
+      ctx.arc(45, -5, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Wavy tentacles
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
+      for (let i = -3; i <= 3; i++) {
+        const x = i * 24;
+        const wave = Math.sin(t * 6 + i) * 16;
+        ctx.beginPath();
+        ctx.moveTo(x, 50);
+        ctx.quadraticCurveTo(x + wave, 95, x + wave * 1.5, 130);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 3 Pulsing Hearts above head!
+      const heartPulse = 1.0 + Math.abs(Math.sin(t * 7.0)) * 0.22;
+      const drawHeart = (hx: number, hy: number, scale: number) => {
+        ctx.save();
+        ctx.translate(hx, hy);
+        ctx.scale(scale * heartPulse, scale * heartPulse);
+        ctx.beginPath();
+        ctx.moveTo(0, 15);
+        ctx.bezierCurveTo(-25, -20, -45, 10, 0, 48);
+        ctx.bezierCurveTo(45, 10, 25, -20, 0, 15);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        ctx.strokeStyle = '#18181b';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      drawHeart(256, 110, 1.15);
+      drawHeart(150, 150, 0.85);
+      drawHeart(360, 150, 0.85);
+      break;
+    }
+
+    case 'comic-shock': {
+      // Dynamic Anime / Manga Speed Lines & Burst Shock!
+      ctx.save();
+      ctx.translate(256, 256);
+      const numLines = 28;
+      ctx.fillStyle = '#18181b';
+      for (let i = 0; i < numLines; i++) {
+        const ang = (i * 2 * Math.PI) / numLines + (t % 0.2);
+        const len = 220 + ((i % 3) * 25);
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(ang) * 90, Math.sin(ang) * 90);
+        ctx.lineTo(Math.cos(ang - 0.05) * len, Math.sin(ang - 0.05) * len);
+        ctx.lineTo(Math.cos(ang + 0.05) * len, Math.sin(ang + 0.05) * len);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.font = '900 170px "Impact", "Arial Black", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 22;
+      ctx.strokeText('!', 0, 0);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('!', 0, 0);
+      ctx.restore();
+      break;
+    }
+
+    case 'planet-space': {
+      // Saturn Planet with Rings, Stars & Mini Rocket
+      ctx.save();
+      ctx.translate(256, 256);
+      ctx.rotate(-0.25);
+
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 180, 52, 0, Math.PI, 0);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 26;
+      ctx.stroke();
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 95, 0, Math.PI * 2);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fill();
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 9;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = '#f97316';
+      ctx.fillRect(-100, -30, 200, 25);
+      ctx.fillRect(-100, 20, 200, 25);
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 180, 52, 0, 0, Math.PI);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 26;
+      ctx.stroke();
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+
+      ctx.restore();
+
+      const star = (sx: number, sy: number, sz: number) => {
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      star(80, 100, 8);
+      star(420, 120, 10);
+      star(400, 420, 7);
+      break;
+    }
+
+    case 'money-gold': {
+      // Golden coins stack & sparkles
+      ctx.save();
+      ctx.translate(256, 260);
+
+      const drawCoin = (cx: number, cy: number, rot: number) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 68, 48, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#facc15';
+        ctx.fill();
+        ctx.strokeStyle = '#18181b';
+        ctx.lineWidth = 7;
+        ctx.stroke();
+
+        ctx.font = 'bold 36px sans-serif';
+        ctx.fillStyle = '#b45309';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Rp', 0, 0);
+        ctx.restore();
+      };
+
+      drawCoin(-40, 70, -0.1);
+      drawCoin(50, 80, 0.15);
+      drawCoin(0, 20, 0.05);
+      drawCoin(-20, -40, -0.2);
+      drawCoin(40, -35, 0.25);
+      drawCoin(0, -90, Math.sin(t * 4) * 0.1);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(-80, -110, 10, 0, Math.PI * 2);
+      ctx.arc(100, -80, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
+
+    case 'ancient-book': {
+      // Open ancient tome / manuscript with magnifying glass
+      ctx.save();
+      ctx.translate(256, 270);
+      ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.moveTo(0, 80);
+      ctx.quadraticCurveTo(-90, 70, -180, 90);
+      ctx.lineTo(-180, -80);
+      ctx.quadraticCurveTo(-90, -100, 0, -80);
+      ctx.quadraticCurveTo(90, -100, 180, -80);
+      ctx.lineTo(180, 90);
+      ctx.quadraticCurveTo(90, 70, 0, 80);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 8;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, -80);
+      ctx.lineTo(0, 80);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#92400e';
+      ctx.lineWidth = 5;
+      for (let y = -50; y <= 50; y += 22) {
+        ctx.beginPath();
+        ctx.moveTo(-150, y);
+        ctx.lineTo(-20, y);
+        ctx.moveTo(20, y);
+        ctx.lineTo(150, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+      break;
+    }
+
+    case 'magnifier': {
+      // Detective magnifying glass
+      ctx.save();
+      ctx.translate(230, 230);
+      ctx.rotate(-Math.PI / 4 + Math.sin(t * 3) * 0.1);
+
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(-18, 110, 36, 140);
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(-18, 110, 36, 140);
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 110, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(224, 242, 254, 0.85)';
+      ctx.fill();
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 14;
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(0, 0, 85, -Math.PI * 0.8, -Math.PI * 0.3);
+      ctx.stroke();
+
+      ctx.font = 'bold 74px sans-serif';
+      ctx.fillStyle = '#dc2626';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('FAKTA!', 0, 5);
+      ctx.restore();
+      break;
+    }
+
+    case 'fire-energy': {
+      // Comic blazing flames
+      const flameFlicker = Math.sin(t * 12) * 15;
+      ctx.save();
+      ctx.translate(256, 320);
+
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.moveTo(-130, 90);
+      ctx.quadraticCurveTo(-150, -60, -70 + flameFlicker, -160);
+      ctx.quadraticCurveTo(-20, -90, 0, -210 + flameFlicker);
+      ctx.quadraticCurveTo(30, -90, 70 - flameFlicker, -160);
+      ctx.quadraticCurveTo(150, -60, 130, 90);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 9;
+      ctx.stroke();
+
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.moveTo(-90, 90);
+      ctx.quadraticCurveTo(-100, -30, -40, -110 + flameFlicker);
+      ctx.quadraticCurveTo(-10, -60, 0, -150);
+      ctx.quadraticCurveTo(10, -60, 40, -110 - flameFlicker);
+      ctx.quadraticCurveTo(100, -30, 90, 90);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.moveTo(-50, 90);
+      ctx.quadraticCurveTo(-60, 0, 0, -90 + flameFlicker);
+      ctx.quadraticCurveTo(60, 0, 50, 90);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+      break;
+    }
+
+    case 'none':
+    default:
+      break;
+  }
 }
 
 /**
@@ -850,25 +1383,36 @@ function createFactBadgeTexture(text: string): THREE.CanvasTexture {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
-  grad.addColorStop(0, 'rgba(139, 92, 246, 0.95)');
-  grad.addColorStop(1, 'rgba(6, 182, 212, 0.95)');
-  ctx.fillStyle = grad;
+  // Cartoon Comic Speech Bubble with Tail
+  ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.roundRect(16, 20, canvas.width - 32, canvas.height - 40, 32);
+  ctx.roundRect(24, 18, canvas.width - 48, 136, 26);
   ctx.fill();
 
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  // Speech bubble pointer tail (points down toward stickman head)
+  ctx.beginPath();
+  ctx.moveTo(canvas.width / 2 - 20, 154);
+  ctx.lineTo(canvas.width / 2 - 45, 185);
+  ctx.lineTo(canvas.width / 2 + 15, 154);
+  ctx.closePath();
+  ctx.fill();
+
+  // Bold black comic outline
+  ctx.lineWidth = 6.5;
+  ctx.strokeStyle = '#18181b';
   ctx.stroke();
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 54px system-ui, -apple-system, sans-serif';
+  // Re-stroke bubble body
+  ctx.beginPath();
+  ctx.roundRect(24, 18, canvas.width - 48, 136, 26);
+  ctx.stroke();
+
+  // Vibrant comic title text
+  ctx.fillStyle = '#0f172a';
+  ctx.font = '900 48px "Impact", "Arial Black", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0,0,0,0.45)';
-  ctx.shadowBlur = 8;
-  ctx.fillText(text.toUpperCase().slice(0, 26), canvas.width / 2, canvas.height / 2);
+  ctx.fillText(text.toUpperCase().slice(0, 26), canvas.width / 2, 86);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -877,7 +1421,7 @@ function createFactBadgeTexture(text: string): THREE.CanvasTexture {
 }
 
 /**
- * Deterministic Three.js 3D Studio Renderer shared by PreviewPlayer and Mediabunny MP4 Export.
+ * Deterministic Three.js 2D/3D Explainer Studio Renderer shared by PreviewPlayer and Mediabunny MP4 Export.
  */
 export class Scene3DRenderer {
   private canvas: HTMLCanvasElement;
@@ -890,10 +1434,14 @@ export class Scene3DRenderer {
   private floorMesh: THREE.Mesh;
   private gridHelper: THREE.GridHelper;
   private podiumRing: THREE.Mesh;
+  private groundSketchMesh: THREE.Mesh;
+  private propCanvas: HTMLCanvasElement;
+  private propTexture: THREE.CanvasTexture;
+  private propMesh: THREE.Mesh;
   private rig: StickmanRig;
   private badgeMesh: THREE.Mesh;
   private currentBadgeText = '';
-  private currentTheme: StageTheme3D = 'dark-studio';
+  private currentTheme: StageTheme3D = 'paper-sketch';
   private glbGroup: THREE.Group | null = null;
   private glbMixer: THREE.AnimationMixer | null = null;
   private glbAnimations: THREE.AnimationClip[] = [];
@@ -919,37 +1467,37 @@ export class Scene3DRenderer {
     this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 50);
-    this.camera.position.set(0, 1.35, 3.6);
+    this.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 50);
+    this.camera.position.set(0, 1.25, 3.4);
 
     // 3-Point Studio Lighting
-    this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 0.9);
+    this.hemiLight = new THREE.HemisphereLight(0xffffff, 0xe2e8f0, 1.25);
     this.scene.add(this.hemiLight);
 
-    this.keyLight = new THREE.DirectionalLight(0xffffff, 1.85);
+    this.keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
     this.keyLight.position.set(2.5, 4.5, 3.5);
     this.keyLight.castShadow = true;
     this.keyLight.shadow.mapSize.width = 1024;
     this.keyLight.shadow.mapSize.height = 1024;
     this.scene.add(this.keyLight);
 
-    this.rimLight = new THREE.DirectionalLight(0x38bdf8, 1.5);
+    this.rimLight = new THREE.DirectionalLight(0xffffff, 1.2);
     this.rimLight.position.set(-2.5, 3.0, -3.0);
     this.scene.add(this.rimLight);
 
     // Studio Floor & Glowing Podium Ring
     const floorGeo = new THREE.CircleGeometry(10, 48);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x111827,
-      roughness: 0.85,
-      metalness: 0.05,
+      color: 0xfcfbf7,
+      roughness: 0.95,
+      metalness: 0.0,
     });
     this.floorMesh = new THREE.Mesh(floorGeo, floorMat);
     this.floorMesh.rotation.x = -Math.PI / 2;
     this.floorMesh.receiveShadow = true;
     this.scene.add(this.floorMesh);
 
-    this.gridHelper = new THREE.GridHelper(12, 24, 0x1e293b, 0x1e293b);
+    this.gridHelper = new THREE.GridHelper(12, 24, 0xd1d5db, 0xd1d5db);
     this.gridHelper.position.y = 0.002;
     this.scene.add(this.gridHelper);
 
@@ -966,12 +1514,41 @@ export class Scene3DRenderer {
     this.podiumRing.position.y = 0.004;
     this.scene.add(this.podiumRing);
 
-    // Procedural 3D Stickman
+    // Hand-drawn sketchy pencil shadow lines under feet (Kok Bisa style)
+    const groundGeo = new THREE.PlaneGeometry(2.1, 0.52);
+    const groundMat = new THREE.MeshBasicMaterial({
+      map: getGroundSketchTexture(),
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+    this.groundSketchMesh = new THREE.Mesh(groundGeo, groundMat);
+    this.groundSketchMesh.rotation.x = -Math.PI / 2;
+    this.groundSketchMesh.position.set(0, 0.003, 0.05);
+    this.scene.add(this.groundSketchMesh);
+
+    // Procedural Storytelling Prop Billboard (Floating illustrations)
+    this.propCanvas = document.createElement('canvas');
+    this.propCanvas.width = 512;
+    this.propCanvas.height = 512;
+    this.propTexture = new THREE.CanvasTexture(this.propCanvas);
+    this.propTexture.colorSpace = THREE.SRGBColorSpace;
+    const propMat = new THREE.MeshBasicMaterial({
+      map: this.propTexture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+    const propGeo = new THREE.PlaneGeometry(1.3, 1.3);
+    this.propMesh = new THREE.Mesh(propGeo, propMat);
+    this.propMesh.position.set(0.65, 1.45, 0.1);
+    this.propMesh.visible = false;
+    this.scene.add(this.propMesh);
+
+    // Procedural Stickman Rig
     this.rig = buildStickmanRig('#f8fafc');
     this.scene.add(this.rig.root);
 
-    // Floating 3D Fact Badge
-    const badgeGeo = new THREE.PlaneGeometry(1.75, 0.44);
+    // Floating Cartoon Speech/Fact Badge
+    const badgeGeo = new THREE.PlaneGeometry(1.85, 0.46);
     const badgeMat = new THREE.MeshBasicMaterial({
       transparent: true,
       side: THREE.DoubleSide,
@@ -981,7 +1558,7 @@ export class Scene3DRenderer {
     this.badgeMesh.visible = false;
     this.scene.add(this.badgeMesh);
 
-    this.applyTheme('dark-studio');
+    this.applyTheme('paper-sketch');
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -1000,17 +1577,27 @@ export class Scene3DRenderer {
   private applyTheme(theme: StageTheme3D): void {
     if (this.currentTheme === theme && this.scene.background) return;
     this.currentTheme = theme;
-    const p = THEME_PALETTES[theme] || THEME_PALETTES['dark-studio'];
+    const p = THEME_PALETTES[theme] || THEME_PALETTES['paper-sketch'];
     this.scene.background = new THREE.Color(p.bg);
     this.scene.fog = new THREE.Fog(p.fog, 6, 15);
     (this.floorMesh.material as THREE.MeshStandardMaterial).color.setHex(p.floor);
     this.rimLight.color.setHex(p.rim);
     this.keyLight.color.setHex(p.key);
-    (this.podiumRing.material as THREE.MeshBasicMaterial).color.setHex(p.rim);
-    this.scene.remove(this.gridHelper);
-    this.gridHelper = new THREE.GridHelper(12, 24, p.grid, p.grid);
-    this.gridHelper.position.y = 0.002;
-    this.scene.add(this.gridHelper);
+
+    if (p.isCartoon) {
+      this.gridHelper.visible = false;
+      this.podiumRing.visible = false;
+      this.groundSketchMesh.visible = theme === 'paper-sketch' || theme === 'light-studio';
+      this.hemiLight.intensity = 1.35;
+      this.keyLight.intensity = 1.55;
+    } else {
+      this.gridHelper.visible = true;
+      this.podiumRing.visible = true;
+      this.groundSketchMesh.visible = false;
+      this.hemiLight.intensity = 0.9;
+      this.keyLight.intensity = 1.85;
+      (this.podiumRing.material as THREE.MeshBasicMaterial).color.setHex(p.rim);
+    }
   }
 
   async ensureGlbLoaded(url: string): Promise<void> {
@@ -1064,6 +1651,8 @@ export class Scene3DRenderer {
     if (config.mode === 'glb' && config.glbUrl && this.glbGroup) {
       this.rig.root.visible = false;
       this.glbGroup.visible = true;
+      this.groundSketchMesh.visible = false;
+      this.propMesh.visible = false;
       if (this.glbMixer && this.glbAnimations.length > 0) {
         const idx = Math.min(config.glbAnimationIndex || 0, this.glbAnimations.length - 1);
         const clip = this.glbAnimations[idx];
@@ -1098,6 +1687,38 @@ export class Scene3DRenderer {
       }
 
       applyStickmanPose(this.rig, config.pose, animTime);
+
+      // Render Storytelling Prop (Illustrations & Visual Story Elements)
+      const effectiveProp: StoryProp3D =
+        config.storyProp ??
+        (config.pose === 'think'
+          ? 'thought-question'
+          : config.pose === 'shock'
+          ? 'comic-shock'
+          : config.pose === 'explain'
+          ? 'idea-bulb'
+          : 'none');
+
+      if (effectiveProp !== 'none') {
+        this.propMesh.visible = true;
+        renderStoryPropCanvas(effectiveProp, animTime, this.propCanvas);
+        this.propTexture.needsUpdate = true;
+
+        if (effectiveProp === 'comic-shock') {
+          // Dynamic comic speed lines bursting behind the character!
+          this.propMesh.position.set(0, 1.25, -0.25);
+          this.propMesh.scale.set(1.9, 1.9, 1);
+        } else if (effectiveProp === 'thought-question' || effectiveProp === 'idea-bulb') {
+          this.propMesh.position.set(0.52, 1.74 + Math.sin(animTime * 3.5) * 0.035, 0.15);
+          this.propMesh.scale.set(1.25, 1.25, 1);
+        } else {
+          this.propMesh.position.set(0.68, 1.42 + Math.sin(animTime * 3.0) * 0.035, 0.15);
+          this.propMesh.scale.set(1.25, 1.25, 1);
+        }
+        this.propMesh.lookAt(this.camera.position);
+      } else {
+        this.propMesh.visible = false;
+      }
     }
 
     const badgeText = (config.factBadgeText || '').trim();
@@ -1110,13 +1731,15 @@ export class Scene3DRenderer {
         mat.needsUpdate = true;
       }
       this.badgeMesh.visible = true;
-      this.badgeMesh.position.y = 2.38 + Math.sin(timeSec * 2.5) * 0.035;
+      this.badgeMesh.position.set(-0.15, 2.38 + Math.sin(timeSec * 2.5) * 0.035, 0);
       this.badgeMesh.lookAt(this.camera.position);
     } else {
       this.badgeMesh.visible = false;
     }
 
     const lookTarget = new THREE.Vector3(0, 1.25, 0);
+    const themeObj = THEME_PALETTES[config.stageTheme] || THEME_PALETTES['paper-sketch'];
+
     switch (config.cameraPreset) {
       case 'orbit': {
         const angle = -0.45 + progress * Math.PI * 0.9;
@@ -1124,27 +1747,33 @@ export class Scene3DRenderer {
         break;
       }
       case 'zoom-in': {
-        const z = 4.0 - progress * 1.45;
-        this.camera.position.set(0.15, 1.38 - progress * 0.08, z);
+        const z = 3.9 - progress * 1.35;
+        this.camera.position.set(0.12, 1.32 - progress * 0.06, z);
         break;
       }
       case 'low-angle': {
-        this.camera.position.set(Math.sin(progress * 0.6) * 0.7, 0.72, 3.15);
-        lookTarget.y = 1.35;
+        this.camera.position.set(Math.sin(progress * 0.6) * 0.6, 0.76, 3.1);
+        lookTarget.y = 1.32;
         break;
       }
       case 'pan': {
-        const x = -0.85 + progress * 1.7;
-        this.camera.position.set(x, 1.4, 3.5);
+        const x = -0.75 + progress * 1.5;
+        this.camera.position.set(x, 1.35, 3.4);
         break;
       }
       case 'presenter':
       default: {
-        this.camera.position.set(
-          Math.sin(timeSec * 0.8) * 0.14,
-          1.36 + Math.cos(timeSec * 0.7) * 0.04,
-          3.45
-        );
+        if (themeObj.isCartoon) {
+          // Stable, beautifully framed 2D explainer camera shot (Kok Bisa style)
+          this.camera.position.set(0.12, 1.26, 3.25);
+          lookTarget.set(0.12, 1.18, 0);
+        } else {
+          this.camera.position.set(
+            Math.sin(timeSec * 0.8) * 0.14,
+            1.36 + Math.cos(timeSec * 0.7) * 0.04,
+            3.45
+          );
+        }
         break;
       }
     }
@@ -1156,6 +1785,7 @@ export class Scene3DRenderer {
   dispose(): void {
     const mat = this.badgeMesh.material as THREE.MeshBasicMaterial;
     mat.map?.dispose();
+    this.propTexture.dispose();
     this.renderer.dispose();
   }
 }

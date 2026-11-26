@@ -127,7 +127,29 @@ export type SarungPattern = 'plaid-red' | 'plaid-green' | 'batik-brown' | 'plain
 
 export type CameraPreset3D = 'presenter' | 'orbit' | 'zoom-in' | 'low-angle' | 'pan';
 
-export type StageTheme3D = 'dark-studio' | 'light-studio' | 'neon-cyber' | 'warm-sunset';
+export type StageTheme3D =
+  | 'paper-sketch'
+  | 'chalkboard'
+  | 'cozy-room'
+  | 'countryside'
+  | 'cosmic'
+  | 'dark-studio'
+  // Backward compatibility aliases
+  | 'light-studio'
+  | 'neon-cyber'
+  | 'warm-sunset';
+
+export type StoryProp3D =
+  | 'none'
+  | 'thought-question'
+  | 'idea-bulb'
+  | 'octopus-hearts'
+  | 'planet-space'
+  | 'comic-shock'
+  | 'money-gold'
+  | 'ancient-book'
+  | 'magnifier'
+  | 'fire-energy';
 
 export interface Scene3DConfig {
   mode: 'stickman' | 'glb';
@@ -141,7 +163,76 @@ export interface Scene3DConfig {
   glbAnimationIndex?: number;
   characterStyle?: StickmanCharacterStyle;
   sarungPattern?: SarungPattern;
+  storyProp?: StoryProp3D;
 }
+
+export const STORY_PROPS_3D: {
+  id: StoryProp3D;
+  name: string;
+  icon: string;
+  description: string;
+}[] = [
+  {
+    id: 'thought-question',
+    name: 'Balon Pikiran & Tanda Tanya',
+    icon: '❓',
+    description: 'Balon awan pikiran melayang ("Kok bisa?")',
+  },
+  {
+    id: 'idea-bulb',
+    name: 'Bohlam Ide Menyala',
+    icon: '💡',
+    description: 'Bohlam kuning bersinar terang dengan kilatan ide',
+  },
+  {
+    id: 'octopus-hearts',
+    name: 'Gurita & 3 Jantung',
+    icon: '🐙',
+    description: 'Gurita kartun & 3 jantung berdenyut (fakta biologi)',
+  },
+  {
+    id: 'comic-shock',
+    name: 'Ledakan Komik (Speed lines)',
+    icon: '⚡',
+    description: 'Garis kilatan aksi manga dramatis saat kaget',
+  },
+  {
+    id: 'planet-space',
+    name: 'Planet & Antariksa',
+    icon: '🪐',
+    description: 'Planet Saturnus bercincin & bintang sains',
+  },
+  {
+    id: 'money-gold',
+    name: 'Koin Emas & Pundi Uang',
+    icon: '💰',
+    description: 'Koin emas kartun berkilau & pundi uang',
+  },
+  {
+    id: 'ancient-book',
+    name: 'Buku / Naskah Kuno',
+    icon: '📜',
+    description: 'Buku kuno terbuka untuk cerita sejarah / mitologi',
+  },
+  {
+    id: 'magnifier',
+    name: 'Kaca Pembesar Rahasia',
+    icon: '🔍',
+    description: 'Lensa penyelidikan mengungkap fakta tersembunyi',
+  },
+  {
+    id: 'fire-energy',
+    name: 'Kobaran Api Semangat',
+    icon: '🔥',
+    description: 'Lidah api kartun berenergi membara',
+  },
+  {
+    id: 'none',
+    name: 'Tanpa Objek Tambahan',
+    icon: '🚫',
+    description: 'Fokus murni ke karakter & gerakan presenter',
+  },
+];
 
 export const STICKMAN_STYLES: {
   id: StickmanCharacterStyle;
@@ -240,11 +331,44 @@ export const STAGE_THEMES_3D: {
   id: StageTheme3D;
   name: string;
   bgPreview: string;
+  description: string;
 }[] = [
-  { id: 'dark-studio', name: 'Studio Gelap', bgPreview: '#0f172a' },
-  { id: 'neon-cyber', name: 'Neon Fakta', bgPreview: '#1e1b4b' },
-  { id: 'light-studio', name: 'Studio Putih', bgPreview: '#e2e8f0' },
-  { id: 'warm-sunset', name: 'Hangat Senja', bgPreview: '#451a03' },
+  {
+    id: 'paper-sketch',
+    name: 'Kertas Sketsa (Kok Bisa)',
+    bgPreview: '#fbf9f4',
+    description: 'Latar kertas putih-krem dengan bayangan pensil tangan',
+  },
+  {
+    id: 'chalkboard',
+    name: 'Papan Tulis Kelas',
+    bgPreview: '#1b382b',
+    description: 'Papan kapur hijau tua dengan doodle edukasi',
+  },
+  {
+    id: 'cozy-room',
+    name: 'Studio Kamar Santai',
+    bgPreview: '#fdf6e2',
+    description: 'Latar pastel hangat dengan siluet rak buku & jendela',
+  },
+  {
+    id: 'countryside',
+    name: 'Alam Pedesaan',
+    bgPreview: '#bae6fd',
+    description: 'Langit cerah & bukit kartun sawah nusantara',
+  },
+  {
+    id: 'cosmic',
+    name: 'Kosmik Sains',
+    bgPreview: '#0f172a',
+    description: 'Langit malam biru tua berbintang kartun',
+  },
+  {
+    id: 'dark-studio',
+    name: 'Studio Gelap Kontras',
+    bgPreview: '#111827',
+    description: 'Latar gelap pekat sinematik modern',
+  },
 ];
 
 export const CHARACTER_COLORS_3D: { name: string; hex: string }[] = [
