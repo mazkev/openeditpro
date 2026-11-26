@@ -55,6 +55,12 @@ import {
   CHARACTER_COLORS_3D,
 } from '../types/editor';
 import { create3DClipThumbnail, ensureStoryImageLoaded } from '../utils/scene3d';
+import {
+  CARTOON_SFX_PRESETS,
+  getCartoonSfxAudio,
+  previewCartoonSfx,
+  type CartoonSfxId,
+} from '../utils/sfx';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
 import {
@@ -265,7 +271,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
 
   // Text-to-Speech (TTS) State
-  const [narrationMode, setNarrationMode] = useState<'tts' | 'mic' | 'upload'>('tts');
+  const [narrationMode, setNarrationMode] = useState<'tts' | 'mic' | 'upload' | 'sfx'>('tts');
   const [ttsText, setTtsText] = useState('');
   const [ttsVoice, setTtsVoice] = useState('id-female');
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
@@ -3628,7 +3634,140 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload</span>
               </button>
+
+              <button
+                onClick={() => setNarrationMode('sfx')}
+                className={`flex-1 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center space-x-1 ${
+                  narrationMode === 'sfx'
+                    ? 'bg-amber-400 text-black font-semibold shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Efek SFX</span>
+              </button>
             </div>
+
+            {/* 4. CARTOON SFX PACK */}
+            {narrationMode === 'sfx' && (
+              <div className="space-y-3">
+                <div className="bg-gradient-to-br from-amber-950/50 to-[#171820] p-3 rounded-xl border border-amber-500/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-200 flex items-center space-x-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Isi SFX Otomatis ke Adegan</span>
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-300 leading-relaxed">
+                    Menambahkan efek suara kartun (*Pop, Bloop, Ding, Boom*) secara otomatis di setiap pergantian adegan kartun.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sfxClips: Voiceover[] = [];
+                      let cursor = 0;
+                      const now = Date.now();
+                      clips.forEach((c, idx) => {
+                        const dur = Math.max(0, c.trimEnd - c.trimStart);
+                        if (c.clipType === '3d' && c.scene3d) {
+                          const pose = c.scene3d.pose;
+                          const sfxId: CartoonSfxId =
+                            pose === 'shock'
+                              ? 'shock'
+                              : pose === 'think'
+                              ? 'bloop'
+                              : pose === 'explain'
+                              ? 'ding'
+                              : pose === 'point'
+                              ? 'whoosh'
+                              : pose === 'walk'
+                              ? 'sparkle'
+                              : 'pop';
+                          const preset = CARTOON_SFX_PRESETS.find((p) => p.id === sfxId)!;
+                          const { url, duration } = getCartoonSfxAudio(sfxId);
+                          sfxClips.push({
+                            id: `vo-sfx-auto-${now}-${idx}`,
+                            name: `SFX: ${preset.icon} ${preset.name}`,
+                            url,
+                            duration,
+                            startTime: parseFloat(cursor.toFixed(2)),
+                            volume: 0.7,
+                          });
+                        }
+                        const transOverlap =
+                          idx < clips.length - 1 && c.transition && c.transition.type !== 'none'
+                            ? Math.min(dur * 0.45, c.transition.duration)
+                            : 0;
+                        cursor += Math.max(0, dur - transOverlap);
+                      });
+                      if (sfxClips.length === 0) {
+                        alert('Tambahkan adegan kartun di Timeline terlebih dahulu.');
+                        return;
+                      }
+                      setVoiceovers((prev) => [
+                        ...prev.filter((v) => !v.id.startsWith('vo-sfx-auto-')),
+                        ...sfxClips,
+                      ]);
+                      if (setCurrentTime) setCurrentTime(0);
+                    }}
+                    className="w-full py-2 px-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-lg transition-all shadow flex items-center justify-center space-x-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Isi SFX Otomatis ({clips.filter((c) => c.clipType === '3d').length} Adegan)</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-gray-300 block">
+                    Pilih & Tempel di Playhead ({formatTime(currentTime)}):
+                  </span>
+                  {CARTOON_SFX_PRESETS.map((sfx) => (
+                    <div
+                      key={sfx.id}
+                      className="bg-[#171820] p-2.5 rounded-xl border border-[#252834] flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-gray-200 flex items-center space-x-1.5">
+                          <span>{sfx.icon}</span>
+                          <span className="truncate">{sfx.name}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 truncate mt-0.5">{sfx.description}</p>
+                      </div>
+                      <div className="flex items-center space-x-1.5 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => previewCartoonSfx(sfx.id)}
+                          className="p-1.5 bg-[#101115] hover:bg-[#232532] text-gray-300 rounded-lg border border-[#2b2d3d] transition-colors"
+                          title="Dengar preview SFX"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const { url, duration } = getCartoonSfxAudio(sfx.id);
+                            const newSfx: Voiceover = {
+                              id: `vo-sfx-${sfx.id}-${Date.now()}`,
+                              name: `SFX: ${sfx.icon} ${sfx.name}`,
+                              url,
+                              duration,
+                              startTime: parseFloat(currentTime.toFixed(2)),
+                              volume: 0.75,
+                            };
+                            setVoiceovers((prev) => [...prev, newSfx]);
+                          }}
+                          className="px-2 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[11px] font-bold flex items-center space-x-1 transition-colors"
+                          title="Tempel efek suara ini ke waktu playhead sekarang"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Tempel</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 1. TEXT TO SPEECH (COPY & GENERATE) */}
             {narrationMode === 'tts' && (

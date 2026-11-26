@@ -88,9 +88,10 @@ export function getVoiceoverMouthOpenAt(
   voiceovers: Voiceover[],
   globalTimeSec: number
 ): number | null {
-  if (!voiceovers || voiceovers.length === 0) return null;
+  const speechVoiceovers = voiceovers.filter((v) => !v.id.startsWith('vo-sfx-'));
+  if (speechVoiceovers.length === 0) return null;
 
-  for (const vo of voiceovers) {
+  for (const vo of speechVoiceovers) {
     const start = vo.startTime;
     const end = vo.startTime + vo.duration;
     if (globalTimeSec >= start && globalTimeSec <= end) {
