@@ -3036,6 +3036,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
 
                     <textarea
                       value={sub.text}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         const val = e.target.value;
                         setSubtitles((prev) =>
@@ -3047,39 +3048,104 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       className="w-full bg-[#101115] border border-[#2b2d3d] rounded-lg p-2 text-xs text-gray-200 outline-none focus:border-teal-500/60 resize-none"
                     />
 
-                    {/* Timing */}
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div>
-                        <span className="text-gray-400 block mb-1">Mulai (detik):</span>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          value={sub.startTime}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            setSubtitles((prev) =>
-                              prev.map((s) => (s.id === sub.id ? { ...s, startTime: val } : s))
-                            );
-                          }}
-                          className="w-full bg-[#101115] border border-[#2b2d3d] rounded px-2 py-1 text-gray-200 font-mono text-xs outline-none"
-                        />
+                    {/* Timing & Durasi */}
+                    <div
+                      className="space-y-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                        <div>
+                          <span className="text-gray-400 block mb-1">Mulai (dtk):</span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={sub.startTime}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') return;
+                              const val = Math.max(0, parseFloat(raw) || 0);
+                              const currentDur = Math.max(0.5, sub.endTime - sub.startTime);
+                              setSubtitles((prev) =>
+                                prev.map((s) =>
+                                  s.id === sub.id
+                                    ? {
+                                        ...s,
+                                        startTime: val,
+                                        endTime: parseFloat(Math.max(val + 0.5, val + currentDur).toFixed(1)),
+                                      }
+                                    : s
+                                )
+                              );
+                            }}
+                            className="w-full bg-[#101115] border border-[#2b2d3d] focus:border-teal-500 rounded px-2 py-1 text-gray-200 font-mono text-xs outline-none"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block mb-1">Selesai (dtk):</span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.5"
+                            value={sub.endTime}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') return;
+                              const val = Math.max(sub.startTime + 0.2, parseFloat(raw) || 0);
+                              setSubtitles((prev) =>
+                                prev.map((s) => (s.id === sub.id ? { ...s, endTime: val } : s))
+                              );
+                            }}
+                            className="w-full bg-[#101115] border border-[#2b2d3d] focus:border-teal-500 rounded px-2 py-1 text-gray-200 font-mono text-xs outline-none"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-teal-400 font-semibold block mb-1">Durasi (dtk):</span>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0.5"
+                            value={parseFloat(Math.max(0.2, sub.endTime - sub.startTime).toFixed(1))}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') return;
+                              const durVal = Math.max(0.2, parseFloat(raw) || 0.5);
+                              setSubtitles((prev) =>
+                                prev.map((s) =>
+                                  s.id === sub.id
+                                    ? { ...s, endTime: parseFloat((s.startTime + durVal).toFixed(1)) }
+                                    : s
+                                )
+                              );
+                            }}
+                            className="w-full bg-[#101115] border border-teal-500/40 focus:border-teal-400 rounded px-2 py-1 text-teal-300 font-mono text-xs outline-none font-bold"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-gray-400 block mb-1">Selesai (detik):</span>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          value={sub.endTime}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            setSubtitles((prev) =>
-                              prev.map((s) => (s.id === sub.id ? { ...s, endTime: val } : s))
-                            );
-                          }}
-                          className="w-full bg-[#101115] border border-[#2b2d3d] rounded px-2 py-1 text-gray-200 font-mono text-xs outline-none"
-                        />
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[10px] text-gray-400">Ubah Durasi:</span>
+                        {[-0.5, 0.5, 1, 2].map((delta) => (
+                          <button
+                            key={delta}
+                            type="button"
+                            onClick={() => {
+                              const newDur = Math.max(
+                                0.5,
+                                parseFloat((sub.endTime - sub.startTime + delta).toFixed(1))
+                              );
+                              setSubtitles((prev) =>
+                                prev.map((s) =>
+                                  s.id === sub.id
+                                    ? { ...s, endTime: parseFloat((s.startTime + newDur).toFixed(1)) }
+                                    : s
+                                )
+                              );
+                            }}
+                            className="px-1.5 py-0.5 bg-[#101115] hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded text-[10px] font-bold transition-colors"
+                          >
+                            {delta > 0 ? `+${delta}s` : `${delta}s`}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
