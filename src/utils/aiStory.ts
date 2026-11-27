@@ -135,7 +135,7 @@ Aturan ketat:
 - Setiap objek punya field:
   - "pose": salah satu dari ["wave","think","explain","point","shock","walk"]
   - "prop": salah satu dari ["thought-question","idea-bulb","comic-shock","planet-space","money-gold","ancient-book","magnifier","fire-energy","coffee-cup","microphone","earth-globe","clock-time","camera-flash","trophy-star","none"]
-  - "theme": salah satu dari ["paper-sketch","chalkboard","cozy-room","countryside","cosmic"]
+  - "theme": salah satu dari ["paper-sketch","chalkboard","cozy-room","countryside"] (hindari latar gelap/hitam)
   - "badge": teks balon kata singkat max 3 kata huruf kapital (contoh: "KOK BISA?!")
   - "subtitle": 1 kalimat narasi bahasa Indonesia yang natural dan seru (max 18 kata)
   - "imagePrompt": deskripsi ilustrasi kartun dalam bahasa Inggris (5-10 kata) untuk adegan ini
@@ -284,7 +284,14 @@ export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): P
         clip.scene3d.storyProp = sc.prop as StoryProp3D;
       }
       if (sc.theme && VALID_THEMES.includes(sc.theme as StageTheme3D)) {
-        clip.scene3d.stageTheme = sc.theme as StageTheme3D;
+        const isSpaceTopic = /(planet|angkasa|bintang|galaksi|bulan|matahari|cosmic)/i.test(topic);
+        const rawTheme = sc.theme as StageTheme3D;
+        clip.scene3d.stageTheme =
+          !isSpaceTopic && (rawTheme === 'cosmic' || rawTheme === 'dark-studio')
+            ? idx % 2 === 0
+              ? 'paper-sketch'
+              : 'cozy-room'
+            : rawTheme;
       }
       if (sc.badge && typeof sc.badge === 'string') {
         clip.scene3d.factBadgeText = sc.badge.toUpperCase().slice(0, 26);
@@ -319,16 +326,18 @@ export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): P
     const seedBase = now % 10000;
     const wikiImg = wiki?.imageUrl;
     const p1 = aiScenes?.[1]?.imagePrompt || `${displayTitle} historical illustration`;
-    const p2 = aiScenes?.[2]?.imagePrompt || `${displayTitle} scenic cartoon background`;
-    const p3 = aiScenes?.[3]?.imagePrompt || `${displayTitle} detailed artifact`;
+    const p2 = aiScenes?.[2]?.imagePrompt || `${displayTitle} scenic storytelling background`;
+    const p3 = aiScenes?.[3]?.imagePrompt || `${displayTitle} detailed cultural scene`;
+    const p4 = aiScenes?.[4]?.imagePrompt || `${displayTitle} dramatic climax illustration`;
 
     const aiImg1 = wikiImg || buildFreeAiImageUrl(p1, seedBase + 1);
     const aiImg2 = buildFreeAiImageUrl(p2, seedBase + 2);
     const aiImg3 = buildFreeAiImageUrl(p3, seedBase + 3);
+    const aiImg4 = buildFreeAiImageUrl(p4, seedBase + 4);
 
     await Promise.race([
-      Promise.all([aiImg1, aiImg2, aiImg3].map((u) => ensureStoryImageLoaded(u))),
-      new Promise((resolve) => setTimeout(resolve, 6500)),
+      Promise.all([aiImg1, aiImg2, aiImg3, aiImg4].map((u) => ensureStoryImageLoaded(u))),
+      new Promise((resolve) => setTimeout(resolve, 9000)),
     ]);
 
     if (base.clips[1]?.scene3d) {
@@ -342,6 +351,10 @@ export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): P
     if (base.clips[3]?.scene3d) {
       base.clips[3].scene3d.customPropImageUrl = aiImg3;
       base.clips[3].thumbnailUrl = create3DClipThumbnail(base.clips[3].scene3d);
+    }
+    if (base.clips[4]?.scene3d) {
+      base.clips[4].scene3d.customBackdropImageUrl = aiImg4;
+      base.clips[4].thumbnailUrl = create3DClipThumbnail(base.clips[4].scene3d);
     }
   }
 
