@@ -113,6 +113,40 @@ export async function fetchWikipediaIndonesia(topic: string): Promise<WikiFactRe
 }
 
 /**
+ * Fetches real, fast-loading topic photos from Wikimedia Commons (100% free, CORS-enabled).
+ */
+async function fetchWikimediaCommonsImages(topic: string, limit = 5): Promise<string[]> {
+  try {
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+      topic
+    )}&gsrnamespace=6&gsrlimit=${limit + 3}&prop=imageinfo&iiprop=url|mime&iiurlwidth=960&format=json&origin=*`;
+    const resp = await fetch(url);
+    if (!resp.ok) return [];
+    const data = (await resp.json()) as {
+      query?: {
+        pages?: Record<
+          string,
+          { imageinfo?: { thumburl?: string; url?: string; mime?: string }[] }
+        >;
+      };
+    };
+    const pages = Object.values(data.query?.pages || {});
+    const urls: string[] = [];
+    for (const p of pages) {
+      const info = p.imageinfo?.[0];
+      if (!info) continue;
+      if (info.mime && !/(image\/jpeg|image\/png|image\/webp)/i.test(info.mime)) continue;
+      const chosen = info.thumburl || info.url;
+      if (chosen) urls.push(chosen);
+      if (urls.length >= limit) break;
+    }
+    return urls;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Builds a free AI illustration URL via Pollinations.ai (no API key required).
  */
 export function buildFreeAiImageUrl(prompt: string, seed = 42): string {
@@ -135,7 +169,7 @@ Aturan ketat:
 - Setiap objek punya field:
   - "pose": salah satu dari ["wave","think","explain","point","shock","walk"]
   - "prop": salah satu dari ["thought-question","idea-bulb","comic-shock","planet-space","money-gold","ancient-book","magnifier","fire-energy","coffee-cup","microphone","earth-globe","clock-time","camera-flash","trophy-star","none"]
-  - "theme": salah satu dari ["paper-sketch","chalkboard","cozy-room","countryside"] (hindari latar gelap/hitam)
+  - "theme": salah satu dari ["paper-sketch","cozy-room","countryside"] (hindari latar gelap/hitam)
   - "badge": teks balon kata singkat max 3 kata huruf kapital (contoh: "KOK BISA?!")
   - "subtitle": 1 kalimat narasi bahasa Indonesia yang natural dan seru (max 18 kata)
   - "imagePrompt": deskripsi ilustrasi kartun dalam bahasa Inggris (5-10 kata) untuk adegan ini
@@ -287,7 +321,7 @@ export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): P
         const isSpaceTopic = /(planet|angkasa|bintang|galaksi|bulan|matahari|cosmic)/i.test(topic);
         const rawTheme = sc.theme as StageTheme3D;
         clip.scene3d.stageTheme =
-          !isSpaceTopic && (rawTheme === 'cosmic' || rawTheme === 'dark-studio')
+          !isSpaceTopic && (rawTheme === 'cosmic' || rawTheme === 'dark-studio' || rawTheme === 'chalkboard')
             ? idx % 2 === 0
               ? 'paper-sketch'
               : 'cozy-room'
@@ -320,24 +354,26 @@ export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): P
     if (base.subtitles[3]) base.subtitles[3].text = s3.length > 135 ? `${s3.slice(0, 132)}...` : s3;
   }
 
-  // Attach real Wikipedia photo and/or Free AI illustrations to scenes!
+  // Attach real Wikipedia/Wikimedia Commons photos and/or Free AI illustrations to scenes!
   if (opts.includeAiImages) {
-    opts.onStatus?.('Membuat ilustrasi gambar AI...');
+    opts.onStatus?.('Menyiapkan foto & ilustrasi adegan...');
     const seedBase = now % 10000;
     const wikiImg = wiki?.imageUrl;
+    const commonsImgs = await fetchWikimediaCommonsImages(displayTitle, 5);
+
     const p1 = aiScenes?.[1]?.imagePrompt || `${displayTitle} historical illustration`;
     const p2 = aiScenes?.[2]?.imagePrompt || `${displayTitle} scenic storytelling background`;
     const p3 = aiScenes?.[3]?.imagePrompt || `${displayTitle} detailed cultural scene`;
     const p4 = aiScenes?.[4]?.imagePrompt || `${displayTitle} dramatic climax illustration`;
 
-    const aiImg1 = wikiImg || buildFreeAiImageUrl(p1, seedBase + 1);
-    const aiImg2 = buildFreeAiImageUrl(p2, seedBase + 2);
-    const aiImg3 = buildFreeAiImageUrl(p3, seedBase + 3);
-    const aiImg4 = buildFreeAiImageUrl(p4, seedBase + 4);
+    const aiImg1 = wikiImg || commonsImgs[0] || buildFreeAiImageUrl(p1, seedBase + 1);
+    const aiImg2 = commonsImgs[1] || wikiImg || buildFreeAiImageUrl(p2, seedBase + 2);
+    const aiImg3 = commonsImgs[2] || buildFreeAiImageUrl(p3, seedBase + 3);
+    const aiImg4 = commonsImgs[3] || commonsImgs[0] || buildFreeAiImageUrl(p4, seedBase + 4);
 
     await Promise.race([
       Promise.all([aiImg1, aiImg2, aiImg3, aiImg4].map((u) => ensureStoryImageLoaded(u))),
-      new Promise((resolve) => setTimeout(resolve, 9000)),
+      new Promise((resolve) => setTimeout(resolve, 7500)),
     ]);
 
     if (base.clips[1]?.scene3d) {
