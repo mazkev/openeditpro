@@ -266,6 +266,14 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [storyboardIncludeAiImages, setStoryboardIncludeAiImages] = useState(true);
   const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
   const [storyboardStatus, setStoryboardStatus] = useState('');
+  const [aiSourceLabel, setAiSourceLabel] = useState('');
+  const [geminiApiKey, setGeminiApiKey] = useState(() => {
+    try {
+      return localStorage.getItem('openedit_gemini_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
   const [aiImagePrompt, setAiImagePrompt] = useState('');
   const [isGeneratingAiImage, setIsGeneratingAiImage] = useState(false);
   const [factBadge3d, setFactBadge3d] = useState('TAHUKAH KAMU?');
@@ -1140,6 +1148,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   const topicToUse = storyboardTopic.trim() || 'Candi Borobudur';
                   if (!storyboardTopic.trim()) setStoryboardTopic(topicToUse);
                   setIsGeneratingStoryboard(true);
+                  setAiSourceLabel('');
                   try {
                     const res = await generateFreeAiStoryboard({
                       topic: topicToUse,
@@ -1150,10 +1159,18 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                       includeSfx: storyboardSfx,
                       enableKaraoke: storyboardKaraoke,
                       includeAiImages: storyboardIncludeAiImages,
+                      geminiApiKey,
                       onStatus: (msg) => setStoryboardStatus(msg),
                     });
                     setClips(res.clips);
                     setSubtitles(res.subtitles);
+                    setAiSourceLabel(
+                      res.usedSource === 'gemini'
+                        ? '✨ Naskah ditulis oleh Google Gemini AI'
+                        : res.usedSource === 'pollinations-llm'
+                        ? '✨ Naskah ditulis oleh LLM AI Gratis (Pollinations)'
+                        : '📚 Naskah disusun dari Wikipedia Indonesia'
+                    );
                     if (res.sfxVoiceovers.length > 0) {
                       setVoiceovers((prev) => [
                         ...prev.filter((v) => !v.id.startsWith('vo-sfx-auto-')),
@@ -1178,9 +1195,36 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                 <span>
                   {isGeneratingStoryboard
                     ? storyboardStatus || 'Menyusun AI Storyboard...'
-                    : 'Buat 6 Adegan AI (Gratis Tanpa Key)'}
+                    : geminiApiKey.trim()
+                    ? 'Buat 6 Adegan dengan Gemini AI'
+                    : 'Buat 6 Adegan dengan AI Gratis'}
                 </span>
               </button>
+              {aiSourceLabel && (
+                <p className="text-[10px] text-emerald-300 font-semibold">{aiSourceLabel}</p>
+              )}
+              <details className="text-[10px] text-gray-400 pt-0.5">
+                <summary className="cursor-pointer hover:text-indigo-300 select-none">
+                  🔑 Opsional: Pakai Google Gemini API Key sendiri
+                </summary>
+                <div className="mt-1.5 space-y-1">
+                  <input
+                    type="password"
+                    value={geminiApiKey}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setGeminiApiKey(val);
+                      try {
+                        localStorage.setItem('openedit_gemini_api_key', val);
+                      } catch {
+                        // ignore storage quota errors
+                      }
+                    }}
+                    placeholder="Tempel Gemini API Key (AIza...) — kosongkan untuk AI gratis"
+                    className="w-full bg-[#0f1118] border border-indigo-500/30 rounded px-2 py-1 text-[10px] text-gray-200 outline-none focus:border-indigo-400"
+                  />
+                </div>
+              </details>
             </div>
 
             {/* 1-CLICK TEMPLATE PAKET 6 ADEGAN CERITA & FAKTA UNIK */}

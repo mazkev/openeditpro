@@ -5,7 +5,6 @@ import type {
   StickmanPose,
   StoryProp3D,
   Subtitle,
-  TransitionType,
   VideoClip,
   Voiceover,
 } from '../types/editor';
@@ -16,8 +15,49 @@ import { generateStoryboardFromTopic } from './storyboard';
 export interface WikiFactResult {
   title: string;
   sentences: string[];
+  extract: string;
   imageUrl?: string;
 }
+
+interface AiSceneItem {
+  pose?: string;
+  prop?: string;
+  theme?: string;
+  badge?: string;
+  subtitle?: string;
+  imagePrompt?: string;
+  dialogue?: boolean;
+  partnerPose?: string;
+  speaker?: string;
+}
+
+const VALID_POSES: StickmanPose[] = ['wave', 'explain', 'think', 'shock', 'point', 'walk', 'idle'];
+const VALID_PROPS: StoryProp3D[] = [
+  'none',
+  'thought-question',
+  'idea-bulb',
+  'octopus-hearts',
+  'planet-space',
+  'comic-shock',
+  'money-gold',
+  'ancient-book',
+  'magnifier',
+  'fire-energy',
+  'coffee-cup',
+  'microphone',
+  'earth-globe',
+  'clock-time',
+  'camera-flash',
+  'trophy-star',
+];
+const VALID_THEMES: StageTheme3D[] = [
+  'paper-sketch',
+  'chalkboard',
+  'cozy-room',
+  'countryside',
+  'cosmic',
+  'dark-studio',
+];
 
 /**
  * Fetches real Indonesian facts and photo from Wikipedia Indonesia (100% free, no API key).
@@ -51,7 +91,7 @@ export async function fetchWikipediaIndonesia(topic: string): Promise<WikiFactRe
     if (!extract) return null;
 
     const rawSentences = extract
-      .replace(/\([^)]*\)/g, '') // remove parenthetical clutter for cleaner narration
+      .replace(/\([^)]*\)/g, '')
       .replace(/\s+/g, ' ')
       .match(/[^.!?]+[.!?]+/g);
 
@@ -64,6 +104,7 @@ export async function fetchWikipediaIndonesia(topic: string): Promise<WikiFactRe
     return {
       title: sumData.title || matchedTitle,
       sentences,
+      extract,
       imageUrl,
     };
   } catch {
@@ -81,6 +122,93 @@ export function buildFreeAiImageUrl(prompt: string, seed = 42): string {
   )}?width=768&height=512&nologo=true&seed=${seed}`;
 }
 
+function buildLlmStoryboardPrompt(
+  topic: string,
+  wikiExtract: string | undefined,
+  includeDialogue: boolean
+): string {
+  return `Kamu adalah penulis naskah video animasi edukasi Indonesia gaya "Kok Bisa?" yang santai, seru, akurat, dan menarik.
+Buatkan storyboard 6 adegan untuk topik: "${topic}".
+${wikiExtract ? `Gunakan fakta referensi berikut agar akurat:\n${wikiExtract.slice(0, 900)}\n` : ''}
+Aturan ketat:
+- Balas HANYA dengan JSON array berisi tepat 6 objek tanpa markdown backticks atau teks lain.
+- Setiap objek punya field:
+  - "pose": salah satu dari ["wave","think","explain","point","shock","walk"]
+  - "prop": salah satu dari ["thought-question","idea-bulb","comic-shock","planet-space","money-gold","ancient-book","magnifier","fire-energy","coffee-cup","microphone","earth-globe","clock-time","camera-flash","trophy-star","none"]
+  - "theme": salah satu dari ["paper-sketch","chalkboard","cozy-room","countryside","cosmic"]
+  - "badge": teks balon kata singkat max 3 kata huruf kapital (contoh: "KOK BISA?!")
+  - "subtitle": 1 kalimat narasi bahasa Indonesia yang natural dan seru (max 18 kata)
+  - "imagePrompt": deskripsi ilustrasi kartun dalam bahasa Inggris (5-10 kata) untuk adegan ini
+  - "dialogue": ${includeDialogue ? 'true pada adegan 2 dan 5, false pada lainnya' : 'false'}
+  - "speaker": "main" atau "partner" atau "both"
+  - "partnerPose": salah satu dari ["think","shock","explain","wave","point"]`;
+}
+
+function parseAiScenesJson(rawText: string): AiSceneItem[] | null {
+  try {
+    const cleaned = rawText
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+    const startIdx = cleaned.indexOf('[');
+    const endIdx = cleaned.lastIndexOf(']');
+    if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return null;
+    const parsed = JSON.parse(cleaned.slice(startIdx, endIdx + 1));
+    if (!Array.isArray(parsed) || parsed.length < 3) return null;
+    return parsed.slice(0, 6) as AiSceneItem[];
+  } catch {
+    return null;
+  }
+}
+
+async function callPollinationsTextLlm(prompt: string): Promise<AiSceneItem[] | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 14000);
+  try {
+    const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=openai&json=true`;
+    const resp = await fetch(url, { signal: controller.signal });
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    return parseAiScenesJson(text);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function callGeminiLlm(prompt: string, apiKey: string): Promise<AiSceneItem[] | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 14000);
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(
+      apiKey.trim()
+    )}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          responseMimeType: 'application/json',
+        },
+      }),
+    });
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    };
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return parseAiScenesJson(text);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export interface FreeAiStoryboardOptions {
   topic: string;
   characterStyle: StickmanCharacterStyle;
@@ -90,25 +218,45 @@ export interface FreeAiStoryboardOptions {
   includeSfx: boolean;
   enableKaraoke: boolean;
   includeAiImages: boolean;
+  geminiApiKey?: string;
   onStatus?: (msg: string) => void;
 }
 
 /**
- * Generates a 6-scene storyboard powered by Wikipedia Indonesia (real facts + photo)
- * and free AI illustration images (Pollinations.ai) — 100% free with zero API key needed.
+ * Generates a 6-scene storyboard powered by real LLM AI:
+ * - Uses Google Gemini 2.0 Flash if user provides a free Gemini API key,
+ * - Otherwise uses Pollinations Text LLM (free, no API key required),
+ * - Grounded with Wikipedia Indonesia facts + Pollinations AI images!
  */
 export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): Promise<{
   clips: VideoClip[];
   subtitles: Subtitle[];
   sfxVoiceovers: Voiceover[];
-  usedWikipediaTitle?: string;
+  usedSource: 'gemini' | 'pollinations-llm' | 'wikipedia-template';
 }> {
   const topic = opts.topic.trim() || 'Candi Borobudur';
 
-  opts.onStatus?.('Mencari fakta asli di Wikipedia Indonesia...');
+  opts.onStatus?.('Mencari fakta di Wikipedia Indonesia...');
   const wiki = await fetchWikipediaIndonesia(topic);
 
-  // Start with smart structural template
+  const prompt = buildLlmStoryboardPrompt(wiki?.title || topic, wiki?.extract, opts.includeDialogue);
+
+  let aiScenes: AiSceneItem[] | null = null;
+  let usedSource: 'gemini' | 'pollinations-llm' | 'wikipedia-template' = 'wikipedia-template';
+
+  if (opts.geminiApiKey && opts.geminiApiKey.trim().length > 10) {
+    opts.onStatus?.('Menulis naskah dengan Gemini AI...');
+    aiScenes = await callGeminiLlm(prompt, opts.geminiApiKey);
+    if (aiScenes) usedSource = 'gemini';
+  }
+
+  if (!aiScenes) {
+    opts.onStatus?.('Menulis naskah dengan LLM AI Gratis...');
+    aiScenes = await callPollinationsTextLlm(prompt);
+    if (aiScenes) usedSource = 'pollinations-llm';
+  }
+
+  // Build base structure (ensuring valid clips/subtitles/SFX)
   const base = generateStoryboardFromTopic({
     topic: wiki?.title || topic,
     characterStyle: opts.characterStyle,
@@ -119,62 +267,87 @@ export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): P
     enableKaraoke: opts.enableKaraoke,
   });
 
-  if (!wiki && !opts.includeAiImages) {
-    return base;
-  }
-
   const now = Date.now();
   const displayTitle = wiki?.title || topic;
 
-  // Replace middle scenes' subtitles with real factual sentences from Wikipedia when available!
-  if (wiki && wiki.sentences.length > 0) {
+  // Apply AI-authored scenes if LLM succeeded!
+  if (aiScenes && aiScenes.length > 0) {
+    aiScenes.forEach((sc, idx) => {
+      const clip = base.clips[idx];
+      const sub = base.subtitles[idx];
+      if (!clip || !clip.scene3d || !sub) return;
+
+      if (sc.pose && VALID_POSES.includes(sc.pose as StickmanPose)) {
+        clip.scene3d.pose = sc.pose as StickmanPose;
+      }
+      if (sc.prop && VALID_PROPS.includes(sc.prop as StoryProp3D)) {
+        clip.scene3d.storyProp = sc.prop as StoryProp3D;
+      }
+      if (sc.theme && VALID_THEMES.includes(sc.theme as StageTheme3D)) {
+        clip.scene3d.stageTheme = sc.theme as StageTheme3D;
+      }
+      if (sc.badge && typeof sc.badge === 'string') {
+        clip.scene3d.factBadgeText = sc.badge.toUpperCase().slice(0, 26);
+      }
+      if (typeof sc.dialogue === 'boolean') {
+        clip.scene3d.dialogueMode = sc.dialogue;
+      }
+      if (sc.partnerPose && VALID_POSES.includes(sc.partnerPose as StickmanPose)) {
+        clip.scene3d.partnerPose = sc.partnerPose as StickmanPose;
+      }
+      if (sc.speaker === 'main' || sc.speaker === 'partner' || sc.speaker === 'both') {
+        clip.scene3d.activeSpeaker = sc.speaker;
+      }
+      if (sc.subtitle && typeof sc.subtitle === 'string') {
+        sub.text = sc.subtitle.trim();
+      }
+      clip.thumbnailUrl = create3DClipThumbnail(clip.scene3d);
+    });
+  } else if (wiki && wiki.sentences.length > 0) {
+    // Fallback to Wikipedia sentences if LLM timed out
     const s1 = wiki.sentences[0];
     const s2 = wiki.sentences[1] || `Fakta menarik lainnya, ${displayTitle} memiliki sejarah panjang di Nusantara.`;
-    const s3 = wiki.sentences[2] || `Tidak heran jika ${displayTitle} menjadi salah satu topik yang paling banyak dicari!`;
-
-    if (base.subtitles[1]) {
-      base.subtitles[1].text = s1.length > 135 ? `${s1.slice(0, 132)}...` : s1;
-    }
-    if (base.subtitles[2]) {
-      base.subtitles[2].text = s2.length > 135 ? `${s2.slice(0, 132)}...` : s2;
-    }
-    if (base.subtitles[3]) {
-      base.subtitles[3].text = s3.length > 135 ? `${s3.slice(0, 132)}...` : s3;
-    }
+    const s3 = wiki.sentences[2] || `Tidak heran jika ${displayTitle} sangat terkenal!`;
+    if (base.subtitles[1]) base.subtitles[1].text = s1.length > 135 ? `${s1.slice(0, 132)}...` : s1;
+    if (base.subtitles[2]) base.subtitles[2].text = s2.length > 135 ? `${s2.slice(0, 132)}...` : s2;
+    if (base.subtitles[3]) base.subtitles[3].text = s3.length > 135 ? `${s3.slice(0, 132)}...` : s3;
   }
 
-  // Attach real Wikipedia image and/or Free AI illustrations to scenes!
+  // Attach real Wikipedia photo and/or Free AI illustrations to scenes!
   if (opts.includeAiImages) {
-    opts.onStatus?.('Menyiapkan foto & ilustrasi AI gratis...');
+    opts.onStatus?.('Membuat ilustrasi gambar AI...');
     const seedBase = now % 10000;
     const wikiImg = wiki?.imageUrl;
-    const aiImg1 = buildFreeAiImageUrl(`${displayTitle} historical scene`, seedBase + 1);
-    const aiImg2 = buildFreeAiImageUrl(`${displayTitle} close up detail`, seedBase + 2);
+    const p1 = aiScenes?.[1]?.imagePrompt || `${displayTitle} historical illustration`;
+    const p2 = aiScenes?.[2]?.imagePrompt || `${displayTitle} scenic cartoon background`;
+    const p3 = aiScenes?.[3]?.imagePrompt || `${displayTitle} detailed artifact`;
 
-    const imgCandidates = [wikiImg || aiImg1, aiImg1, aiImg2].filter(Boolean) as string[];
-    // Preload with a safe timeout so slow image servers never block the UI
+    const aiImg1 = wikiImg || buildFreeAiImageUrl(p1, seedBase + 1);
+    const aiImg2 = buildFreeAiImageUrl(p2, seedBase + 2);
+    const aiImg3 = buildFreeAiImageUrl(p3, seedBase + 3);
+
     await Promise.race([
-      Promise.all(imgCandidates.map((u) => ensureStoryImageLoaded(u))),
-      new Promise((resolve) => setTimeout(resolve, 6000)),
+      Promise.all([aiImg1, aiImg2, aiImg3].map((u) => ensureStoryImageLoaded(u))),
+      new Promise((resolve) => setTimeout(resolve, 6500)),
     ]);
 
-    // Attach to Scene 2 (Card), Scene 3 (Full Backdrop with Ken Burns), Scene 4 (Card)
     if (base.clips[1]?.scene3d) {
-      base.clips[1].scene3d.customPropImageUrl = wikiImg || aiImg1;
+      base.clips[1].scene3d.customPropImageUrl = aiImg1;
       base.clips[1].thumbnailUrl = create3DClipThumbnail(base.clips[1].scene3d);
     }
     if (base.clips[2]?.scene3d) {
-      base.clips[2].scene3d.customBackdropImageUrl = aiImg1;
+      base.clips[2].scene3d.customBackdropImageUrl = aiImg2;
       base.clips[2].thumbnailUrl = create3DClipThumbnail(base.clips[2].scene3d);
     }
     if (base.clips[3]?.scene3d) {
-      base.clips[3].scene3d.customPropImageUrl = aiImg2;
+      base.clips[3].scene3d.customPropImageUrl = aiImg3;
       base.clips[3].thumbnailUrl = create3DClipThumbnail(base.clips[3].scene3d);
     }
   }
 
-  // Ensure SFX stay synced
-  if (opts.includeSfx && base.sfxVoiceovers.length === 0) {
+  // Re-sync SFX to final poses
+  if (opts.includeSfx) {
+    const sfxList: Voiceover[] = [];
     let cursor = 0;
     base.clips.forEach((c, idx) => {
       const dur = Math.max(0, c.trimEnd - c.trimStart);
@@ -193,7 +366,7 @@ export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): P
           : 'pop';
       const preset = CARTOON_SFX_PRESETS.find((p) => p.id === sfxId)!;
       const { url, duration } = getCartoonSfxAudio(sfxId);
-      base.sfxVoiceovers.push({
+      sfxList.push({
         id: `vo-sfx-auto-${now}-${idx}`,
         name: `SFX: ${preset.icon} ${preset.name}`,
         url,
@@ -207,14 +380,12 @@ export async function generateFreeAiStoryboard(opts: FreeAiStoryboardOptions): P
           : 0;
       cursor += Math.max(0, dur - transOverlap);
     });
+    base.sfxVoiceovers = sfxList;
   }
 
   opts.onStatus?.('');
   return {
     ...base,
-    usedWikipediaTitle: wiki?.title,
+    usedSource,
   };
 }
-
-// Re-export unused types cleanly if needed
-export type { StageTheme3D, StoryProp3D, TransitionType };
