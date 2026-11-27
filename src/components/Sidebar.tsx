@@ -61,6 +61,7 @@ import {
   previewCartoonSfx,
   type CartoonSfxId,
 } from '../utils/sfx';
+import { generateStoryboardFromTopic } from '../utils/storyboard';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
 import {
@@ -258,6 +259,10 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [dialogueMode3d, setDialogueMode3d] = useState(false);
   const [partnerPose3d, setPartnerPose3d] = useState<StickmanPose>('think');
   const [activeSpeaker3d, setActiveSpeaker3d] = useState<'main' | 'partner' | 'both'>('main');
+  const [storyboardTopic, setStoryboardTopic] = useState('');
+  const [storyboardDialogue, setStoryboardDialogue] = useState(true);
+  const [storyboardSfx, setStoryboardSfx] = useState(true);
+  const [storyboardKaraoke, setStoryboardKaraoke] = useState(true);
   const [factBadge3d, setFactBadge3d] = useState('TAHUKAH KAMU?');
   const [mode3d, setMode3d] = useState<'stickman' | 'glb'>('stickman');
   const [glbUrl3d, setGlbUrl3d] = useState('');
@@ -1050,6 +1055,101 @@ const SidebarComponent: React.FC<SidebarProps> = ({
               <p className="text-[11px] text-gray-400 mt-0.5">
                 Animasi 2D Si Stickman Blangkon khas konten fakta unik & edukasi, lengkap dengan ilustrasi objek cerita dan balon kata.
               </p>
+            </div>
+
+            {/* STORYBOARD OTOMATIS DARI 1 TOPIK */}
+            <div className="bg-gradient-to-br from-indigo-950/60 via-[#151c2c] to-emerald-950/40 p-3 rounded-xl border border-indigo-400/40 shadow-md space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-200 flex items-center space-x-1.5">
+                  <span>🪄</span>
+                  <span>Storyboard Otomatis (1 Topik)</span>
+                </span>
+                <span className="text-[10px] text-emerald-300 font-semibold">6 Adegan Instan</span>
+              </div>
+              <input
+                type="text"
+                value={storyboardTopic}
+                onChange={(e) => setStoryboardTopic(e.target.value)}
+                placeholder="Ketik topik (mis. Sejarah Candi Borobudur)..."
+                className="w-full bg-[#0f1118] border border-indigo-500/35 focus:border-indigo-400 rounded-lg px-2.5 py-1.5 text-xs text-gray-100 outline-none"
+              />
+              <div className="flex flex-wrap gap-1">
+                {[
+                  'Sejarah Candi Borobudur',
+                  'Fakta Unik Komodo',
+                  'Kenapa Langit Biru',
+                  'Rahasia Kopi Nusantara',
+                ].map((sample) => (
+                  <button
+                    key={sample}
+                    type="button"
+                    onClick={() => setStoryboardTopic(sample)}
+                    className="px-1.5 py-0.5 bg-[#10121b] hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/25 rounded text-[9.5px] transition-colors"
+                  >
+                    {sample}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-1 text-[9.5px] text-gray-300">
+                <label className="flex items-center space-x-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={storyboardDialogue}
+                    onChange={(e) => setStoryboardDialogue(e.target.checked)}
+                    className="accent-indigo-400"
+                  />
+                  <span>Dialog 2 Char</span>
+                </label>
+                <label className="flex items-center space-x-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={storyboardSfx}
+                    onChange={(e) => setStoryboardSfx(e.target.checked)}
+                    className="accent-indigo-400"
+                  />
+                  <span>SFX Kartun</span>
+                </label>
+                <label className="flex items-center space-x-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={storyboardKaraoke}
+                    onChange={(e) => setStoryboardKaraoke(e.target.checked)}
+                    className="accent-indigo-400"
+                  />
+                  <span>Karaoke</span>
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const topicToUse = storyboardTopic.trim() || 'Sejarah Candi Borobudur';
+                  if (!storyboardTopic.trim()) setStoryboardTopic(topicToUse);
+                  const res = generateStoryboardFromTopic({
+                    topic: topicToUse,
+                    characterStyle: characterStyle3d,
+                    sarungPattern: sarungPattern3d,
+                    characterColor: color3d,
+                    includeDialogue: storyboardDialogue,
+                    includeSfx: storyboardSfx,
+                    enableKaraoke: storyboardKaraoke,
+                  });
+                  setClips(res.clips);
+                  setSubtitles(res.subtitles);
+                  if (res.sfxVoiceovers.length > 0) {
+                    setVoiceovers((prev) => [
+                      ...prev.filter((v) => !v.id.startsWith('vo-sfx-auto-')),
+                      ...res.sfxVoiceovers,
+                    ]);
+                  }
+                  if (res.clips.length > 0) setSelectedClipId(res.clips[0].id);
+                  if (setCurrentTime) setCurrentTime(0);
+                  if (onPlayPreview) onPlayPreview();
+                }}
+                className="w-full py-2 px-3 bg-gradient-to-r from-indigo-500 to-emerald-500 hover:from-indigo-400 hover:to-emerald-400 text-slate-950 font-extrabold text-xs rounded-lg transition-all shadow flex items-center justify-center space-x-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Buat 6 Adegan Storyboard Otomatis</span>
+              </button>
             </div>
 
             {/* 1-CLICK TEMPLATE PAKET 6 ADEGAN CERITA & FAKTA UNIK */}
