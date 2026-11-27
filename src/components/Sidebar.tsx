@@ -61,7 +61,7 @@ import {
   previewCartoonSfx,
   type CartoonSfxId,
 } from '../utils/sfx';
-import { generateStoryboardFromTopic } from '../utils/storyboard';
+import { generateFreeAiStoryboard, buildFreeAiImageUrl } from '../utils/aiStory';
 import { formatTime } from '../utils/time';
 import { processVideoFile, processAudioFile } from '../utils/media';
 import {
@@ -263,6 +263,11 @@ const SidebarComponent: React.FC<SidebarProps> = ({
   const [storyboardDialogue, setStoryboardDialogue] = useState(true);
   const [storyboardSfx, setStoryboardSfx] = useState(true);
   const [storyboardKaraoke, setStoryboardKaraoke] = useState(true);
+  const [storyboardIncludeAiImages, setStoryboardIncludeAiImages] = useState(true);
+  const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
+  const [storyboardStatus, setStoryboardStatus] = useState('');
+  const [aiImagePrompt, setAiImagePrompt] = useState('');
+  const [isGeneratingAiImage, setIsGeneratingAiImage] = useState(false);
   const [factBadge3d, setFactBadge3d] = useState('TAHUKAH KAMU?');
   const [mode3d, setMode3d] = useState<'stickman' | 'glb'>('stickman');
   const [glbUrl3d, setGlbUrl3d] = useState('');
@@ -1090,7 +1095,16 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-3 gap-1 text-[9.5px] text-gray-300">
+              <div className="grid grid-cols-2 gap-1 text-[9.5px] text-gray-300">
+                <label className="flex items-center space-x-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={storyboardIncludeAiImages}
+                    onChange={(e) => setStoryboardIncludeAiImages(e.target.checked)}
+                    className="accent-emerald-400"
+                  />
+                  <span>Foto Wiki & Gambar AI</span>
+                </label>
                 <label className="flex items-center space-x-1 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1098,7 +1112,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     onChange={(e) => setStoryboardDialogue(e.target.checked)}
                     className="accent-indigo-400"
                   />
-                  <span>Dialog 2 Char</span>
+                  <span>Dialog 2 Karakter</span>
                 </label>
                 <label className="flex items-center space-x-1 cursor-pointer">
                   <input
@@ -1116,39 +1130,56 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     onChange={(e) => setStoryboardKaraoke(e.target.checked)}
                     className="accent-indigo-400"
                   />
-                  <span>Karaoke</span>
+                  <span>Subtitle Karaoke</span>
                 </label>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  const topicToUse = storyboardTopic.trim() || 'Sejarah Candi Borobudur';
+                disabled={isGeneratingStoryboard}
+                onClick={async () => {
+                  const topicToUse = storyboardTopic.trim() || 'Candi Borobudur';
                   if (!storyboardTopic.trim()) setStoryboardTopic(topicToUse);
-                  const res = generateStoryboardFromTopic({
-                    topic: topicToUse,
-                    characterStyle: characterStyle3d,
-                    sarungPattern: sarungPattern3d,
-                    characterColor: color3d,
-                    includeDialogue: storyboardDialogue,
-                    includeSfx: storyboardSfx,
-                    enableKaraoke: storyboardKaraoke,
-                  });
-                  setClips(res.clips);
-                  setSubtitles(res.subtitles);
-                  if (res.sfxVoiceovers.length > 0) {
-                    setVoiceovers((prev) => [
-                      ...prev.filter((v) => !v.id.startsWith('vo-sfx-auto-')),
-                      ...res.sfxVoiceovers,
-                    ]);
+                  setIsGeneratingStoryboard(true);
+                  try {
+                    const res = await generateFreeAiStoryboard({
+                      topic: topicToUse,
+                      characterStyle: characterStyle3d,
+                      sarungPattern: sarungPattern3d,
+                      characterColor: color3d,
+                      includeDialogue: storyboardDialogue,
+                      includeSfx: storyboardSfx,
+                      enableKaraoke: storyboardKaraoke,
+                      includeAiImages: storyboardIncludeAiImages,
+                      onStatus: (msg) => setStoryboardStatus(msg),
+                    });
+                    setClips(res.clips);
+                    setSubtitles(res.subtitles);
+                    if (res.sfxVoiceovers.length > 0) {
+                      setVoiceovers((prev) => [
+                        ...prev.filter((v) => !v.id.startsWith('vo-sfx-auto-')),
+                        ...res.sfxVoiceovers,
+                      ]);
+                    }
+                    if (res.clips.length > 0) setSelectedClipId(res.clips[0].id);
+                    if (setCurrentTime) setCurrentTime(0);
+                    if (onPlayPreview) onPlayPreview();
+                  } finally {
+                    setIsGeneratingStoryboard(false);
+                    setStoryboardStatus('');
                   }
-                  if (res.clips.length > 0) setSelectedClipId(res.clips[0].id);
-                  if (setCurrentTime) setCurrentTime(0);
-                  if (onPlayPreview) onPlayPreview();
                 }}
-                className="w-full py-2 px-3 bg-gradient-to-r from-indigo-500 to-emerald-500 hover:from-indigo-400 hover:to-emerald-400 text-slate-950 font-extrabold text-xs rounded-lg transition-all shadow flex items-center justify-center space-x-1.5"
+                className="w-full py-2 px-3 bg-gradient-to-r from-indigo-500 to-emerald-500 hover:from-indigo-400 hover:to-emerald-400 disabled:opacity-60 text-slate-950 font-extrabold text-xs rounded-lg transition-all shadow flex items-center justify-center space-x-1.5"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Buat 6 Adegan Storyboard Otomatis</span>
+                {isGeneratingStoryboard ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {isGeneratingStoryboard
+                    ? storyboardStatus || 'Menyusun AI Storyboard...'
+                    : 'Buat 6 Adegan AI (Gratis Tanpa Key)'}
+                </span>
               </button>
             </div>
 
@@ -1900,6 +1931,65 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     <Upload className="w-3.5 h-3.5" />
                     <span>Upload Banyak Gambar (Auto Adegan)</span>
                   </button>
+
+                  {/* GENERATOR GAMBAR AI GRATIS (TANPA API KEY) */}
+                  <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
+                    <span className="text-[10.5px] font-bold text-emerald-300 flex items-center space-x-1">
+                      <span>🎨</span>
+                      <span>Buat Gambar AI Gratis (Tanpa API Key):</span>
+                    </span>
+                    <input
+                      type="text"
+                      value={aiImagePrompt}
+                      onChange={(e) => setAiImagePrompt(e.target.value)}
+                      placeholder="Contoh: Kerajaan Majapahit kuno di Nusantara..."
+                      className="w-full bg-[#101116] border border-emerald-500/30 rounded-lg px-2 py-1.5 text-[11px] text-gray-200 outline-none focus:border-emerald-400"
+                    />
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        disabled={isGeneratingAiImage}
+                        onClick={async () => {
+                          const p = aiImagePrompt.trim() || 'Kerajaan Majapahit kuno Nusantara';
+                          setIsGeneratingAiImage(true);
+                          try {
+                            const url = buildFreeAiImageUrl(p, Math.floor(Math.random() * 10000));
+                            await Promise.race([
+                              ensureStoryImageLoaded(url),
+                              new Promise((r) => setTimeout(r, 8000)),
+                            ]);
+                            setCustomPropImageUrl3d(url);
+                          } finally {
+                            setIsGeneratingAiImage(false);
+                          }
+                        }}
+                        className="py-1.5 px-2 bg-emerald-500/20 hover:bg-emerald-500/30 disabled:opacity-50 text-emerald-200 border border-emerald-500/40 rounded-lg text-[10px] font-bold transition-colors"
+                      >
+                        {isGeneratingAiImage ? 'Membuat...' : '✨ Jadi Kartu Foto'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isGeneratingAiImage}
+                        onClick={async () => {
+                          const p = aiImagePrompt.trim() || 'Kerajaan Majapahit kuno Nusantara';
+                          setIsGeneratingAiImage(true);
+                          try {
+                            const url = buildFreeAiImageUrl(p, Math.floor(Math.random() * 10000));
+                            await Promise.race([
+                              ensureStoryImageLoaded(url),
+                              new Promise((r) => setTimeout(r, 8000)),
+                            ]);
+                            setCustomBackdropImageUrl3d(url);
+                          } finally {
+                            setIsGeneratingAiImage(false);
+                          }
+                        }}
+                        className="py-1.5 px-2 bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-50 text-cyan-200 border border-cyan-500/40 rounded-lg text-[10px] font-bold transition-colors"
+                      >
+                        {isGeneratingAiImage ? 'Membuat...' : '✨ Jadi Latar Penuh'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* WARNA STICKMAN */}
